@@ -246,10 +246,32 @@ export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[])
       </html>
     `;
 
+    const plainTextContent = `
+=========================================
+📄 COMPROBANTE DE COMPRA - FACTURA #${sale.id}
+=========================================
+¡Gracias por tu compra!
+
+Facturado a: ${sale.customer_name || 'Cliente General'}
+Fecha: ${invoiceDate}
+Tipo de Compra: ${sale.type.toUpperCase()}
+Metodo de Pago: ${sale.payment_method.toUpperCase()}
+
+Detalle de Productos:
+${items.map(item => `- ${item.name} x${item.quantity} ($${Number(item.price).toFixed(2)}) = $${(Number(item.price) * item.quantity).toFixed(2)}`).join('\n')}
+
+-----------------------------------------
+TOTAL NETO: $${Number(sale.total).toFixed(2)}
+=========================================
+Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
+© ${new Date().getFullYear()} POS Online. Todos los derechos reservados.
+    `;
+
     const info = await client.sendMail({
       from: fromAddress,
       to: toEmail,
       subject: `Factura de compra #${sale.id} - POS Online`,
+      text: plainTextContent,
       html: htmlContent
     });
 

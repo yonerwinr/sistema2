@@ -594,8 +594,12 @@ function bindCheckoutEvents() {
       // Cargar productos de nuevo para actualizar stock en UI
       await loadProducts();
 
-      // Abrir modal de éxito de factura
-      showInvoiceSuccess(result, phone, email);
+      // Abrir modal de éxito de factura (pasando lista de items)
+      const itemsFormatted = items.map(item => {
+        const prod = productsList.find(p => p.id === item.productId);
+        return { name: prod ? prod.name : 'Producto', quantity: item.quantity, price: prod ? prod.price : 0 };
+      });
+      showInvoiceSuccess(result, phone, email, itemsFormatted);
 
     } catch (error: any) {
       alert(error.message || 'Error al completar la compra');
@@ -625,16 +629,37 @@ function renderInvoiceSuccessModal(): string {
           <div style="font-size: 12px; color:var(--text-muted);" id="success-id">ID: #000</div>
         </div>
 
+        <!-- Factura PNG Vista Previa e Interacciones -->
+        <div style="margin: 16px 0; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <div style="font-size:11px; color:var(--text-secondary); text-transform:uppercase; font-weight:600; letter-spacing:0.5px;">Comprobante Digital (PNG)</div>
+          <div id="success-png-container" style="width: 100%; max-height: 220px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: var(--radius-md); background: #0f172a; padding: 8px; display:flex; align-items:center; justify-content:center;">
+            <p style="color: var(--text-muted); font-size: 11px; padding: 20px;">Generando imagen PNG de la factura...</p>
+          </div>
+          <div class="flex gap-2 w-100" style="margin-top: 4px;">
+            <button type="button" class="btn btn-secondary w-100" id="success-copy-png-btn" style="font-size: 12px; font-weight:600; padding: 8px; display:flex; align-items:center; justify-content:center; gap:6px;">
+              📋 Copiar PNG
+            </button>
+            <a href="#" class="btn btn-secondary w-100" id="success-download-png-btn" style="font-size: 12px; font-weight:600; padding: 8px; display:flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; color:inherit;">
+              📥 Descargar
+            </a>
+          </div>
+        </div>
+
         <div class="invoice-preview-links">
           <!-- WhatsApp Link -->
           <a href="#" target="_blank" class="wa-link" id="success-wa-btn">
-            ${icons.whatsapp} Enviar Factura a WhatsApp (Gratis)
+            ${icons.whatsapp} Enviar a WhatsApp (Pega la Imagen)
           </a>
 
           <!-- Mailto Email Link -->
           <a href="#" class="btn btn-secondary w-100" id="success-mailto-btn" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; background: rgba(99, 102, 241, 0.1); border-color: var(--primary);">
             ✉️ Enviar Factura a mi Correo (Gratis)
           </a>
+
+          <!-- Copiar al Portapapeles (Texto Fallback) -->
+          <button class="btn btn-secondary w-100" id="success-copy-btn" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; margin-top: 8px;">
+            📄 Copiar Factura en Texto
+          </button>
 
           <!-- Email Preview Link -->
           <div id="success-email-box" style="display:none;">
@@ -655,7 +680,183 @@ function renderInvoiceSuccessModal(): string {
   `;
 }
 
-function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?: string) {
+function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return reject('No se pudo inicializar canvas');
+
+    const width = 450;
+    const rowHeight = 30;
+    const headerHeight = 130;
+    const clientHeight = 110;
+    const footerHeight = 100;
+    const itemsHeight = items.length * rowHeight;
+    const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    // Pintar fondo oscuro elegante
+    ctx.fillStyle = '#0f172a'; // slate-900
+    ctx.fillRect(0, 0, width, height);
+
+    // Borde brillante de estilo glassmorphism
+    ctx.strokeStyle = '#6366f1'; // indigo
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, width - 4, height - 4);
+
+    // Dibujar Header
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px Outfit, Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.fillText('COMPROBANTE DE COMPRA', width / 2, 45);
+
+    ctx.fillStyle = '#6366f1';
+    ctx.font = '14px Outfit, Segoe UI';
+    ctx.fillText('POS & E-COMMERCE HIBRIDO', width / 2, 70);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '13px Outfit, Segoe UI';
+    ctx.fillText(`Factura: #${sale.id}`, width / 2, 95);
+    ctx.fillText(`Fecha: ${new Date(sale.created_at || new Date()).toLocaleString('es-ES')}`, width / 2, 115);
+
+    // Dibujar Línea divisoria
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(30, 135);
+    ctx.lineTo(width - 30, 135);
+    ctx.stroke();
+
+    // Dibujar Datos del Cliente
+    let yOffset = 160;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '10px Outfit, Segoe UI';
+    ctx.fillText('FACTURADO A:', 30, yOffset);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px Outfit, Segoe UI';
+    ctx.fillText(sale.customer_name || 'Cliente General', 30, yOffset + 20);
+
+    ctx.font = '12px Outfit, Segoe UI';
+    ctx.fillStyle = '#e2e8f0';
+    let nextY = yOffset + 40;
+    if (sale.customer_phone) {
+      ctx.fillText(`Tel: ${sale.customer_phone}`, 30, nextY);
+      nextY += 20;
+    }
+    if (sale.customer_email) {
+      ctx.fillText(`Email: ${sale.customer_email}`, 30, nextY);
+      nextY += 20;
+    }
+
+    // Datos del pago (derecha)
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '10px Outfit, Segoe UI';
+    ctx.fillText('DETALLES DE PAGO:', width - 30, yOffset);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '12px Outfit, Segoe UI';
+    ctx.fillText(`Metodo: ${sale.payment_method.toUpperCase()}`, width - 30, yOffset + 20);
+    ctx.fillText(`Tipo: ${sale.type.toUpperCase()}`, width - 30, yOffset + 40);
+
+    // Divisor
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath();
+    ctx.moveTo(30, nextY + 10);
+    ctx.lineTo(width - 30, nextY + 10);
+    ctx.stroke();
+
+    // Tabla de ítems
+    let y = nextY + 35;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'bold 11px Outfit, Segoe UI';
+    ctx.fillText('PRODUCTO', 30, y);
+    ctx.textAlign = 'center';
+    ctx.fillText('CANT', 250, y);
+    ctx.textAlign = 'right';
+    ctx.fillText('TOTAL', width - 30, y);
+
+    y += 15;
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(30, y);
+    ctx.lineTo(width - 30, y);
+    ctx.stroke();
+
+    y += 20;
+    ctx.font = '12px Outfit, Segoe UI';
+    items.forEach(item => {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      
+      // Cortar nombre si es muy largo
+      let name = item.name;
+      if (name.length > 25) name = name.substring(0, 22) + '...';
+      ctx.fillText(name, 30, y);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(item.quantity.toString(), 250, y);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`$${(Number(item.price) * item.quantity).toFixed(2)}`, width - 30, y);
+
+      y += rowHeight;
+    });
+
+    // Divisor de Totales
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath();
+    ctx.moveTo(30, y);
+    ctx.lineTo(width - 30, y);
+    ctx.stroke();
+
+    y += 30;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'bold 13px Outfit, Segoe UI';
+    ctx.fillText('TOTAL NETO', 30, y);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#6366f1';
+    ctx.font = 'bold 22px Outfit, Segoe UI';
+    ctx.fillText(`$${Number(sale.total).toFixed(2)}`, width - 30, y);
+
+    // Divisor
+    y += 25;
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath();
+    ctx.moveTo(30, y);
+    ctx.lineTo(width - 30, y);
+    ctx.stroke();
+
+    // Footer
+    y += 35;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 13px Outfit, Segoe UI';
+    ctx.fillText('¡Gracias por tu compra!', width / 2, y);
+
+    y += 20;
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px Outfit, Segoe UI';
+    ctx.fillText('Documento digital no tributario.', width / 2, y);
+
+    // Convertir canvas a Blob y retornar
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject('Error al exportar blob');
+    }, 'image/png');
+  });
+}
+
+async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?: string, purchaseItems?: { name: string, quantity: number, price: number }[]) {
   const modal = document.getElementById('success-modal');
   modal?.classList.add('open');
 
@@ -669,9 +870,10 @@ function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?: stri
   if (totalEl) totalEl.innerText = `$${Number(result.total).toFixed(2)}`;
   if (idEl) idEl.innerText = `ID de Venta: #${result.saleId}`;
 
-  // WhatsApp Link
+  // WhatsApp Link - Mensaje explicando que pegue la imagen
   const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
-  waBtn.href = `https://wa.me/${formattedPhone}?text=${result.whatsappText}`;
+  const waMessage = `Hola, te adjunto el comprobante digital de compra de tu Factura #${result.saleId} por un valor de $${Number(result.total).toFixed(2)}. (Por favor, pega el archivo de imagen que tienes copiado en el portapapeles).`;
+  waBtn.href = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMessage)}`;
 
   // Mailto Email Link
   const decodedText = decodeURIComponent(result.whatsappText);
@@ -686,12 +888,102 @@ function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?: stri
   } else {
     if (emailBox) emailBox.style.display = 'none';
   }
+
+  // Generar y configurar la imagen de la factura
+  const pngContainer = document.getElementById('success-png-container');
+  const copyPngBtn = document.getElementById('success-copy-png-btn');
+  const downloadPngBtn = document.getElementById('success-download-png-btn') as HTMLAnchorElement;
+
+  if (pngContainer && purchaseItems) {
+    pngContainer.innerHTML = `<p style="color:var(--text-muted); font-size: 11px; padding: 20px;">Generando imagen PNG...</p>`;
+    try {
+      // Inferencia de datos de pago
+      let payMethod = 'tarjeta';
+      if (decodedText.toLowerCase().includes('efectivo') || decodedText.toLowerCase().includes('cash')) payMethod = 'efectivo';
+      else if (decodedText.toLowerCase().includes('transfer')) payMethod = 'transferencia';
+
+      let saleType = 'online';
+      if (decodedText.toLowerCase().includes('pos')) saleType = 'pos';
+
+      const saleMock = {
+        id: result.saleId,
+        customer_name: result.customerName || 'Cliente General',
+        customer_phone: clientPhone,
+        customer_email: clientEmail,
+        total: result.total,
+        payment_method: payMethod,
+        type: saleType,
+        created_at: new Date()
+      };
+
+      const blob = await generateReceiptPNG(saleMock, purchaseItems);
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Renderizar imagen
+      pngContainer.innerHTML = `<img src="${blobUrl}" style="max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 6px; box-shadow: var(--shadow-lg);" alt="Factura PNG">`;
+
+      // Configurar Descarga
+      if (downloadPngBtn) {
+        downloadPngBtn.href = blobUrl;
+        downloadPngBtn.download = `factura-${result.saleId}.png`;
+      }
+
+      // Copiar automaticamente al portapapeles
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        console.log('Factura PNG copiada al portapapeles.');
+      } catch (err) {
+        console.warn('Copia automatica bloqueada por el navegador. Presiona el boton.');
+      }
+
+      // Configurar boton de copiar
+      if (copyPngBtn) {
+        const newCopyBtn = copyPngBtn.cloneNode(true) as HTMLButtonElement;
+        copyPngBtn.parentNode?.replaceChild(newCopyBtn, copyPngBtn);
+        newCopyBtn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob })
+            ]);
+            alert('¡Factura PNG copiada al portapapeles! Abre el chat de WhatsApp y presiona Ctrl + V para enviarla.');
+          } catch (err) {
+            console.error(err);
+            alert('Error al copiar la imagen automaticamente. Por favor descarga la factura.');
+          }
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      pngContainer.innerHTML = `<p style="color:var(--danger); font-size:11px; padding:20px;">Error al generar PNG.</p>`;
+    }
+  }
 }
 
 function bindSuccessEvents() {
   document.getElementById('success-close-btn')?.addEventListener('click', () => {
     document.getElementById('success-modal')?.classList.remove('open');
     navigate('store');
+  });
+
+  // Copiar al Portapapeles
+  document.getElementById('success-copy-btn')?.addEventListener('click', () => {
+    const waBtn = document.getElementById('success-wa-btn') as HTMLAnchorElement;
+    if (waBtn) {
+      const urlParams = new URLSearchParams(waBtn.href.split('?')[1]);
+      const text = urlParams.get('text');
+      if (text) {
+        navigator.clipboard.writeText(decodeURIComponent(text))
+          .then(() => {
+            alert('¡Factura copiada al portapapeles! Puedes pegarla directamente en tu correo, Word o chat.');
+          })
+          .catch(err => {
+            console.error('Error al copiar:', err);
+            alert('No se pudo copiar automaticamente. Por favor, selecciona y copia el texto manualmente.');
+          });
+      }
+    }
   });
 }
 
@@ -1284,7 +1576,11 @@ function bindPOSEvents() {
       await loadProducts(); // recargar
       
       // Mostrar modal de éxito
-      showInvoiceSuccess(result, phone, email);
+      const itemsFormatted = items.map(item => {
+        const prod = productsList.find(p => p.id === item.productId);
+        return { name: prod ? prod.name : 'Producto', quantity: item.quantity, price: prod ? prod.price : 0 };
+      });
+      showInvoiceSuccess(result, phone, email, itemsFormatted);
 
       // Renderizar POS de nuevo
       await renderAdminPOS();
