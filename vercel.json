@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "http://localhost:5000/api/:path*"
+      "destination": "https://sistema2-backend-1rlw.onrender.com/api/:path*"
     }
   ]
 }
