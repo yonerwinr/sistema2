@@ -97,14 +97,11 @@ router.post('/checkout', async (req: AuthRequest, res) => {
     // Generar texto para WhatsApp
     const waText = generateWhatsAppText(saleInfo, saleItemsToInsert);
 
-    // Intentar enviar correo de factura
-    let emailPreviewUrl = '';
+    // Intentar enviar correo de factura en segundo plano para no bloquear el checkout
     if (customerEmail) {
-      try {
-        emailPreviewUrl = await sendInvoiceEmail(customerEmail, saleInfo, saleItemsToInsert);
-      } catch (err) {
+      sendInvoiceEmail(customerEmail, saleInfo, saleItemsToInsert).catch(err => {
         console.error('Error enviando correo en checkout:', err);
-      }
+      });
     }
 
     res.status(201).json({
@@ -112,7 +109,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       saleId,
       total,
       whatsappText: encodeURIComponent(waText),
-      emailPreviewUrl
+      emailPreviewUrl: ''
     });
   } catch (error: any) {
     await conn.rollback();
@@ -210,14 +207,11 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
     // Generar texto para WhatsApp
     const waText = generateWhatsAppText(saleInfo, saleItemsToInsert);
 
-    // Intentar enviar correo de factura
-    let emailPreviewUrl = '';
+    // Intentar enviar correo de factura en segundo plano para no bloquear la venta POS
     if (customerEmail) {
-      try {
-        emailPreviewUrl = await sendInvoiceEmail(customerEmail, saleInfo, saleItemsToInsert);
-      } catch (err) {
+      sendInvoiceEmail(customerEmail, saleInfo, saleItemsToInsert).catch(err => {
         console.error('Error enviando correo en POS:', err);
-      }
+      });
     }
 
     res.status(201).json({
@@ -225,7 +219,7 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
       saleId,
       total,
       whatsappText: encodeURIComponent(waText),
-      emailPreviewUrl
+      emailPreviewUrl: ''
     });
   } catch (error: any) {
     await conn.rollback();
