@@ -107,6 +107,15 @@ async function runMigrations() {
       ('eur_to_ves_rate', '43.50')
     `);
         console.log('Configuraciones iniciales de tasas y recordatorios verificadas.');
+        // Insertar vendedor de prueba si no existe
+        const [existingSeller] = await conn.query("SELECT id FROM users WHERE email = 'vendedor@sistema.com' LIMIT 1");
+        if (existingSeller.length === 0) {
+            await conn.query(`
+        INSERT INTO users (name, email, password, role, phone) 
+        VALUES ('Vendedor', 'vendedor@sistema.com', '$2a$10$vOcp1PI6sKSr3gRv6TMwSOW.SnrMNn.OGN70l8ZTitvT6FkL3TYi.', 'seller', '+584120000000')
+      `);
+            console.log('Usuario vendedor registrado con éxito (contraseña: vendedor123).');
+        }
         console.log('Migraciones completadas exitosamente.');
     }
     catch (error) {

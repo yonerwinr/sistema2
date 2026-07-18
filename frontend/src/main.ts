@@ -203,9 +203,9 @@ function renderNavbar(): string {
           <a class="nav-link ${currentView === 'store' ? 'active' : ''}" id="link-store">Tienda</a>
           
           ${currentUser ? `
-            ${currentUser.role === 'admin' ? `
+            ${(currentUser.role === 'admin' || currentUser.role === 'seller') ? `
               <a class="nav-link ${currentView === 'admin' ? 'active' : ''}" id="link-admin">
-                <span style="display:inline-flex; align-items:center; gap:4px;">${icons.dashboard} Panel Admin</span>
+                <span style="display:inline-flex; align-items:center; gap:4px;">${icons.dashboard} ${currentUser.role === 'admin' ? 'Panel Admin' : 'Caja POS'}</span>
               </a>
             ` : ''}
             <span class="nav-link" style="color: var(--primary); font-weight: 600; cursor: default;">
@@ -870,6 +870,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     ctx.font = '12px Outfit, Segoe UI';
     ctx.fillText(`Metodo: ${sale.payment_method.toUpperCase()}`, width - 30, yOffset + 20);
     ctx.fillText(`Tipo: ${sale.is_quotation === 1 ? 'COTIZACIÓN' : sale.type.toUpperCase()}`, width - 30, yOffset + 40);
+    ctx.fillText(`Cajero: ${sale.registered_by || 'Online'}`, width - 30, yOffset + 60);
 
     // Divisor
     ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -1377,14 +1378,19 @@ function bindAuthEvents() {
 // VISTA: PANEL DE ADMINISTRACION (DASHBOARD)
 // ==========================================================================
 function renderAdminView(): string {
-  if (!currentUser || currentUser.role !== 'admin') {
+  if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller')) {
     return `
       <div class="container text-center" style="padding: 100px 0;">
         <h2 style="color:var(--danger)">Acceso Restringido</h2>
-        <p class="mb-4">Debes ser administrador para ingresar a esta seccion.</p>
+        <p class="mb-4">Debes ser administrador o vendedor para ingresar a esta seccion.</p>
         <button class="btn btn-primary" onclick="navigate('store')">Volver a la Tienda</button>
       </div>
     `;
+  }
+
+  // Si es un vendedor, forzar vista POS
+  if (currentUser.role === 'seller') {
+    activeAdminView = 'pos';
   }
 
   return `
@@ -1392,53 +1398,59 @@ function renderAdminView(): string {
       <!-- Sidebar de Administracion -->
       <aside class="dashboard-sidebar" style="display:flex; flex-direction:column; justify-content:space-between; min-height: 500px;">
         <div>
-          <button class="sidebar-nav-btn ${activeAdminView === 'stats' ? 'active' : ''}" id="admin-tab-stats">
-            ${icons.dashboard} Estadisticas
-          </button>
+          ${currentUser.role === 'admin' ? `
+            <button class="sidebar-nav-btn ${activeAdminView === 'stats' ? 'active' : ''}" id="admin-tab-stats">
+              ${icons.dashboard} Estadisticas
+            </button>
+          ` : ''}
           <button class="sidebar-nav-btn ${activeAdminView === 'pos' ? 'active' : ''}" id="admin-tab-pos">
             ${icons.pos} Punto de Venta (POS)
           </button>
-          <button class="sidebar-nav-btn ${activeAdminView === 'products' ? 'active' : ''}" id="admin-tab-products">
-            ${icons.products} Catalogo Productos
-          </button>
-          <button class="sidebar-nav-btn ${activeAdminView === 'sales' ? 'active' : ''}" id="admin-tab-sales">
-            ${icons.sales} Historico Ventas
-          </button>
-          <button class="sidebar-nav-btn ${activeAdminView === 'debtors' ? 'active' : ''}" id="admin-tab-debtors">
-            💸 Deudores
-          </button>
-          <button class="sidebar-nav-btn ${activeAdminView === 'quotations' ? 'active' : ''}" id="admin-tab-quotations">
-            📝 Cotizaciones
-          </button>
-          <button class="sidebar-nav-btn ${activeAdminView === 'coupons' ? 'active' : ''}" id="admin-tab-coupons">
-            🎟️ Cupones
-          </button>
+          ${currentUser.role === 'admin' ? `
+            <button class="sidebar-nav-btn ${activeAdminView === 'products' ? 'active' : ''}" id="admin-tab-products">
+              ${icons.products} Catalogo Productos
+            </button>
+            <button class="sidebar-nav-btn ${activeAdminView === 'sales' ? 'active' : ''}" id="admin-tab-sales">
+              ${icons.sales} Historico Ventas
+            </button>
+            <button class="sidebar-nav-btn ${activeAdminView === 'debtors' ? 'active' : ''}" id="admin-tab-debtors">
+              💸 Deudores
+            </button>
+            <button class="sidebar-nav-btn ${activeAdminView === 'quotations' ? 'active' : ''}" id="admin-tab-quotations">
+              📝 Cotizaciones
+            </button>
+            <button class="sidebar-nav-btn ${activeAdminView === 'coupons' ? 'active' : ''}" id="admin-tab-coupons">
+              🎟️ Cupones
+            </button>
+          ` : ''}
         </div>
 
-        <!-- Tasas de Cambio Widget -->
-        <div class="card" style="margin-top: 20px; padding: 12px; font-size:11px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
-          <div style="font-weight:700; margin-bottom: 8px; display:flex; align-items:center; gap:4px; color:var(--primary);">
-            💵 Tasas del Día (BCV)
+        ${currentUser.role === 'admin' ? `
+          <!-- Tasas de Cambio Widget -->
+          <div class="card" style="margin-top: 20px; padding: 12px; font-size:11px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
+            <div style="font-weight:700; margin-bottom: 8px; display:flex; align-items:center; gap:4px; color:var(--primary);">
+              💵 Tasas del Día (BCV)
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                <span>$ a Bs:</span>
+                <input type="number" step="0.01" id="rate-usd-input" value="${rateUsdToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                <span>€ a Bs:</span>
+                <input type="number" step="0.01" id="rate-eur-input" value="${rateEurToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
+              </div>
+              <div style="display:flex; gap:4px;">
+                <button type="button" class="btn btn-secondary" id="sync-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:45%; background:rgba(255,255,255,0.05); color:white; border-color:var(--border-glass);" title="Sincronizar automáticamente con el BCV">
+                  🔄 BCV
+                </button>
+                <button type="button" class="btn btn-primary" id="save-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:55%;">
+                  Guardar
+                </button>
+              </div>
+            </div>
           </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-              <span>$ a Bs:</span>
-              <input type="number" step="0.01" id="rate-usd-input" value="${rateUsdToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-              <span>€ a Bs:</span>
-              <input type="number" step="0.01" id="rate-eur-input" value="${rateEurToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
-            </div>
-            <div style="display:flex; gap:4px;">
-              <button type="button" class="btn btn-secondary" id="sync-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:45%; background:rgba(255,255,255,0.05); color:white; border-color:var(--border-glass);" title="Sincronizar automáticamente con el BCV">
-                🔄 BCV
-              </button>
-              <button type="button" class="btn btn-primary" id="save-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:55%;">
-                Guardar
-              </button>
-            </div>
-          </div>
-        </div>
+        ` : ''}
       </aside>
 
       <!-- Panel de Contenido -->
@@ -2437,6 +2449,7 @@ async function renderAdminSales() {
                   <th>Cliente</th>
                   <th>Fecha</th>
                   <th>Tipo</th>
+                  <th>Cajero / Vendedor</th>
                   <th>Metodo Pago</th>
                   <th>Total</th>
                   <th class="text-right">Acciones</th>
@@ -2452,6 +2465,11 @@ async function renderAdminSales() {
                     </td>
                     <td>${new Date(sale.created_at).toLocaleString('es-ES')}</td>
                     <td><span class="badge-status" style="background:rgba(255,255,255,0.05); color:white;">${sale.type.toUpperCase()}</span></td>
+                    <td>
+                      <span style="font-weight: 600; color: var(--text-secondary); font-size:12px;">
+                        👤 ${sale.registered_by || 'Online (Tienda)'}
+                      </span>
+                    </td>
                     <td><span style="text-transform:uppercase; font-size:12px; font-weight:600;">${sale.payment_method}</span></td>
                     <td><strong style="color:var(--primary); font-size:15px;">$${Number(sale.total).toFixed(2)}</strong></td>
                     <td class="text-right">
@@ -2461,7 +2479,7 @@ async function renderAdminSales() {
                     </td>
                   </tr>
                 `).join('')}
-                ${sales.length === 0 ? '<tr><td colspan="7" class="text-center">No se han registrado ventas aun.</td></tr>' : ''}
+                ${sales.length === 0 ? '<tr><td colspan="8" class="text-center">No se han registrado ventas aun.</td></tr>' : ''}
               </tbody>
             </table>
           </div>
@@ -2513,6 +2531,7 @@ function renderSaleDetailModal(): string {
               <div style="color:var(--text-muted); font-size:11px; text-transform:uppercase;">Detalles de Transaccion:</div>
               <div>Tipo: <strong id="detail-type">--</strong></div>
               <div>Metodo Pago: <strong id="detail-payment" style="text-transform:uppercase;">--</strong></div>
+              <div>Cajero/Vendedor: <strong id="detail-registered-by">--</strong></div>
             </div>
           </div>
         </div>
@@ -2568,6 +2587,7 @@ function showSaleDetails(details: SaleDetail) {
   const clientEmail = document.getElementById('detail-client-email');
   const typeEl = document.getElementById('detail-type');
   const paymentEl = document.getElementById('detail-payment');
+  const registeredByEl = document.getElementById('detail-registered-by');
   const totalVal = document.getElementById('detail-total-value');
   const tableBody = document.getElementById('detail-items-rows');
   const waBtn = document.getElementById('detail-wa-btn') as HTMLAnchorElement;
@@ -2579,6 +2599,7 @@ function showSaleDetails(details: SaleDetail) {
   if (clientEmail) clientEmail.innerText = sale.customer_email ? `Email: ${sale.customer_email}` : '';
   if (typeEl) typeEl.innerText = sale.type.toUpperCase();
   if (paymentEl) paymentEl.innerText = sale.payment_method;
+  if (registeredByEl) registeredByEl.innerText = sale.registered_by || 'Online (Tienda)';
   if (totalVal) {
     const totalUsd = Number(sale.total);
     const totalVes = totalUsd * rateUsdToVes;

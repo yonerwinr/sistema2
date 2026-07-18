@@ -57,9 +57,10 @@ async function getTransporter() {
 async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
     try {
         const client = await getTransporter();
-        // Obtener tasas de cambio oficiales
+        // Obtener tasas de cambio oficiales y nombre del vendedor
         let rateUsdToVes = 40.00;
         let rateEurToVes = 43.50;
+        let registeredBy = 'Online (Tienda)';
         try {
             const [settingsRows] = await db_1.default.query("SELECT * FROM settings WHERE settings_key IN ('usd_to_ves_rate', 'eur_to_ves_rate')");
             const usdSetting = settingsRows.find((s) => s.settings_key === 'usd_to_ves_rate');
@@ -68,9 +69,15 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
                 rateUsdToVes = parseFloat(usdSetting.settings_value);
             if (eurSetting)
                 rateEurToVes = parseFloat(eurSetting.settings_value);
+            if (sale.user_id) {
+                const [userRows] = await db_1.default.query('SELECT name FROM users WHERE id = ?', [sale.user_id]);
+                if (userRows.length > 0) {
+                    registeredBy = userRows[0].name;
+                }
+            }
         }
         catch (dbErr) {
-            console.error('Error al consultar tasas para email:', dbErr);
+            console.error('Error al consultar tasas/usuario para email:', dbErr);
         }
         const subtotal = items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
         const itemsHtml = items.map(item => `
@@ -278,6 +285,7 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
                 <div>Fecha: <strong>${invoiceDate}</strong></div>
                 <div>Tipo: <strong>${sale.is_quotation === 1 ? 'COTIZACIÓN' : sale.type.toUpperCase()}</strong></div>
                 <div>Método Pago: <strong style="text-transform: uppercase;">${sale.payment_method}</strong></div>
+                <div>Cajero/Vendedor: <strong>${registeredBy}</strong></div>
                 ${sale.status === 'pending' ? `<div>Estado Pago: <strong style="color:#ef4444;">PENDIENTE (Deuda)</strong></div>` : ''}
               </div>
             </div>

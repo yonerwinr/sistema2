@@ -35,7 +35,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'customer';
+  role: 'admin' | 'customer' | 'seller';
   phone?: string;
 }
 

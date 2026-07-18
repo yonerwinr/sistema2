@@ -278,13 +278,16 @@ router.get('/history', auth_1.authenticate, async (req, res) => {
 router.get('/:id', auth_1.authenticate, async (req, res) => {
     const { id } = req.params;
     try {
-        const [sales] = await db_1.default.query('SELECT * FROM sales WHERE id = ?', [id]);
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by 
+       FROM sales s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       WHERE s.id = ?`, [id]);
         if (sales.length === 0) {
             return res.status(404).json({ message: 'Venta no encontrada' });
         }
         const sale = sales[0];
-        // Verificar seguridad: solo el propio cliente o un admin puede ver el detalle
-        if (req.user?.role !== 'admin' && sale.user_id !== req.user?.id) {
+        // Verificar seguridad: solo el propio cliente, vendedor o admin puede ver el detalle
+        if (req.user?.role !== 'admin' && req.user?.role !== 'seller' && sale.user_id !== req.user?.id) {
             return res.status(403).json({ message: 'No autorizado' });
         }
         const [items] = await db_1.default.query(`SELECT si.*, p.name FROM sale_items si 
@@ -555,8 +558,8 @@ router.post('/:id/resend-email', auth_1.authenticate, async (req, res) => {
             return res.status(404).json({ message: 'Venta no encontrada' });
         }
         const sale = sales[0];
-        // Verificar seguridad: solo el propio cliente o un admin puede ver/reenviar la factura
-        if (req.user?.role !== 'admin' && sale.user_id !== req.user?.id) {
+        // Verificar seguridad: solo el propio cliente, vendedor o admin puede ver/reenviar la factura
+        if (req.user?.role !== 'admin' && req.user?.role !== 'seller' && sale.user_id !== req.user?.id) {
             return res.status(403).json({ message: 'No autorizado' });
         }
         const [items] = await db_1.default.query(`SELECT si.*, p.name FROM sale_items si 

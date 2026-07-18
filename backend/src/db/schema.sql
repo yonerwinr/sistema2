@@ -57,6 +57,12 @@ INSERT INTO users (name, email, password, role, phone)
 VALUES ('Administrador', 'admin@sistema.com', '$2a$10$l8fs7iw/e3Xm.mIJvFAHsuhA.jfva6FvaNpvSoqOSVxqnRkJo0Ie2', 'admin', '+5491122334455')
 ON DUPLICATE KEY UPDATE id=id;
 
+-- Insertar Usuario Vendedor por Defecto
+-- Contraseña es 'vendedor123' (encriptado con bcrypt rounds=10)
+INSERT INTO users (name, email, password, role, phone) 
+VALUES ('Vendedor', 'vendedor@sistema.com', '$2a$10$vOcp1PI6sKSr3gRv6TMwSOW.SnrMNn.OGN70l8ZTitvT6FkL3TYi.', 'seller', '+584120000000')
+ON DUPLICATE KEY UPDATE id=id;
+
 -- Insertar Productos de Prueba Iniciales
 INSERT INTO products (name, description, price, stock, image_url, category)
 VALUES 
