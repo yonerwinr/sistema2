@@ -861,19 +861,17 @@ async function shareInvoiceAsImage(sale: any, items: any[], clientPhone: string)
     const blob = await generateReceiptPNG(sale, items);
     const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
     
-    // Fallback para escritorio y móvil: copiar imagen al portapapeles y redirigir
+    // Copiar imagen al portapapeles de forma silenciosa (sin interrumpir con alerts)
     try {
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': blob })
       ]);
-      alert('¡Comprobante de factura copiado al portapapeles! A continuación se abrirá WhatsApp. Presiona Ctrl + V para pegar y enviar la imagen.');
     } catch (err) {
       console.warn('Clipboard image write failed:', err);
-      alert('Se abrirá WhatsApp. Descarga la factura en formato PNG desde el botón "Descargar" y pégala en el chat.');
     }
     
     // Mensaje de agradecimiento amigable y profesional
-    const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${sale.id} por un total de $${Number(sale.total).toFixed(2)}.\n\n*(Por favor, pega el archivo de imagen que tienes copiado en el portapapeles aquí presionando Ctrl + V o manteniendo presionado y seleccionando Pegar).*`;
+    const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${sale.id} por un total de $${Number(sale.total).toFixed(2)}.\n\n*(Pega la factura presionando Ctrl + V o manteniendo presionado y seleccionando Pegar).*`;
     const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMessage)}`;
     window.open(waUrl, '_blank');
   } catch (error) {

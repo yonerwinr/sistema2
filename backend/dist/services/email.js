@@ -63,7 +63,8 @@ async function sendInvoiceEmail(toEmail, sale, items) {
         <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; color: #1a202c; text-align: right; fontWeight: 600;">$${(Number(item.price) * item.quantity).toFixed(2)}</td>
       </tr>
     `).join('');
-        const fromAddress = process.env.SMTP_FROM || 'no-reply@sistema-pos-online.local';
+        const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@sistema-pos-online.local';
+        const friendlyFrom = `"Sistema POS & Tienda" <${fromAddress}>`;
         const invoiceDate = new Date(sale.created_at || new Date()).toLocaleString('es-ES');
         const htmlContent = `
       <!DOCTYPE html>
@@ -320,11 +321,19 @@ Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
 © ${new Date().getFullYear()} POS Online. Todos los derechos reservados.
     `;
         const info = await client.sendMail({
-            from: fromAddress,
+            from: friendlyFrom,
             to: toEmail,
             subject: `Factura de compra #${sale.id} - POS Online`,
             text: plainTextContent,
-            html: htmlContent
+            html: htmlContent,
+            headers: {
+                'X-Priority': '3',
+                'X-MSMail-Priority': 'Normal',
+                'Importance': 'Normal',
+                'X-Mailer': 'Nodemailer',
+                'Precedence': 'transactional',
+                'X-Auto-Response-Suppress': 'OOF, AutoReply'
+            }
         });
         const testUrl = nodemailer_1.default.getTestMessageUrl(info);
         if (testUrl) {
