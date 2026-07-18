@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendInvoiceEmail = sendInvoiceEmail;
+exports.sendPlainEmail = sendPlainEmail;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
@@ -360,6 +361,30 @@ Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
     }
     catch (error) {
         console.error('Error enviando correo de factura:', error);
+        throw error;
+    }
+}
+async function sendPlainEmail(to, subject, text) {
+    try {
+        const mailTransporter = await getTransporter();
+        const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@pos-online.com';
+        const mailOptions = {
+            from: `"Recordatorio de Pago" <${fromEmail}>`,
+            to,
+            subject,
+            text
+        };
+        const info = await mailTransporter.sendMail(mailOptions);
+        const testUrl = nodemailer_1.default.getTestMessageUrl(info);
+        if (testUrl) {
+            console.log(`[EMAIL SENT] Recordatorio enviado a ${to} - Preview: ${testUrl}`);
+            return testUrl;
+        }
+        console.log(`[EMAIL SENT] Recordatorio enviado a ${to}`);
+        return 'Email enviado';
+    }
+    catch (error) {
+        console.error('Error enviando correo recordatorio:', error);
         throw error;
     }
 }

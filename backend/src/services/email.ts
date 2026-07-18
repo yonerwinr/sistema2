@@ -364,3 +364,29 @@ Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
     throw error;
   }
 }
+
+export async function sendPlainEmail(to: string, subject: string, text: string): Promise<string> {
+  try {
+    const mailTransporter = await getTransporter();
+    const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@pos-online.com';
+
+    const mailOptions = {
+      from: `"Recordatorio de Pago" <${fromEmail}>`,
+      to,
+      subject,
+      text
+    };
+
+    const info = await mailTransporter.sendMail(mailOptions);
+    const testUrl = nodemailer.getTestMessageUrl(info);
+    if (testUrl) {
+      console.log(`[EMAIL SENT] Recordatorio enviado a ${to} - Preview: ${testUrl}`);
+      return testUrl;
+    }
+    console.log(`[EMAIL SENT] Recordatorio enviado a ${to}`);
+    return 'Email enviado';
+  } catch (error) {
+    console.error('Error enviando correo recordatorio:', error);
+    throw error;
+  }
+}

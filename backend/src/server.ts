@@ -6,6 +6,7 @@ import authRoutes from './controllers/auth';
 import productRoutes from './controllers/products';
 import saleRoutes from './controllers/sales';
 import statsRoutes from './controllers/stats';
+import { startReminderCron } from './services/reminders';
 
 dotenv.config();
 
@@ -57,6 +58,10 @@ async function runMigrations() {
       console.log('Columna "amount_paid" agregada a la tabla sales.');
       await conn.query("UPDATE sales SET amount_paid = total WHERE status = 'completed'");
     }
+    if (!columnNames.includes('last_reminder_sent_at')) {
+      await conn.query('ALTER TABLE sales ADD COLUMN last_reminder_sent_at TIMESTAMP NULL DEFAULT NULL');
+      console.log('Columna "last_reminder_sent_at" agregada a la tabla sales.');
+    }
 
     // Crear tabla de cupones si no existe
     await conn.query(`
@@ -93,6 +98,25 @@ async function runMigrations() {
       console.log('Cupones por defecto agregados.');
     }
 
+    // Crear tabla de settings si no existe
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        settings_key VARCHAR(50) PRIMARY KEY,
+        settings_value TEXT NOT NULL
+      ) ENGINE=InnoDB;
+    `);
+
+    // Insertar configuraciones por defecto si no existen
+    const [existingSettings]: any = await conn.query('SELECT settings_key FROM settings LIMIT 1');
+    if (existingSettings.length === 0) {
+      await conn.query(`
+        INSERT INTO settings (settings_key, settings_value) VALUES 
+        ('debtor_reminder_frequency_days', '7'),
+        ('debtor_reminder_email_template', 'Hola {customerName},\\n\\nTe recordamos amablemente que tienes un saldo pendiente de \${amountPending} de tu compra con factura #{saleId}.\\n\\nPor favor realiza el pago correspondiente lo antes posible para saldar tu cuenta.\\n\\n¡Muchas gracias por tu preferencia!')
+      `);
+      console.log('Configuraciones iniciales insertadas.');
+    }
+
     console.log('Migraciones completadas exitosamente.');
   } catch (error) {
     console.error('Error al ejecutar migraciones de base de datos:', error);
@@ -108,5 +132,8 @@ runMigrations().then(() => {
     console.log(`🚀 Servidor backend POS Online corriendo en puerto ${PORT}`);
     console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
     console.log(`==========================================================`);
+    
+    // Iniciar cron de recordatorio de deudas en segundo plano
+    startReminderCron();
   });
 });

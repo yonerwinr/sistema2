@@ -2485,15 +2485,47 @@ async function renderAdminDebtors() {
   const panel = document.getElementById('dashboard-content-panel');
   if (!panel) return;
 
-  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando lista de deudores...</div>`;
+  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando lista de deudores y configuraciones...</div>`;
 
   try {
     const debtors = await api.sales.getDebtors();
+    const settings = await api.sales.getReminderSettings();
 
     panel.innerHTML = `
       <div class="card animate-on-scroll animate-fade-up visible">
         <div class="flex justify-between align-center mb-4">
           <h2 style="font-size:20px; font-weight:700;">💸 Control de Deudores (Pagos Pendientes)</h2>
+          <button class="btn btn-secondary" id="toggle-reminder-settings-btn" style="padding: 6px 12px; font-size: 11px;">
+            ⚙️ Alertas de Cobro
+          </button>
+        </div>
+
+        <!-- Formulario Configuración Recordatorios -->
+        <div id="reminder-settings-box" class="card mb-4 animate-fade-in" style="display: none; padding: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass);">
+          <h4 style="font-size: 14px; font-weight:600; margin-bottom: 12px;">Configurar Frecuencia y Mensaje de Alertas</h4>
+          <form id="reminder-settings-form">
+            <div class="grid-2 gap-2 mb-2">
+              <div class="form-group">
+                <label class="form-label" style="font-size: 11px;">Frecuencia de Alertas (Días)</label>
+                <input type="number" min="1" class="form-control" id="reminder-days-input" required value="${settings.frequencyDays}">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 11px;">Variables Disponibles</label>
+                <div style="font-size: 10px; color: var(--text-muted); padding: 8px; background: rgba(255,255,255,0.03); border-radius: 4px; line-height: 1.4;">
+                  <code>{customerName}</code> - Nombre cliente<br>
+                  <code>\${amountPending}</code> - Saldo deudor<br>
+                  <code>{saleId}</code> - ID factura
+                </div>
+              </div>
+            </div>
+            <div class="form-group mb-3">
+              <label class="form-label" style="font-size: 11px;">Plantilla de Recordatorio</label>
+              <textarea class="form-control" id="reminder-template-input" rows="3" required style="font-size:12px; font-family:inherit; line-height:1.4;">${settings.emailTemplate}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" id="save-reminder-settings-btn" style="padding: 6px 16px; font-size:11px;">
+              Guardar Configuración
+            </button>
+          </form>
         </div>
 
         <div class="table-responsive">
@@ -2515,6 +2547,13 @@ async function renderAdminDebtors() {
                 const total = Number(sale.total);
                 const paid = Number(sale.amount_paid || 0);
                 const pending = Math.max(0, total - paid);
+                
+                // Formatear texto recordatorio de WhatsApp
+                const waText = settings.emailTemplate
+                  .replace(/{customerName}/g, sale.customer_name || 'Cliente')
+                  .replace(/\${amountPending}/g, pending.toFixed(2))
+                  .replace(/{saleId}/g, sale.id.toString());
+
                 return `
                   <tr>
                     <td><strong>#${sale.id}</strong></td>
@@ -2528,12 +2567,18 @@ async function renderAdminDebtors() {
                     <td class="text-right" style="font-weight:700; color:var(--danger);">$${pending.toFixed(2)}</td>
                     <td>${new Date(sale.created_at).toLocaleString('es-ES')}</td>
                     <td class="text-center">
-                      <div style="display: flex; gap: 8px; justify-content: center;">
-                        <button class="btn btn-secondary abono-btn" data-id="${sale.id}" data-pending="${pending}" style="padding: 6px 12px; font-size:11px;">
+                      <div style="display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; max-width: 250px; margin: 0 auto;">
+                        <button class="btn btn-secondary abono-btn" data-id="${sale.id}" data-pending="${pending}" style="padding: 6px 10px; font-size:10px;">
                           💵 Abonar
                         </button>
-                        <button class="btn btn-primary mark-as-paid-btn" data-id="${sale.id}" style="padding: 6px 12px; font-size:11px;">
-                          ✓ Liquidar Todo
+                        <button class="btn btn-primary mark-as-paid-btn" data-id="${sale.id}" style="padding: 6px 10px; font-size:10px;">
+                          ✓ Cobrar
+                        </button>
+                        <button class="btn btn-secondary send-email-reminder-btn" data-id="${sale.id}" style="padding: 6px 10px; font-size:10px; background:#4f46e5; border-color:#4f46e5; color:white;" ${!sale.customer_email ? 'disabled title="Sin correo"' : ''}>
+                          ✉️ Correo
+                        </button>
+                        <button class="btn btn-secondary send-wa-reminder-btn" data-phone="${sale.customer_phone || ''}" data-text="${encodeURIComponent(waText)}" style="padding: 6px 10px; font-size:10px; background:#25d366; border-color:#25d366; color:white;" ${!sale.customer_phone ? 'disabled title="Sin teléfono"' : ''}>
+                          💬 WA
                         </button>
                       </div>
                     </td>
@@ -2546,6 +2591,36 @@ async function renderAdminDebtors() {
         </div>
       </div>
     `;
+
+    // Toggle Configuración Box
+    const toggleBtn = document.getElementById('toggle-reminder-settings-btn');
+    const settingsBox = document.getElementById('reminder-settings-box');
+    toggleBtn?.addEventListener('click', () => {
+      if (settingsBox) {
+        settingsBox.style.display = settingsBox.style.display === 'none' ? 'block' : 'none';
+      }
+    });
+
+    // Guardar Configuración
+    document.getElementById('reminder-settings-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const days = parseInt((document.getElementById('reminder-days-input') as HTMLInputElement).value);
+      const template = (document.getElementById('reminder-template-input') as HTMLTextAreaElement).value;
+      const saveBtn = document.getElementById('save-reminder-settings-btn') as HTMLButtonElement;
+      
+      saveBtn.disabled = true;
+      saveBtn.innerText = 'Guardando...';
+
+      try {
+        await api.sales.updateReminderSettings({ frequencyDays: days, emailTemplate: template });
+        alert('Configuración de alertas guardada con éxito.');
+        await renderAdminDebtors();
+      } catch (err: any) {
+        alert(err.message || 'Error al guardar configuraciones.');
+        saveBtn.disabled = false;
+        saveBtn.innerText = 'Guardar Configuración';
+      }
+    });
 
     // Bind abono events
     document.querySelectorAll('.abono-btn').forEach(btn => {
@@ -2588,8 +2663,42 @@ async function renderAdminDebtors() {
       });
     });
 
+    // Bind manual email reminder
+    document.querySelectorAll('.send-email-reminder-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        const originalText = (e.currentTarget as HTMLButtonElement).innerText;
+        (e.currentTarget as HTMLButtonElement).disabled = true;
+        (e.currentTarget as HTMLButtonElement).innerText = 'Enviando...';
+        try {
+          const res = await api.sales.sendManualReminder(id);
+          alert(res.message || '¡Recordatorio enviado con éxito por correo!');
+          await renderAdminDebtors();
+        } catch (err: any) {
+          alert(err.message || 'Error al enviar recordatorio por correo.');
+        } finally {
+          (e.currentTarget as HTMLButtonElement).disabled = false;
+          (e.currentTarget as HTMLButtonElement).innerText = originalText;
+        }
+      });
+    });
+
+    // Bind WhatsApp reminder
+    document.querySelectorAll('.send-wa-reminder-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const phone = (e.currentTarget as HTMLButtonElement).dataset.phone || '';
+        const text = (e.currentTarget as HTMLButtonElement).dataset.text || '';
+        if (!phone) {
+          alert('Este cliente no tiene teléfono registrado.');
+          return;
+        }
+        const formattedPhone = phone.replace(/\+/g, '').replace(/\s/g, '');
+        window.open(`https://wa.me/${formattedPhone}?text=${text}`, '_blank');
+      });
+    });
+
   } catch (error) {
-    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar la lista de deudores.</div>`;
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar la lista de deudores o configuraciones.</div>`;
   }
 }
 

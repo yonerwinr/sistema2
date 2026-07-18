@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import pool from '../config/db';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { sendInvoiceEmail } from '../services/email';
+import { sendInvoiceEmail, sendPlainEmail } from '../services/email';
 import { syncSaleToSheets } from '../services/sheets';
 
 const router = Router();
@@ -681,6 +681,111 @@ router.post('/:id/resend-email', authenticate, async (req: AuthRequest, res: Res
   } catch (error: any) {
     console.error('Error al reenviar factura por correo:', error);
     res.status(500).json({ message: 'Error al reenviar la factura por correo', error: error.message });
+  }
+});
+
+// Obtener configuraciones de recordatorios de deudores (Solo Admin)
+router.get('/settings/reminders', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  try {
+    const [rows]: any = await pool.query('SELECT * FROM settings WHERE settings_key IN (?, ?)', [
+      'debtor_reminder_frequency_days',
+      'debtor_reminder_email_template'
+    ]);
+
+    const frequency = rows.find((r: any) => r.settings_key === 'debtor_reminder_frequency_days')?.settings_value || '7';
+    const template = rows.find((r: any) => r.settings_key === 'debtor_reminder_email_template')?.settings_value || '';
+
+    res.json({
+      frequencyDays: parseInt(frequency),
+      emailTemplate: template
+    });
+  } catch (error) {
+    console.error('Error al obtener configuraciones:', error);
+    res.status(500).json({ message: 'Error al obtener configuraciones de recordatorios' });
+  }
+});
+
+// Guardar configuraciones de recordatorios de deudores (Solo Admin)
+router.put('/settings/reminders', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  const { frequencyDays, emailTemplate } = req.body;
+
+  if (frequencyDays === undefined || !emailTemplate) {
+    return res.status(400).json({ message: 'Por favor complete todos los datos' });
+  }
+
+  try {
+    await pool.query(
+      'INSERT INTO settings (settings_key, settings_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE settings_value = ?',
+      ['debtor_reminder_frequency_days', frequencyDays.toString(), frequencyDays.toString()]
+    );
+    await pool.query(
+      'INSERT INTO settings (settings_key, settings_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE settings_value = ?',
+      ['debtor_reminder_email_template', emailTemplate, emailTemplate]
+    );
+
+    res.json({ message: 'Configuraciones de recordatorios guardadas con éxito' });
+  } catch (error) {
+    console.error('Error al guardar configuraciones:', error);
+    res.status(500).json({ message: 'Error al guardar configuraciones de recordatorios' });
+  }
+});
+
+// Enviar recordatorio manual por correo (Solo Admin)
+router.post('/:id/remind', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  const { id } = req.params;
+
+  try {
+    const [sales]: any = await pool.query('SELECT * FROM sales WHERE id = ?', [id]);
+    if (sales.length === 0) {
+      return res.status(404).json({ message: 'Factura no encontrada' });
+    }
+
+    const sale = sales[0];
+    if (sale.status !== 'pending') {
+      return res.status(400).json({ message: 'Esta factura ya está cobrada o cancelada' });
+    }
+
+    if (!sale.customer_email) {
+      return res.status(400).json({ message: 'El cliente no tiene correo electrónico registrado para enviar el recordatorio' });
+    }
+
+    // Obtener la plantilla de correo
+    const [templateRows]: any = await pool.query("SELECT settings_value FROM settings WHERE settings_key = 'debtor_reminder_email_template'");
+    const templateText = templateRows.length > 0 ? templateRows[0].settings_value : 'Hola {customerName}, tienes un saldo pendiente de ${amountPending} de tu factura #{saleId}.';
+
+    const pendingAmount = Number(sale.total) - Number(sale.amount_paid || 0);
+
+    // Formatear mensaje
+    const emailBody = templateText
+      .replace(/{customerName}/g, sale.customer_name || 'Cliente')
+      .replace(/\${amountPending}/g, pendingAmount.toFixed(2))
+      .replace(/{saleId}/g, sale.id.toString());
+
+    await sendPlainEmail(
+      sale.customer_email,
+      `Recordatorio de Pago Pendiente - Factura #${sale.id}`,
+      emailBody
+    );
+
+    // Actualizar last_reminder_sent_at
+    await pool.query('UPDATE sales SET last_reminder_sent_at = NOW() WHERE id = ?', [id]);
+
+    res.json({ message: 'Correo recordatorio enviado con éxito al deudor' });
+  } catch (error) {
+    console.error('Error al enviar recordatorio manual:', error);
+    res.status(500).json({ message: 'Error al enviar recordatorio por correo' });
   }
 });
 

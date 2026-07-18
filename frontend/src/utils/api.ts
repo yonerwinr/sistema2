@@ -215,6 +215,14 @@ export const api = {
     deleteCoupon: (id: number) => request<{ message: string }>(`/sales/coupons/${id}`, {
       method: 'DELETE',
     }),
+    getReminderSettings: () => request<{ frequencyDays: number; emailTemplate: string }>('/sales/settings/reminders'),
+    updateReminderSettings: (body: { frequencyDays: number; emailTemplate: string }) => request<{ message: string }>('/sales/settings/reminders', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+    sendManualReminder: (id: number) => request<{ message: string }>(`/sales/${id}/remind`, {
+      method: 'POST',
+    }),
   },
 
   // Estadísticas (Dashboard Admin)
