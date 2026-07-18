@@ -79,6 +79,10 @@ async function runMigrations() {
       await conn.query('ALTER TABLE sales ADD COLUMN last_reminder_sent_at TIMESTAMP NULL DEFAULT NULL');
       console.log('Columna "last_reminder_sent_at" agregada a la tabla sales.');
     }
+    if (!columnNames.includes('coupon_code')) {
+      await conn.query('ALTER TABLE sales ADD COLUMN coupon_code VARCHAR(50) NULL');
+      console.log('Columna "coupon_code" agregada a la tabla sales.');
+    }
 
     // Crear tabla de cupones si no existe
     await conn.query(`

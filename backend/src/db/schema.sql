@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS sales (
     payment_method VARCHAR(50) NOT NULL DEFAULT 'cash',
     type ENUM('online', 'pos') NOT NULL DEFAULT 'pos',
     status ENUM('pending', 'completed', 'cancelled') NOT NULL DEFAULT 'completed',
+    coupon_code VARCHAR(50) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;

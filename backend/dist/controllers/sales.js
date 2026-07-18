@@ -28,19 +28,31 @@ router.post('/checkout', async (req, res) => {
         await conn.beginTransaction();
         // Validar cupón si se suministró alguno
         if (couponCode) {
-            const [coupons] = await conn.query('SELECT * FROM coupons WHERE code = ? AND active = 1 FOR UPDATE', [couponCode.toUpperCase().trim()]);
-            if (coupons.length > 0) {
-                const coupon = coupons[0];
-                if (coupon.is_used === 1) {
-                    throw new Error('El cupón ya ha sido utilizado');
+            const cleanCoupon = couponCode.toUpperCase().trim();
+            const [coupons] = await conn.query('SELECT * FROM coupons WHERE code = ? AND active = 1 FOR UPDATE', [cleanCoupon]);
+            if (coupons.length === 0) {
+                throw new Error('El cupón no es válido o está inactivo');
+            }
+            const coupon = coupons[0];
+            if (coupon.is_used === 1) {
+                throw new Error('El cupón ya ha sido utilizado');
+            }
+            const currentUserId = userId || (req.user ? req.user.id : null);
+            // Si es personal, verificar coincidencia de usuario
+            if (coupon.user_id !== null) {
+                if (!currentUserId || Number(currentUserId) !== Number(coupon.user_id)) {
+                    throw new Error('El cupón es personal e intransferible');
                 }
-                if (coupon.user_id !== null) {
-                    const currentUserId = userId || (req.user ? req.user.id : null);
-                    if (!currentUserId || Number(currentUserId) !== Number(coupon.user_id)) {
-                        throw new Error('El cupón es personal e intransferible');
+                // Marcar como usado (solo se puede usar una vez)
+                await conn.query('UPDATE coupons SET is_used = 1 WHERE id = ?', [coupon.id]);
+            }
+            else {
+                // Si es público/general, verificar si este usuario ya lo usó en una compra previa
+                if (currentUserId) {
+                    const [alreadyUsed] = await conn.query('SELECT id FROM sales WHERE user_id = ? AND coupon_code = ? AND status != "cancelled"', [currentUserId, cleanCoupon]);
+                    if (alreadyUsed.length > 0) {
+                        throw new Error('Ya has utilizado este cupón en una compra anterior');
                     }
-                    // Marcar como usado
-                    await conn.query('UPDATE coupons SET is_used = 1 WHERE id = ?', [coupon.id]);
                 }
             }
         }
@@ -71,7 +83,7 @@ router.post('/checkout', async (req, res) => {
         const finalTotal = total - (discount || 0) + (tax || 0);
         const initialPaid = paymentMethod === 'transfer' ? 0.00 : finalTotal;
         // Registrar la venta
-        const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)', [
+        const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)', [
             userId || null,
             customerName || 'Cliente Online',
             customerEmail || null,
@@ -82,7 +94,8 @@ router.post('/checkout', async (req, res) => {
             paymentMethod === 'transfer' ? 'pending' : 'completed', // Transferencia empieza como pendiente (Deudor)
             discount || 0,
             tax || 0,
-            initialPaid
+            initialPaid,
+            couponCode ? couponCode.toUpperCase().trim() : null
         ]);
         const saleId = saleResult.insertId;
         // Registrar detalles
@@ -147,18 +160,30 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
         await conn.beginTransaction();
         // Validar cupón si se suministró alguno
         if (couponCode) {
-            const [coupons] = await conn.query('SELECT * FROM coupons WHERE code = ? AND active = 1 FOR UPDATE', [couponCode.toUpperCase().trim()]);
-            if (coupons.length > 0) {
-                const coupon = coupons[0];
-                if (coupon.is_used === 1) {
-                    throw new Error('El cupón ya ha sido utilizado');
+            const cleanCoupon = couponCode.toUpperCase().trim();
+            const [coupons] = await conn.query('SELECT * FROM coupons WHERE code = ? AND active = 1 FOR UPDATE', [cleanCoupon]);
+            if (coupons.length === 0) {
+                throw new Error('El cupón no es válido o está inactivo');
+            }
+            const coupon = coupons[0];
+            if (coupon.is_used === 1) {
+                throw new Error('El cupón ya ha sido utilizado');
+            }
+            // Si es personal, verificar coincidencia de usuario
+            if (coupon.user_id !== null) {
+                if (!customerUserId || Number(customerUserId) !== Number(coupon.user_id)) {
+                    throw new Error('El cupón es personal e intransferible para otro cliente');
                 }
-                if (coupon.user_id !== null) {
-                    if (!customerUserId || Number(customerUserId) !== Number(coupon.user_id)) {
-                        throw new Error('El cupón es personal e intransferible para otro cliente');
+                // Marcar como usado (solo se puede usar una vez)
+                await conn.query('UPDATE coupons SET is_used = 1 WHERE id = ?', [coupon.id]);
+            }
+            else {
+                // Si es público/general, verificar si este usuario ya lo usó en una compra previa
+                if (customerUserId) {
+                    const [alreadyUsed] = await conn.query('SELECT id FROM sales WHERE user_id = ? AND coupon_code = ? AND status != "cancelled"', [customerUserId, cleanCoupon]);
+                    if (alreadyUsed.length > 0) {
+                        throw new Error('Este cliente ya ha utilizado este cupón en una compra anterior');
                     }
-                    // Marcar como usado
-                    await conn.query('UPDATE coupons SET is_used = 1 WHERE id = ?', [coupon.id]);
                 }
             }
         }
@@ -215,7 +240,8 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
           discount = ?, 
           tax = ?, 
           is_quotation = ?, 
-          amount_paid = ? 
+          amount_paid = ?,
+          coupon_code = ?
          WHERE id = ?`, [
                 customerUserId || null,
                 customerName || 'Consumidor Final',
@@ -228,12 +254,13 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
                 tax || 0.00,
                 isQuotation ? 1 : 0,
                 finalAmountPaid,
+                couponCode ? couponCode.toUpperCase().trim() : null,
                 saleId
             ]);
         }
         else {
             // Registrar la venta nueva
-            const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+            const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
                 customerUserId || null,
                 customerName || 'Consumidor Final',
                 customerEmail || null,
@@ -245,7 +272,8 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
                 discount || 0.00,
                 tax || 0.00,
                 isQuotation ? 1 : 0,
-                finalAmountPaid
+                finalAmountPaid,
+                couponCode ? couponCode.toUpperCase().trim() : null
             ]);
             saleId = saleResult.insertId;
         }
@@ -446,7 +474,7 @@ router.post('/coupon/validate', async (req, res) => {
             return res.status(404).json({ message: 'Cupón inválido o inactivo' });
         }
         const coupon = coupons[0];
-        // Verificar si ya fue utilizado (si es de un solo uso)
+        // Verificar si ya fue utilizado (si es de un solo uso personal)
         if (coupon.is_used === 1) {
             return res.status(400).json({ message: 'Este cupón de descuento ya ha sido utilizado' });
         }
@@ -454,6 +482,15 @@ router.post('/coupon/validate', async (req, res) => {
         if (coupon.user_id !== null) {
             if (!userId || Number(userId) !== Number(coupon.user_id)) {
                 return res.status(403).json({ message: 'Este cupón es personal e intransferible para otro cliente' });
+            }
+        }
+        else {
+            // Si es público/general, verificar si este usuario ya lo usó en una compra previa
+            if (userId) {
+                const [alreadyUsed] = await db_1.default.query('SELECT id FROM sales WHERE user_id = ? AND coupon_code = ? AND status != "cancelled"', [userId, code.toUpperCase().trim()]);
+                if (alreadyUsed.length > 0) {
+                    return res.status(400).json({ message: 'Ya has utilizado este cupón en una compra anterior' });
+                }
             }
         }
         res.json(coupon);
