@@ -64,6 +64,7 @@ export interface Sale {
   discount?: number;
   tax?: number;
   is_quotation?: number;
+  amount_paid?: number;
 }
 
 export interface Coupon {
@@ -176,6 +177,7 @@ export const api = {
       tax?: number;
       isQuotation?: boolean;
       status?: string;
+      amountPaid?: number;
     }) => request<SaleResult>('/sales/pos', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -188,9 +190,9 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
     getDebtors: () => request<Sale[]>('/sales/debtors/all'),
-    updateStatus: (id: number, status: 'completed' | 'cancelled' | 'pending') => request<{ message: string }>(`/sales/${id}/status`, {
+    updateStatus: (id: number, status?: 'completed' | 'cancelled' | 'pending', abono?: number) => request<{ message: string; status?: string; amount_paid?: number }>(`/sales/${id}/status`, {
       method: 'PUT',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, abono }),
     }),
     getQuotations: () => request<Sale[]>('/sales/quotations/all'),
     validateCoupon: (code: string) => request<Coupon>('/sales/coupon/validate', {

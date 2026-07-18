@@ -57,9 +57,11 @@ router.post('/checkout', async (req: AuthRequest, res) => {
     // Calcular total final neto: total original menos descuento más tax
     const finalTotal = total - (discount || 0) + (tax || 0);
 
+    const initialPaid = paymentMethod === 'transfer' ? 0.00 : finalTotal;
+
     // Registrar la venta
     const [saleResult]: any = await conn.query(
-      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
+      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
       [
         userId || null,
         customerName || 'Cliente Online',
@@ -70,7 +72,8 @@ router.post('/checkout', async (req: AuthRequest, res) => {
         'online',
         paymentMethod === 'transfer' ? 'pending' : 'completed', // Transferencia empieza como pendiente (Deudor)
         discount || 0,
-        tax || 0
+        tax || 0,
+        initialPaid
       ]
     );
 
@@ -133,7 +136,7 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
     return res.status(403).json({ message: 'No autorizado. Solo administradores pueden registrar ventas POS' });
   }
 
-  const { customerName, customerEmail, customerPhone, customerUserId, paymentMethod, items, discount, tax, isQuotation, status } = req.body;
+  const { customerName, customerEmail, customerPhone, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'Debe agregar al menos un producto' });
@@ -178,9 +181,17 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
     // Calcular total final neto
     const finalTotal = total - (discount || 0) + (tax || 0);
 
+    let finalAmountPaid = 0.00;
+    const saleStatus = isQuotation ? 'pending' : (status || 'completed');
+    if (saleStatus === 'completed') {
+      finalAmountPaid = finalTotal;
+    } else if (!isQuotation && saleStatus === 'pending') {
+      finalAmountPaid = Math.min(finalTotal, Number(amountPaid || 0));
+    }
+
     // Registrar la venta
     const [saleResult]: any = await conn.query(
-      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         customerUserId || null,
         customerName || 'Consumidor Final',
@@ -189,10 +200,11 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
         finalTotal,
         paymentMethod || 'cash',
         'pos',
-        isQuotation ? 'pending' : (status || 'completed'),
+        saleStatus,
         discount || 0.00,
         tax || 0.00,
-        isQuotation ? 1 : 0
+        isQuotation ? 1 : 0,
+        finalAmountPaid
       ]
     );
 
@@ -343,15 +355,47 @@ router.put('/:id/status', authenticate, async (req: AuthRequest, res: Response) 
   }
 
   const { id } = req.params;
-  const { status } = req.body; // 'completed' | 'cancelled' | 'pending'
+  const { status, abono } = req.body; // 'completed' | 'cancelled' | 'pending', abono: number (opcional)
 
-  if (!['completed', 'cancelled', 'pending'].includes(status)) {
+  if (status && !['completed', 'cancelled', 'pending'].includes(status)) {
     return res.status(400).json({ message: 'Estado inválido' });
   }
 
   try {
-    await pool.query('UPDATE sales SET status = ? WHERE id = ?', [status, id]);
-    res.json({ message: 'Estado de factura actualizado con éxito' });
+    const [sales]: any = await pool.query('SELECT total, amount_paid, status FROM sales WHERE id = ?', [id]);
+    if (sales.length === 0) {
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+
+    const sale = sales[0];
+    let newAmountPaid = Number(sale.amount_paid);
+    let newStatus = status || sale.status;
+
+    if (abono !== undefined) {
+      const abonoNum = parseFloat(abono);
+      if (isNaN(abonoNum) || abonoNum <= 0) {
+        return res.status(400).json({ message: 'El abono debe ser un número positivo' });
+      }
+      newAmountPaid += abonoNum;
+      
+      // Si el total pagado alcanza o supera el total de la venta, se completa
+      if (newAmountPaid >= Number(sale.total)) {
+        newAmountPaid = Number(sale.total);
+        newStatus = 'completed';
+      } else {
+        newStatus = 'pending';
+      }
+    } else if (status === 'completed') {
+      newAmountPaid = Number(sale.total);
+    }
+
+    await pool.query('UPDATE sales SET status = ?, amount_paid = ? WHERE id = ?', [newStatus, newAmountPaid, id]);
+    
+    res.json({ 
+      message: 'Estado de factura actualizado con éxito',
+      status: newStatus,
+      amount_paid: newAmountPaid
+    });
   } catch (error) {
     console.error('Error al actualizar estado:', error);
     res.status(500).json({ message: 'Error al actualizar el estado de la venta' });

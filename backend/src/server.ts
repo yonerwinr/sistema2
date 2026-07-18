@@ -52,6 +52,11 @@ async function runMigrations() {
       await conn.query('ALTER TABLE sales ADD COLUMN is_quotation TINYINT NOT NULL DEFAULT 0');
       console.log('Columna "is_quotation" agregada a la tabla sales.');
     }
+    if (!columnNames.includes('amount_paid')) {
+      await conn.query('ALTER TABLE sales ADD COLUMN amount_paid DECIMAL(10, 2) NOT NULL DEFAULT 0.00');
+      console.log('Columna "amount_paid" agregada a la tabla sales.');
+      await conn.query("UPDATE sales SET amount_paid = total WHERE status = 'completed'");
+    }
 
     // Crear tabla de cupones si no existe
     await conn.query(`

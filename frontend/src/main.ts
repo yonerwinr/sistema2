@@ -41,6 +41,8 @@ let posDiscount = 0;
 let posApplyTax = true;
 let posCouponCode = '';
 let posCouponDiscountPercent = 0;
+let posIsPending = false;
+let posInitialPayment = 0;
 
 // Instancias de Chart.js para destruirlas al cambiar de pestaña
 let revenueChartInstance: Chart | null = null;
@@ -1758,8 +1760,13 @@ async function renderAdminPOS() {
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                <input type="checkbox" id="pos-is-pending" style="width: 16px; height: 16px; accent-color: var(--danger);">
+                <input type="checkbox" id="pos-is-pending" ${posIsPending ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--danger);">
                 <label for="pos-is-pending" class="form-label" style="font-size:11px; margin: 0; cursor: pointer; color: var(--danger);">Marcar como Deuda / Pago Pendiente</label>
+              </div>
+
+              <div id="pos-initial-payment-box" style="display: ${posIsPending ? 'block' : 'none'}; margin-top: 10px; margin-left: 24px;">
+                <label class="form-label" style="font-size:10px; color: var(--text-secondary);">Abono Inicial / Pago Parcial ($)</label>
+                <input type="number" step="0.01" min="0" class="form-control" id="pos-initial-payment-input" style="padding: 6px 12px; font-size:12px;" placeholder="0.00" value="${posInitialPayment > 0 ? posInitialPayment : ''}">
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
@@ -1918,6 +1925,23 @@ function bindPOSEvents() {
     await renderAdminPOS();
   });
 
+  // Toggle Deuda y Abono Inicial
+  const isPendingCheckbox = document.getElementById('pos-is-pending') as HTMLInputElement;
+  const initialPaymentBox = document.getElementById('pos-initial-payment-box');
+  const initialPaymentInput = document.getElementById('pos-initial-payment-input') as HTMLInputElement;
+
+  isPendingCheckbox?.addEventListener('change', (e) => {
+    posIsPending = (e.target as HTMLInputElement).checked;
+    if (initialPaymentBox) {
+      initialPaymentBox.style.display = posIsPending ? 'block' : 'none';
+    }
+  });
+
+  initialPaymentInput?.addEventListener('change', (e) => {
+    const val = parseFloat((e.target as HTMLInputElement).value);
+    posInitialPayment = isNaN(val) ? 0 : val;
+  });
+
   // Toggle Cotización
   const isQuotationCheckbox = document.getElementById('pos-is-quotation') as HTMLInputElement;
   isQuotationCheckbox?.addEventListener('change', (e) => {
@@ -1967,7 +1991,8 @@ function bindPOSEvents() {
         discount: totalDiscount,
         tax: taxAmount,
         isQuotation,
-        status: isPending ? 'pending' : 'completed'
+        status: isPending ? 'pending' : 'completed',
+        amountPaid: posIsPending ? posInitialPayment : undefined
       });
 
       // Venta exitosa, limpiar estados
@@ -1978,6 +2003,8 @@ function bindPOSEvents() {
       posApplyTax = true;
       posCouponCode = '';
       posCouponDiscountPercent = 0;
+      posIsPending = false;
+      posInitialPayment = 0;
       
       await loadProducts(); // recargar
       
@@ -2471,43 +2498,80 @@ async function renderAdminDebtors() {
                 <th>Factura ID</th>
                 <th>Cliente</th>
                 <th>Contacto</th>
-                <th>Método Registro</th>
-                <th class="text-right">Total Pendiente</th>
+                <th>Total Factura</th>
+                <th>Monto Abonado</th>
+                <th class="text-right">Monto Pendiente</th>
                 <th>Fecha Emisión</th>
                 <th class="text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              ${debtors.map(sale => `
-                <tr>
-                  <td><strong>#${sale.id}</strong></td>
-                  <td><strong>${sale.customer_name}</strong></td>
-                  <td>
-                    <div style="font-size:12px;">${sale.customer_email || ''}</div>
-                    <div style="font-size:12px; color:var(--text-muted);">${sale.customer_phone || ''}</div>
-                  </td>
-                  <td><span class="badge" style="background:rgba(255,255,255,0.05); color:white; font-size:11px; padding:2px 6px;">${sale.type.toUpperCase()}</span></td>
-                  <td class="text-right" style="font-weight:700; color:var(--danger);">$${Number(sale.total).toFixed(2)}</td>
-                  <td>${new Date(sale.created_at).toLocaleString('es-ES')}</td>
-                  <td class="text-center">
-                    <button class="btn btn-primary mark-as-paid-btn" data-id="${sale.id}" style="padding: 6px 12px; font-size:11px;">
-                      ✓ Registrar Pago (Completar)
-                    </button>
-                  </td>
-                </tr>
-              `).join('')}
-              ${debtors.length === 0 ? '<tr><td colspan="7" class="text-center">No hay clientes deudores o pagos pendientes.</td></tr>' : ''}
+              ${debtors.map(sale => {
+                const total = Number(sale.total);
+                const paid = Number(sale.amount_paid || 0);
+                const pending = Math.max(0, total - paid);
+                return `
+                  <tr>
+                    <td><strong>#${sale.id}</strong></td>
+                    <td><strong>${sale.customer_name}</strong></td>
+                    <td>
+                      <div style="font-size:12px;">${sale.customer_email || ''}</div>
+                      <div style="font-size:12px; color:var(--text-muted);">${sale.customer_phone || ''}</div>
+                    </td>
+                    <td>$${total.toFixed(2)}</td>
+                    <td style="color:var(--success); font-weight:600;">$${paid.toFixed(2)}</td>
+                    <td class="text-right" style="font-weight:700; color:var(--danger);">$${pending.toFixed(2)}</td>
+                    <td>${new Date(sale.created_at).toLocaleString('es-ES')}</td>
+                    <td class="text-center">
+                      <div style="display: flex; gap: 8px; justify-content: center;">
+                        <button class="btn btn-secondary abono-btn" data-id="${sale.id}" data-pending="${pending}" style="padding: 6px 12px; font-size:11px;">
+                          💵 Abonar
+                        </button>
+                        <button class="btn btn-primary mark-as-paid-btn" data-id="${sale.id}" style="padding: 6px 12px; font-size:11px;">
+                          ✓ Liquidar Todo
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+              ${debtors.length === 0 ? '<tr><td colspan="8" class="text-center">No hay clientes deudores o pagos pendientes.</td></tr>' : ''}
             </tbody>
           </table>
         </div>
       </div>
     `;
 
+    // Bind abono events
+    document.querySelectorAll('.abono-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        const pending = parseFloat((e.currentTarget as HTMLButtonElement).dataset.pending || '0');
+        
+        const inputStr = prompt(`Monto a abonar para la factura #${id} (Máximo $${pending.toFixed(2)}):`);
+        if (inputStr === null) return; // cancelado
+        
+        const abonoVal = parseFloat(inputStr);
+        if (isNaN(abonoVal) || abonoVal <= 0) {
+          alert('Por favor ingrese un monto válido mayor a 0.');
+          return;
+        }
+
+        try {
+          const res = await api.sales.updateStatus(id, undefined, abonoVal);
+          alert(res.message || 'Abono registrado con éxito.');
+          await renderAdminDebtors();
+        } catch (err: any) {
+          alert(err.message || 'Error al procesar el abono.');
+        }
+      });
+    });
+
     // Bind mark as paid events
     document.querySelectorAll('.mark-as-paid-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
-        if (confirm(`¿Estás seguro de marcar la factura #${id} como completada y pagada?`)) {
+        if (confirm(`¿Estás seguro de marcar la factura #${id} como completada y pagada en su totalidad?`)) {
           try {
             await api.sales.updateStatus(id, 'completed');
             alert('¡Pago registrado con éxito!');
