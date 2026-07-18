@@ -43,6 +43,7 @@ let posCouponCode = '';
 let posCouponDiscountPercent = 0;
 let posIsPending = false;
 let posInitialPayment = 0;
+let posLoadedQuotationId: number | null = null;
 let rateUsdToVes = 40.00;
 let rateEurToVes = 43.50;
 
@@ -2192,7 +2193,8 @@ function bindPOSEvents() {
         isQuotation,
         status: isPending ? 'pending' : 'completed',
         amountPaid: posIsPending ? posInitialPayment : undefined,
-        couponCode: posCouponCode || undefined
+        couponCode: posCouponCode || undefined,
+        loadedQuotationId: posLoadedQuotationId || undefined
       });
 
       // Venta exitosa, limpiar estados
@@ -2205,6 +2207,7 @@ function bindPOSEvents() {
       posCouponDiscountPercent = 0;
       posIsPending = false;
       posInitialPayment = 0;
+      posLoadedQuotationId = null;
       
       await loadProducts(); // recargar
       
@@ -2957,12 +2960,15 @@ async function renderAdminQuotations() {
                   </td>
                   <td class="text-right" style="font-weight:700; color:var(--primary);">$${Number(sale.total).toFixed(2)}</td>
                   <td>${new Date(sale.created_at).toLocaleString('es-ES')}</td>
-                  <td class="text-center" style="display:flex; justify-content:center; gap:8px;">
+                  <td class="text-center" style="display:flex; justify-content:center; gap:8px; align-items:center;">
                     <button class="btn btn-secondary view-quote-details-btn" data-id="${sale.id}" style="padding: 6px 12px; font-size:11px;">
-                      🔍 Ver Productos
+                      🔍 Ver
                     </button>
                     <button class="btn btn-primary send-quote-wa-btn" data-id="${sale.id}" style="padding: 6px 12px; font-size:11px; background:#25d366; border-color:#25d366;">
                       WhatsApp
+                    </button>
+                    <button class="btn btn-secondary load-quote-pos-btn" data-id="${sale.id}" style="padding: 6px 12px; font-size:11px; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); color:var(--primary);" title="Cargar cotización en el POS para facturar">
+                      🛒 Facturar
                     </button>
                   </td>
                 </tr>
@@ -3001,6 +3007,67 @@ async function renderAdminQuotations() {
           await shareInvoiceAsImage(details.sale, details.items, cleanedPhone);
         } catch (err: any) {
           alert(err.message || 'Error al enviar cotización.');
+        }
+      });
+    });
+
+    // Bind load quote to POS
+    document.querySelectorAll('.load-quote-pos-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        try {
+          const details = await api.sales.getDetails(id);
+          
+          // Cargar productos en posCart
+          posCart = details.items.map(item => ({
+            product: {
+              id: item.product_id,
+              name: item.name,
+              price: Number(item.price),
+              stock: 9999,
+              description: '',
+              image_url: '',
+              category: ''
+            },
+            quantity: item.quantity
+          }));
+
+          // Cargar descuento e impuestos
+          posDiscount = Number(details.sale.discount || 0);
+          posApplyTax = Number(details.sale.tax || 0) > 0;
+          posSelectedCustomerId = details.sale.user_id || null;
+          posLoadedQuotationId = details.sale.id;
+
+          // Cambiar de pestaña al POS
+          activeAdminView = 'pos';
+          
+          // Recargar la vista del admin
+          const tabPOS = document.getElementById('admin-tab-pos');
+          document.querySelectorAll('.sidebar-nav-btn').forEach(b => b.classList.remove('active'));
+          tabPOS?.classList.add('active');
+          
+          await renderAdminPOS();
+
+          // Auto-llenar campos en el formulario de la derecha tras renderizar
+          setTimeout(() => {
+            const nameIn = document.getElementById('pos-cust-name') as HTMLInputElement;
+            const phoneIn = document.getElementById('pos-cust-phone') as HTMLInputElement;
+            const emailIn = document.getElementById('pos-cust-email') as HTMLInputElement;
+            const selectCustomer = document.getElementById('pos-customer-select') as HTMLSelectElement;
+            const discountIn = document.getElementById('pos-discount-input') as HTMLInputElement;
+            const taxIn = document.getElementById('pos-tax-checkbox') as HTMLInputElement;
+
+            if (nameIn) nameIn.value = details.sale.customer_name || '';
+            if (phoneIn) phoneIn.value = details.sale.customer_phone || '';
+            if (emailIn) emailIn.value = details.sale.customer_email || '';
+            if (selectCustomer && details.sale.user_id) selectCustomer.value = details.sale.user_id.toString();
+            if (discountIn) discountIn.value = posDiscount.toString();
+            if (taxIn) taxIn.checked = posApplyTax;
+          }, 50);
+
+          alert(`Cotización #${id} cargada con éxito en el POS. Puedes modificar productos, cantidades o descuentos antes de facturar.`);
+        } catch (err: any) {
+          alert(err.message || 'Error al cargar cotización en el POS.');
         }
       });
     });

@@ -158,12 +158,12 @@ router.post('/checkout', async (req: AuthRequest, res) => {
 
 // Registrar Venta POS (Solo Admin)
 router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
-  // Solo administradores pueden usar el POS
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ message: 'No autorizado. Solo administradores pueden registrar ventas POS' });
+  // Administradores y vendedores pueden usar el POS
+  if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
+    return res.status(403).json({ message: 'No autorizado. Solo administradores y vendedores pueden registrar ventas POS' });
   }
 
-  const { customerName, customerEmail, customerPhone, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode } = req.body;
+  const { customerName, customerEmail, customerPhone, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'Debe agregar al menos un producto' });
@@ -234,26 +234,64 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
       finalAmountPaid = Math.min(finalTotal, Number(amountPaid || 0));
     }
 
-    // Registrar la venta
-    const [saleResult]: any = await conn.query(
-      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        customerUserId || null,
-        customerName || 'Consumidor Final',
-        customerEmail || null,
-        customerPhone || null,
-        finalTotal,
-        paymentMethod || 'cash',
-        'pos',
-        saleStatus,
-        discount || 0.00,
-        tax || 0.00,
-        isQuotation ? 1 : 0,
-        finalAmountPaid
-      ]
-    );
+    let saleId = loadedQuotationId ? Number(loadedQuotationId) : null;
 
-    const saleId = saleResult.insertId;
+    if (saleId) {
+      // 1. Eliminar los items viejos de la cotización para re-insertar los nuevos
+      await conn.query('DELETE FROM sale_items WHERE sale_id = ?', [saleId]);
+
+      // 2. Actualizar la cabecera de la venta convirtiéndola en factura/POS
+      await conn.query(
+        `UPDATE sales SET 
+          user_id = ?, 
+          customer_name = ?, 
+          customer_email = ?, 
+          customer_phone = ?, 
+          total = ?, 
+          payment_method = ?, 
+          type = 'pos', 
+          status = ?, 
+          discount = ?, 
+          tax = ?, 
+          is_quotation = ?, 
+          amount_paid = ? 
+         WHERE id = ?`,
+        [
+          customerUserId || null,
+          customerName || 'Consumidor Final',
+          customerEmail || null,
+          customerPhone || null,
+          finalTotal,
+          paymentMethod || 'cash',
+          saleStatus,
+          discount || 0.00,
+          tax || 0.00,
+          isQuotation ? 1 : 0,
+          finalAmountPaid,
+          saleId
+        ]
+      );
+    } else {
+      // Registrar la venta nueva
+      const [saleResult]: any = await conn.query(
+        'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          customerUserId || null,
+          customerName || 'Consumidor Final',
+          customerEmail || null,
+          customerPhone || null,
+          finalTotal,
+          paymentMethod || 'cash',
+          'pos',
+          saleStatus,
+          discount || 0.00,
+          tax || 0.00,
+          isQuotation ? 1 : 0,
+          finalAmountPaid
+        ]
+      );
+      saleId = saleResult.insertId;
+    }
 
     // Registrar detalles
     for (const item of saleItemsToInsert) {
