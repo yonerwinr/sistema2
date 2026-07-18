@@ -18,13 +18,31 @@ const router = (0, express_1.Router)();
 // - GET /all: Historial de todas las ventas (requiere admin)
 // Registrar Venta Online (Cliente / Invitado)
 router.post('/checkout', async (req, res) => {
-    const { userId, customerName, customerEmail, customerPhone, paymentMethod, items, discount, tax } = req.body;
+    const { userId, customerName, customerEmail, customerPhone, paymentMethod, items, discount, tax, couponCode } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: 'El carrito no puede estar vacio' });
     }
     const conn = await db_1.default.getConnection();
     try {
         await conn.beginTransaction();
+        // Validar cupón si se suministró alguno
+        if (couponCode) {
+            const [coupons] = await conn.query('SELECT * FROM coupons WHERE code = ? AND active = 1 FOR UPDATE', [couponCode.toUpperCase().trim()]);
+            if (coupons.length > 0) {
+                const coupon = coupons[0];
+                if (coupon.is_used === 1) {
+                    throw new Error('El cupón ya ha sido utilizado');
+                }
+                if (coupon.user_id !== null) {
+                    const currentUserId = userId || (req.user ? req.user.id : null);
+                    if (!currentUserId || Number(currentUserId) !== Number(coupon.user_id)) {
+                        throw new Error('El cupón es personal e intransferible');
+                    }
+                    // Marcar como usado
+                    await conn.query('UPDATE coupons SET is_used = 1 WHERE id = ?', [coupon.id]);
+                }
+            }
+        }
         let total = 0;
         const saleItemsToInsert = [];
         // Validar productos y stock
@@ -119,13 +137,30 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
     if (req.user?.role !== 'admin') {
         return res.status(403).json({ message: 'No autorizado. Solo administradores pueden registrar ventas POS' });
     }
-    const { customerName, customerEmail, customerPhone, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid } = req.body;
+    const { customerName, customerEmail, customerPhone, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: 'Debe agregar al menos un producto' });
     }
     const conn = await db_1.default.getConnection();
     try {
         await conn.beginTransaction();
+        // Validar cupón si se suministró alguno
+        if (couponCode) {
+            const [coupons] = await conn.query('SELECT * FROM coupons WHERE code = ? AND active = 1 FOR UPDATE', [couponCode.toUpperCase().trim()]);
+            if (coupons.length > 0) {
+                const coupon = coupons[0];
+                if (coupon.is_used === 1) {
+                    throw new Error('El cupón ya ha sido utilizado');
+                }
+                if (coupon.user_id !== null) {
+                    if (!customerUserId || Number(customerUserId) !== Number(coupon.user_id)) {
+                        throw new Error('El cupón es personal e intransferible para otro cliente');
+                    }
+                    // Marcar como usado
+                    await conn.query('UPDATE coupons SET is_used = 1 WHERE id = ?', [coupon.id]);
+                }
+            }
+        }
         let total = 0;
         const saleItemsToInsert = [];
         // Validar productos y stock
@@ -362,16 +397,27 @@ router.put('/:id/status', auth_1.authenticate, async (req, res) => {
 });
 // Validar cupón de descuento
 router.post('/coupon/validate', async (req, res) => {
-    const { code } = req.body;
+    const { code, userId } = req.body;
     if (!code) {
         return res.status(400).json({ message: 'Código de cupón requerido' });
     }
     try {
-        const [coupons] = await db_1.default.query('SELECT * FROM coupons WHERE code = ? AND active = 1', [code.toUpperCase()]);
+        const [coupons] = await db_1.default.query('SELECT * FROM coupons WHERE code = ? AND active = 1', [code.toUpperCase().trim()]);
         if (coupons.length === 0) {
             return res.status(404).json({ message: 'Cupón inválido o inactivo' });
         }
-        res.json(coupons[0]);
+        const coupon = coupons[0];
+        // Verificar si ya fue utilizado (si es de un solo uso)
+        if (coupon.is_used === 1) {
+            return res.status(400).json({ message: 'Este cupón de descuento ya ha sido utilizado' });
+        }
+        // Verificar si es personal e intransferible
+        if (coupon.user_id !== null) {
+            if (!userId || Number(userId) !== Number(coupon.user_id)) {
+                return res.status(403).json({ message: 'Este cupón es personal e intransferible para otro cliente' });
+            }
+        }
+        res.json(coupon);
     }
     catch (error) {
         console.error('Error al validar cupón:', error);
@@ -394,12 +440,16 @@ router.get('/coupons/all', auth_1.authenticate, async (req, res) => {
 });
 // Agregar cupón de descuento (Admin y Usuarios)
 router.post('/coupons', auth_1.authenticate, async (req, res) => {
-    const { code, discountPercent } = req.body;
+    const { code, discountPercent, userId } = req.body;
     if (!code || !discountPercent) {
         return res.status(400).json({ message: 'Código y porcentaje de descuento son obligatorios' });
     }
     try {
-        await db_1.default.query('INSERT INTO coupons (code, discount_percent) VALUES (?, ?)', [code.toUpperCase().trim(), discountPercent]);
+        await db_1.default.query('INSERT INTO coupons (code, discount_percent, user_id) VALUES (?, ?, ?)', [
+            code.toUpperCase().trim(),
+            discountPercent,
+            userId || null
+        ]);
         res.status(201).json({ message: 'Cupón de descuento agregado con éxito' });
     }
     catch (error) {
@@ -408,6 +458,52 @@ router.post('/coupons', auth_1.authenticate, async (req, res) => {
             return res.status(400).json({ message: 'El cupón ya existe en el sistema' });
         }
         res.status(500).json({ message: 'Error al registrar cupón' });
+    }
+});
+// Editar cupón de descuento (Solo Admin)
+router.put('/coupons/:id', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado' });
+    }
+    const { id } = req.params;
+    const { code, discountPercent, active, userId } = req.body;
+    try {
+        const [coupons] = await db_1.default.query('SELECT * FROM coupons WHERE id = ?', [id]);
+        if (coupons.length === 0) {
+            return res.status(404).json({ message: 'Cupón no encontrado' });
+        }
+        const currentCoupon = coupons[0];
+        const newCode = code !== undefined ? code.toUpperCase().trim() : currentCoupon.code;
+        const newDiscount = discountPercent !== undefined ? discountPercent : currentCoupon.discount_percent;
+        const newActive = active !== undefined ? active : currentCoupon.active;
+        const newUserId = userId !== undefined ? (userId || null) : currentCoupon.user_id;
+        await db_1.default.query('UPDATE coupons SET code = ?, discount_percent = ?, active = ?, user_id = ? WHERE id = ?', [newCode, newDiscount, newActive, newUserId, id]);
+        res.json({ message: 'Cupón actualizado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al editar cupón:', error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ message: 'Ya existe otro cupón con ese código' });
+        }
+        res.status(500).json({ message: 'Error al actualizar cupón' });
+    }
+});
+// Eliminar cupón de descuento (Solo Admin)
+router.delete('/coupons/:id', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado' });
+    }
+    const { id } = req.params;
+    try {
+        const [result] = await db_1.default.query('DELETE FROM coupons WHERE id = ?', [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Cupón no encontrado' });
+        }
+        res.json({ message: 'Cupón eliminado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al eliminar cupón:', error);
+        res.status(500).json({ message: 'Error al eliminar cupón' });
     }
 });
 // Historial de Todas las Ventas (Solo Admin)

@@ -572,6 +572,7 @@ function bindCheckoutEvents() {
   const cancelBtn = document.getElementById('checkout-cancel');
 
   let checkoutCouponPercent = 0;
+  let checkoutCouponCode = '';
 
   const closeModal = () => {
     modal?.classList.remove('open');
@@ -595,14 +596,16 @@ function bindCheckoutEvents() {
       return;
     }
     try {
-      const coupon = await api.sales.validateCoupon(code);
+      const coupon = await api.sales.validateCoupon(code, currentUser?.id);
       checkoutCouponPercent = Number(coupon.discount_percent);
+      checkoutCouponCode = coupon.code;
       if (couponStatus) {
         couponStatus.style.color = 'var(--success)';
         couponStatus.innerText = `¡Cupón ${coupon.code} aplicado! (${coupon.discount_percent}% de descuento)`;
       }
     } catch (err: any) {
       checkoutCouponPercent = 0;
+      checkoutCouponCode = '';
       if (couponStatus) {
         couponStatus.style.color = 'var(--danger)';
         couponStatus.innerText = err.message || 'Cupón inválido o inactivo';
@@ -640,7 +643,8 @@ function bindCheckoutEvents() {
         paymentMethod: payment,
         items,
         discount,
-        tax: 0
+        tax: 0,
+        couponCode: checkoutCouponCode || undefined
       });
 
       // Compra exitosa
@@ -1908,7 +1912,7 @@ function bindPOSEvents() {
       return;
     }
     try {
-      const coupon = await api.sales.validateCoupon(code);
+      const coupon = await api.sales.validateCoupon(code, posSelectedCustomerId || undefined);
       posCouponCode = coupon.code;
       posCouponDiscountPercent = Number(coupon.discount_percent);
       alert(`¡Cupón ${coupon.code} aplicado! (${coupon.discount_percent}% de descuento)`);
@@ -1992,7 +1996,8 @@ function bindPOSEvents() {
         tax: taxAmount,
         isQuotation,
         status: isPending ? 'pending' : 'completed',
-        amountPaid: posIsPending ? posInitialPayment : undefined
+        amountPaid: posIsPending ? posInitialPayment : undefined,
+        couponCode: posCouponCode || undefined
       });
 
       // Venta exitosa, limpiar estados
@@ -2692,6 +2697,11 @@ async function renderAdminCoupons() {
   panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando cupones de descuento...</div>`;
 
   try {
+    // Cargar lista de clientes si está vacía
+    if (posCustomersList.length === 0) {
+      posCustomersList = await api.auth.getCustomers();
+    }
+
     const coupons = await api.sales.getCoupons();
 
     panel.innerHTML = `
@@ -2701,13 +2711,22 @@ async function renderAdminCoupons() {
           <h3 class="mb-4" style="font-size:18px; font-weight:700;">🎟️ Crear Nuevo Cupón</h3>
           
           <form id="create-coupon-form">
-            <div class="form-group">
+            <div class="form-group mb-2">
               <label class="form-label" for="coupon-code-input">Código del Cupón</label>
               <input type="text" class="form-control" id="coupon-code-input" required placeholder="Ej. LIQUIDACION30" style="text-transform: uppercase;">
             </div>
-            <div class="form-group">
+            <div class="form-group mb-2">
               <label class="form-label" for="coupon-percent-input">Porcentaje de Descuento (%)</label>
               <input type="number" min="1" max="100" class="form-control" id="coupon-percent-input" required placeholder="Ej. 30">
+            </div>
+            <div class="form-group mb-4">
+              <label class="form-label" for="coupon-client-select">Asignar a Cliente (Opcional - Personal y Uniuso)</label>
+              <select class="form-control" id="coupon-client-select" style="padding: 8px 12px; font-size:13px;">
+                <option value="">-- Público / General --</option>
+                ${posCustomersList.map(c => `
+                  <option value="${c.id}">${c.name} (${c.email})</option>
+                `).join('')}
+              </select>
             </div>
             <button type="submit" class="btn btn-primary w-100" id="coupon-submit-btn">
               Crear Cupón
@@ -2725,22 +2744,53 @@ async function renderAdminCoupons() {
                 <tr>
                   <th>Código</th>
                   <th class="text-center">Descuento</th>
+                  <th>Destinatario / Uso</th>
                   <th class="text-center">Estado</th>
+                  <th class="text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                ${coupons.map(cp => `
-                  <tr>
-                    <td><strong>${cp.code}</strong></td>
-                    <td class="text-center" style="font-weight:700; color:var(--primary);">${cp.discount_percent}%</td>
-                    <td class="text-center">
-                      <span class="badge" style="background:${cp.active === 1 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color:${cp.active === 1 ? 'var(--success)' : 'var(--danger)'}; padding:2px 6px; font-size:11px;">
-                        ${cp.active === 1 ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                  </tr>
-                `).join('')}
-                ${coupons.length === 0 ? '<tr><td colspan="3" class="text-center">No hay cupones registrados.</td></tr>' : ''}
+                ${coupons.map(cp => {
+                  let userText = '<span style="color:var(--text-muted);">Público</span>';
+                  if (cp.user_id) {
+                    const cust = posCustomersList.find(c => c.id === cp.user_id);
+                    userText = cust ? `👤 ${cust.name}` : `👤 Cliente #${cp.user_id}`;
+                  }
+                  
+                  let useStatus = '';
+                  if (cp.user_id) {
+                    useStatus = cp.is_used === 1 
+                      ? ' <span class="badge" style="background:rgba(239,68,68,0.1); color:var(--danger); font-size:10px; padding:1px 4px;">Usado</span>' 
+                      : ' <span class="badge" style="background:rgba(16,185,129,0.1); color:var(--success); font-size:10px; padding:1px 4px;">Disponible</span>';
+                  }
+
+                  return `
+                    <tr>
+                      <td><strong>${cp.code}</strong></td>
+                      <td class="text-center" style="font-weight:700; color:var(--primary);">${cp.discount_percent}%</td>
+                      <td>
+                        <div style="font-size:12px;">${userText}</div>
+                        <div>${useStatus}</div>
+                      </td>
+                      <td class="text-center">
+                        <span class="badge" style="background:${cp.active === 1 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color:${cp.active === 1 ? 'var(--success)' : 'var(--danger)'}; padding:2px 6px; font-size:11px;">
+                          ${cp.active === 1 ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                      <td class="text-center">
+                        <div style="display: flex; gap: 6px; justify-content: center;">
+                          <button class="btn btn-secondary edit-coupon-btn" data-id="${cp.id}" data-code="${cp.code}" data-percent="${cp.discount_percent}" data-active="${cp.active}" style="padding: 6px 10px; font-size:11px;">
+                            ✏️
+                          </button>
+                          <button class="btn btn-primary delete-coupon-btn" data-id="${cp.id}" style="padding: 6px 10px; font-size:11px; background:var(--danger); border-color:var(--danger);">
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+                ${coupons.length === 0 ? '<tr><td colspan="5" class="text-center">No hay cupones registrados.</td></tr>' : ''}
               </tbody>
             </table>
           </div>
@@ -2753,13 +2803,14 @@ async function renderAdminCoupons() {
       e.preventDefault();
       const code = (document.getElementById('coupon-code-input') as HTMLInputElement).value;
       const percent = parseFloat((document.getElementById('coupon-percent-input') as HTMLInputElement).value);
+      const selectedUserId = (document.getElementById('coupon-client-select') as HTMLSelectElement).value;
 
       const submitBtn = document.getElementById('coupon-submit-btn') as HTMLButtonElement;
       submitBtn.disabled = true;
       submitBtn.innerText = 'Creando...';
 
       try {
-        await api.sales.addCoupon(code, percent);
+        await api.sales.addCoupon(code, percent, selectedUserId ? parseInt(selectedUserId) : undefined);
         alert('Cupón de descuento creado con éxito.');
         await renderAdminCoupons();
       } catch (err: any) {
@@ -2767,6 +2818,49 @@ async function renderAdminCoupons() {
         submitBtn.disabled = false;
         submitBtn.innerText = 'Crear Cupón';
       }
+    });
+
+    // Bind delete coupon
+    document.querySelectorAll('.delete-coupon-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        if (confirm(`¿Estás seguro de eliminar permanentemente este cupón?`)) {
+          try {
+            await api.sales.deleteCoupon(id);
+            alert('Cupón eliminado con éxito.');
+            await renderAdminCoupons();
+          } catch (err: any) {
+            alert(err.message || 'Error al eliminar el cupón.');
+          }
+        }
+      });
+    });
+
+    // Bind edit coupon
+    document.querySelectorAll('.edit-coupon-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        const code = (e.currentTarget as HTMLButtonElement).dataset.code || '';
+        const currentPercent = (e.currentTarget as HTMLButtonElement).dataset.percent || '0';
+
+        const newPercentStr = prompt(`Editar porcentaje de descuento para cupón ${code}:`, currentPercent);
+        if (newPercentStr === null) return;
+        const newPercent = parseFloat(newPercentStr);
+        if (isNaN(newPercent) || newPercent < 1 || newPercent > 100) {
+          alert('Por favor ingrese un porcentaje válido (1-100).');
+          return;
+        }
+
+        const newActive = confirm(`¿Deseas que el cupón ${code} esté ACTIVO? (Aceptar = Activo, Cancelar = Inactivo)`);
+
+        try {
+          await api.sales.updateCoupon(id, { discount_percent: newPercent, active: newActive ? 1 : 0 });
+          alert('Cupón actualizado con éxito.');
+          await renderAdminCoupons();
+        } catch (err: any) {
+          alert(err.message || 'Error al actualizar cupón.');
+        }
+      });
     });
 
   } catch (error) {

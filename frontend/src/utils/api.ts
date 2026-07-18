@@ -72,6 +72,8 @@ export interface Coupon {
   code: string;
   discount_percent: number;
   active: number;
+  user_id?: number | null;
+  is_used?: number;
   created_at?: string;
 }
 
@@ -162,6 +164,7 @@ export const api = {
       items: { productId: number; quantity: number }[];
       discount?: number;
       tax?: number;
+      couponCode?: string;
     }) => request<SaleResult>('/sales/checkout', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -178,6 +181,7 @@ export const api = {
       isQuotation?: boolean;
       status?: string;
       amountPaid?: number;
+      couponCode?: string;
     }) => request<SaleResult>('/sales/pos', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -195,14 +199,21 @@ export const api = {
       body: JSON.stringify({ status, abono }),
     }),
     getQuotations: () => request<Sale[]>('/sales/quotations/all'),
-    validateCoupon: (code: string) => request<Coupon>('/sales/coupon/validate', {
+    validateCoupon: (code: string, userId?: number) => request<Coupon>('/sales/coupon/validate', {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, userId }),
     }),
     getCoupons: () => request<Coupon[]>('/sales/coupons/all'),
-    addCoupon: (code: string, discountPercent: number) => request<{ message: string }>('/sales/coupons', {
+    addCoupon: (code: string, discountPercent: number, userId?: number) => request<{ message: string }>('/sales/coupons', {
       method: 'POST',
-      body: JSON.stringify({ code, discountPercent }),
+      body: JSON.stringify({ code, discountPercent, userId }),
+    }),
+    updateCoupon: (id: number, body: Partial<Coupon>) => request<{ message: string }>(`/sales/coupons/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+    deleteCoupon: (id: number) => request<{ message: string }>(`/sales/coupons/${id}`, {
+      method: 'DELETE',
     }),
   },
 

@@ -63,6 +63,17 @@ async function runMigrations() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB;
     `);
+        // Añadir columnas para cupones personales y de un solo uso
+        const [couponColumns] = await conn.query('SHOW COLUMNS FROM coupons');
+        const couponColumnNames = couponColumns.map((col) => col.Field);
+        if (!couponColumnNames.includes('user_id')) {
+            await conn.query('ALTER TABLE coupons ADD COLUMN user_id INT NULL');
+            console.log('Columna "user_id" agregada a la tabla coupons.');
+        }
+        if (!couponColumnNames.includes('is_used')) {
+            await conn.query('ALTER TABLE coupons ADD COLUMN is_used TINYINT NOT NULL DEFAULT 0');
+            console.log('Columna "is_used" agregada a la tabla coupons.');
+        }
         // Insertar cupones por defecto si está vacía
         const [existingCoupons] = await conn.query('SELECT id FROM coupons LIMIT 1');
         if (existingCoupons.length === 0) {
