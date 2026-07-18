@@ -98,15 +98,14 @@ async function runMigrations() {
       ) ENGINE=InnoDB;
     `);
         // Insertar configuraciones por defecto si no existen
-        const [existingSettings] = await conn.query('SELECT settings_key FROM settings LIMIT 1');
-        if (existingSettings.length === 0) {
-            await conn.query(`
-        INSERT INTO settings (settings_key, settings_value) VALUES 
-        ('debtor_reminder_frequency_days', '7'),
-        ('debtor_reminder_email_template', 'Hola {customerName},\\n\\nTe recordamos amablemente que tienes un saldo pendiente de \${amountPending} de tu compra con factura #{saleId}.\\n\\nPor favor realiza el pago correspondiente lo antes posible para saldar tu cuenta.\\n\\n¡Muchas gracias por tu preferencia!')
-      `);
-            console.log('Configuraciones iniciales insertadas.');
-        }
+        await conn.query(`
+      INSERT IGNORE INTO settings (settings_key, settings_value) VALUES 
+      ('debtor_reminder_frequency_days', '7'),
+      ('debtor_reminder_email_template', 'Hola {customerName},\\n\\nTe recordamos amablemente que tienes un saldo pendiente de \${amountPending} de tu compra con factura #{saleId}.\\n\\nPor favor realiza el pago correspondiente lo antes posible para saldar tu cuenta.\\n\\n¡Muchas gracias por tu preferencia!'),
+      ('usd_to_ves_rate', '40.00'),
+      ('eur_to_ves_rate', '43.50')
+    `);
+        console.log('Configuraciones iniciales de tasas y recordatorios verificadas.');
         console.log('Migraciones completadas exitosamente.');
     }
     catch (error) {

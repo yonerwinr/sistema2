@@ -7,6 +7,7 @@ exports.sendInvoiceEmail = sendInvoiceEmail;
 exports.sendPlainEmail = sendPlainEmail;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const db_1 = __importDefault(require("../config/db"));
 dotenv_1.default.config();
 let transporter = null;
 // Inicializa el transportador SMTP
@@ -56,6 +57,21 @@ async function getTransporter() {
 async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
     try {
         const client = await getTransporter();
+        // Obtener tasas de cambio oficiales
+        let rateUsdToVes = 40.00;
+        let rateEurToVes = 43.50;
+        try {
+            const [settingsRows] = await db_1.default.query("SELECT * FROM settings WHERE settings_key IN ('usd_to_ves_rate', 'eur_to_ves_rate')");
+            const usdSetting = settingsRows.find((s) => s.settings_key === 'usd_to_ves_rate');
+            const eurSetting = settingsRows.find((s) => s.settings_key === 'eur_to_ves_rate');
+            if (usdSetting)
+                rateUsdToVes = parseFloat(usdSetting.settings_value);
+            if (eurSetting)
+                rateEurToVes = parseFloat(eurSetting.settings_value);
+        }
+        catch (dbErr) {
+            console.error('Error al consultar tasas para email:', dbErr);
+        }
         const subtotal = items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
         const itemsHtml = items.map(item => `
       <tr>
@@ -301,8 +317,16 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
                 </tr>
                 ` : ''}
                 <tr style="border-top: 1px solid #e2e8f0;">
-                  <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #4f46e5;">TOTAL:</td>
+                  <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #4f46e5;">TOTAL USD:</td>
                   <td style="padding: 10px 0; text-align: right; font-size: 18px; font-weight: 700; color: #4f46e5;">$${Number(sale.total).toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #f59e0b; font-weight: 700;">TOTAL Bs. (BCV):</td>
+                  <td style="padding: 6px 0; text-align: right; font-weight: 700; color: #f59e0b;">Bs. ${(Number(sale.total) * rateUsdToVes).toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 0; color: #64748b; font-size: 11px;">Equivalente EUR (€):</td>
+                  <td style="padding: 4px 0; text-align: right; color: #64748b; font-size: 11px;">€ ${((Number(sale.total) * rateUsdToVes) / rateEurToVes).toFixed(2)}</td>
                 </tr>
               </table>
               <div style="clear: both;"></div>

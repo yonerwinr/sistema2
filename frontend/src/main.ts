@@ -43,6 +43,8 @@ let posCouponCode = '';
 let posCouponDiscountPercent = 0;
 let posIsPending = false;
 let posInitialPayment = 0;
+let rateUsdToVes = 40.00;
+let rateEurToVes = 43.50;
 
 // Instancias de Chart.js para destruirlas al cambiar de pestaña
 let revenueChartInstance: Chart | null = null;
@@ -92,6 +94,15 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Cargar productos iniciales
   await loadProducts();
+
+  // Cargar tasas de cambio
+  try {
+    const rates = await api.sales.getExchangeRates();
+    rateUsdToVes = rates.usdToVes;
+    rateEurToVes = rates.eurToVes;
+  } catch (e) {
+    console.error('Error al cargar tasas de cambio en el arranque:', e);
+  }
 
   // Renderizar e iniciar animaciones
   navigate('store');
@@ -177,6 +188,12 @@ function renderNavbar(): string {
   const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return `
+    <div class="exchange-rate-banner" style="background: rgba(16,185,129,0.06); border-bottom: 1px solid var(--border-glass); padding: 6px 0; font-size: 11px; font-weight: 600; text-align: center; color: var(--success); display: flex; justify-content: center; gap: 16px; align-items:center;">
+      <span>💵 Tasa Oficial (BCV):</span>
+      <span>Dólar $: <strong>Bs. ${rateUsdToVes.toFixed(2)}</strong></span>
+      <span style="color:var(--text-muted);">|</span>
+      <span>Euro €: <strong>Bs. ${rateEurToVes.toFixed(2)}</strong></span>
+    </div>
     <nav class="navbar">
       <div class="container navbar-container">
         <a class="logo" href="#" id="nav-logo">
@@ -540,11 +557,29 @@ function renderCheckoutModal(): string {
             <small style="color:var(--text-muted); font-size:11px;">Codigo de pais incluido (ej. +54 o +57).</small>
           </div>
           <div class="form-group">
-            <label class="form-label">Metodo de Pago</label>
+            <label class="form-label">Método de Pago</label>
             <select class="form-control" id="checkout-payment" required>
-              <option value="card">Tarjeta de Credito / Debito</option>
-              <option value="transfer">Transferencia Bancaria (Pago Pendiente)</option>
+              <option value="pago_movil">📱 Pago Móvil (Bs.)</option>
+              <option value="zelle">💸 Zelle ($)</option>
+              <option value="transferencia_ves">🏢 Transferencia Bancaria (Bs.)</option>
+              <option value="binance">🔶 Binance Pay</option>
+              <option value="paypal">🅿️ PayPal ($)</option>
             </select>
+          </div>
+
+          <!-- Resumen de Pago Multimoneda -->
+          <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; margin-bottom: 16px; border: 1px dashed var(--border-glass); font-size:13px;">
+            <div class="flex justify-between" style="font-weight:700;">
+              <span>Total Compra (USD)</span>
+              <span style="color:var(--primary); font-size:16px;">$${cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0).toFixed(2)}</span>
+            </div>
+            <div class="flex justify-between mt-1" style="font-weight:600; color: #f59e0b;">
+              <span>Equivalente en Bolívares (Bs.)</span>
+              <span>Bs. ${(cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0) * rateUsdToVes).toFixed(2)}</span>
+            </div>
+            <small style="color: var(--text-muted); font-size:10px; display:block; margin-top:6px; line-height:1.2;">
+              * Tasa oficial de cambio (BCV): 1 USD = Bs. ${rateUsdToVes.toFixed(2)}. Si aplicas un cupón de descuento, el descuento se calculará sobre el total de tu factura.
+            </small>
           </div>
           
           <div class="form-group mb-4">
@@ -765,7 +800,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     if (discountVal > 0) extraHeight += 18;
     if (taxVal > 0) extraHeight += 18;
     
-    const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight + extraHeight;
+    const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight + extraHeight + 40;
 
     canvas.width = width;
     canvas.height = height;
@@ -933,16 +968,37 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     y += 25;
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 13px Outfit, Segoe UI';
-    ctx.fillText('TOTAL NETO', 30, y);
+    ctx.font = 'bold 12px Outfit, Segoe UI';
+    ctx.fillText('TOTAL NETO (USD)', 30, y);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#6366f1';
-    ctx.font = 'bold 20px Outfit, Segoe UI';
+    ctx.font = 'bold 18px Outfit, Segoe UI';
     ctx.fillText(`$${Number(sale.total).toFixed(2)}`, width - 30, y);
 
+    const totalVes = Number(sale.total) * rateUsdToVes;
+    const totalEur = totalVes / rateEurToVes;
+
+    y += 18;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = 'bold 11px Outfit, Segoe UI';
+    ctx.fillText('Equivalente Bs. (BCV)', 30, y);
+
+    ctx.textAlign = 'right';
+    ctx.fillText(`Bs. ${totalVes.toFixed(2)}`, width - 30, y);
+
+    y += 16;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '10px Outfit, Segoe UI';
+    ctx.fillText('Equivalente EUR (€)', 30, y);
+
+    ctx.textAlign = 'right';
+    ctx.fillText(`€ ${totalEur.toFixed(2)}`, width - 30, y);
+
     // Divisor
-    y += 25;
+    y += 20;
     ctx.strokeStyle = 'rgba(255,255,255,0.1)';
     ctx.beginPath();
     ctx.moveTo(30, y);
@@ -1004,7 +1060,16 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
   const emailBox = document.getElementById('success-email-box');
   const emailBtn = document.getElementById('success-email-btn') as HTMLAnchorElement;
 
-  if (totalEl) totalEl.innerText = `$${Number(result.total).toFixed(2)}`;
+  if (totalEl) {
+    const totalUsd = Number(result.total);
+    const totalVes = totalUsd * rateUsdToVes;
+    const totalEur = totalVes / rateEurToVes;
+    totalEl.innerHTML = `
+      <div style="font-size:24px; color:var(--primary); font-weight:700;">$${totalUsd.toFixed(2)}</div>
+      <div style="font-size:15px; color:#f59e0b; font-weight:600; margin-top:2px;">Bs. ${totalVes.toFixed(2)}</div>
+      <div style="font-size:11px; color:var(--text-muted); font-weight:500;">€ ${totalEur.toFixed(2)}</div>
+    `;
+  }
   if (idEl) idEl.innerText = `ID de Venta: #${result.saleId}`;
 
   // WhatsApp Link - Interceptado por click
@@ -1325,28 +1390,50 @@ function renderAdminView(): string {
   return `
     <div class="dashboard-layout">
       <!-- Sidebar de Administracion -->
-      <aside class="dashboard-sidebar">
-        <button class="sidebar-nav-btn ${activeAdminView === 'stats' ? 'active' : ''}" id="admin-tab-stats">
-          ${icons.dashboard} Estadisticas
-        </button>
-        <button class="sidebar-nav-btn ${activeAdminView === 'pos' ? 'active' : ''}" id="admin-tab-pos">
-          ${icons.pos} Punto de Venta (POS)
-        </button>
-        <button class="sidebar-nav-btn ${activeAdminView === 'products' ? 'active' : ''}" id="admin-tab-products">
-          ${icons.products} Catalogo Productos
-        </button>
-        <button class="sidebar-nav-btn ${activeAdminView === 'sales' ? 'active' : ''}" id="admin-tab-sales">
-          ${icons.sales} Historico Ventas
-        </button>
-        <button class="sidebar-nav-btn ${activeAdminView === 'debtors' ? 'active' : ''}" id="admin-tab-debtors">
-          💸 Deudores
-        </button>
-        <button class="sidebar-nav-btn ${activeAdminView === 'quotations' ? 'active' : ''}" id="admin-tab-quotations">
-          📝 Cotizaciones
-        </button>
-        <button class="sidebar-nav-btn ${activeAdminView === 'coupons' ? 'active' : ''}" id="admin-tab-coupons">
-          🎟️ Cupones
-        </button>
+      <aside class="dashboard-sidebar" style="display:flex; flex-direction:column; justify-content:space-between; min-height: 500px;">
+        <div>
+          <button class="sidebar-nav-btn ${activeAdminView === 'stats' ? 'active' : ''}" id="admin-tab-stats">
+            ${icons.dashboard} Estadisticas
+          </button>
+          <button class="sidebar-nav-btn ${activeAdminView === 'pos' ? 'active' : ''}" id="admin-tab-pos">
+            ${icons.pos} Punto de Venta (POS)
+          </button>
+          <button class="sidebar-nav-btn ${activeAdminView === 'products' ? 'active' : ''}" id="admin-tab-products">
+            ${icons.products} Catalogo Productos
+          </button>
+          <button class="sidebar-nav-btn ${activeAdminView === 'sales' ? 'active' : ''}" id="admin-tab-sales">
+            ${icons.sales} Historico Ventas
+          </button>
+          <button class="sidebar-nav-btn ${activeAdminView === 'debtors' ? 'active' : ''}" id="admin-tab-debtors">
+            💸 Deudores
+          </button>
+          <button class="sidebar-nav-btn ${activeAdminView === 'quotations' ? 'active' : ''}" id="admin-tab-quotations">
+            📝 Cotizaciones
+          </button>
+          <button class="sidebar-nav-btn ${activeAdminView === 'coupons' ? 'active' : ''}" id="admin-tab-coupons">
+            🎟️ Cupones
+          </button>
+        </div>
+
+        <!-- Tasas de Cambio Widget -->
+        <div class="card" style="margin-top: 20px; padding: 12px; font-size:11px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
+          <div style="font-weight:700; margin-bottom: 8px; display:flex; align-items:center; gap:4px; color:var(--primary);">
+            💵 Tasas del Día (BCV)
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+              <span>$ a Bs:</span>
+              <input type="number" step="0.01" id="rate-usd-input" value="${rateUsdToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+              <span>€ a Bs:</span>
+              <input type="number" step="0.01" id="rate-eur-input" value="${rateEurToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
+            </div>
+            <button class="btn btn-primary" id="save-rates-btn" style="padding:4px 8px; font-size:10px; margin-top:4px; width:100%;">
+              Actualizar Tasas
+            </button>
+          </div>
+        </div>
       </aside>
 
       <!-- Panel de Contenido -->
@@ -1451,6 +1538,33 @@ async function bindAdminEvents() {
   } else if (activeAdminView === 'coupons') {
     await renderAdminCoupons();
   }
+
+  // Guardar Tasas de Cambio
+  document.getElementById('save-rates-btn')?.addEventListener('click', async () => {
+    const usdVal = parseFloat((document.getElementById('rate-usd-input') as HTMLInputElement).value);
+    const eurVal = parseFloat((document.getElementById('rate-eur-input') as HTMLInputElement).value);
+
+    if (isNaN(usdVal) || usdVal <= 0 || isNaN(eurVal) || eurVal <= 0) {
+      alert('Por favor ingrese tasas válidas mayores a 0.');
+      return;
+    }
+
+    const btn = document.getElementById('save-rates-btn') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.innerText = 'Guardando...';
+
+    try {
+      await api.sales.updateExchangeRates({ usdToVes: usdVal, eurToVes: eurVal });
+      rateUsdToVes = usdVal;
+      rateEurToVes = eurVal;
+      alert('Tasas de cambio oficiales actualizadas con éxito.');
+      navigate('admin'); // Recargar vista admin para refrescar todo
+    } catch (err: any) {
+      alert(err.message || 'Error al actualizar tasas de cambio.');
+      btn.disabled = false;
+      btn.innerText = 'Actualizar Tasas';
+    }
+  });
 }
 
 // ==========================================================================
@@ -1732,11 +1846,17 @@ async function renderAdminPOS() {
               <input type="tel" class="form-control" id="pos-client-phone" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. +5491122334455" value="${posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.phone || '') : ''}">
             </div>
             <div class="form-group mb-2">
-              <label class="form-label" style="font-size:10px;">Metodo de Pago</label>
+              <label class="form-label" style="font-size:10px;">Método de Pago</label>
               <select class="form-control" id="pos-client-payment" style="padding: 8px 12px; font-size:13px;">
-                <option value="cash">Efectivo</option>
-                <option value="card">Tarjeta</option>
-                <option value="transfer">Transferencia</option>
+                <option value="efectivo_usd">💵 Efectivo USD ($)</option>
+                <option value="efectivo_ves">💵 Efectivo Bs. (VES)</option>
+                <option value="efectivo_eur">💶 Efectivo EUR (€)</option>
+                <option value="pago_movil">📱 Pago Móvil</option>
+                <option value="zelle">💸 Zelle ($)</option>
+                <option value="punto_de_venta">💳 Punto de Venta (Bs.)</option>
+                <option value="transferencia_ves">🏢 Transferencia Bancaria (Bs.)</option>
+                <option value="paypal">🅿️ PayPal ($)</option>
+                <option value="binance">🔶 Binance Pay</option>
               </select>
             </div>
 
@@ -1797,9 +1917,21 @@ async function renderAdminPOS() {
                 <span>$${taxAmount.toFixed(2)}</span>
               </div>
               ` : ''}
-              <div class="flex justify-between" style="font-size:18px; font-weight:700; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
-                <span>Total</span>
-                <span style="color:var(--primary);">$${posTotal.toFixed(2)}</span>
+              
+              <!-- Desglose Multimoneda (Venezuela) -->
+              <div style="background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; margin-top: 8px; border: 1px dashed var(--border-glass);">
+                <div class="flex justify-between" style="font-size:16px; font-weight:700;">
+                  <span>Total USD ($)</span>
+                  <span style="color:var(--primary);">$${posTotal.toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between mt-1" style="font-size:14px; font-weight:600; color: #f59e0b;">
+                  <span>Total VES (Bs.)</span>
+                  <span>Bs. ${(posTotal * rateUsdToVes).toFixed(2)}</span>
+                </div>
+                <div class="flex justify-between mt-1" style="font-size:12px; color: var(--text-muted);">
+                  <span>Equivalente EUR (€)</span>
+                  <span>€ ${((posTotal * rateUsdToVes) / rateEurToVes).toFixed(2)}</span>
+                </div>
               </div>
             </div>
 
@@ -2411,7 +2543,16 @@ function showSaleDetails(details: SaleDetail) {
   if (clientEmail) clientEmail.innerText = sale.customer_email ? `Email: ${sale.customer_email}` : '';
   if (typeEl) typeEl.innerText = sale.type.toUpperCase();
   if (paymentEl) paymentEl.innerText = sale.payment_method;
-  if (totalVal) totalVal.innerText = `$${Number(sale.total).toFixed(2)}`;
+  if (totalVal) {
+    const totalUsd = Number(sale.total);
+    const totalVes = totalUsd * rateUsdToVes;
+    const totalEur = totalVes / rateEurToVes;
+    totalVal.innerHTML = `
+      <div style="font-size:22px; color:var(--primary); font-weight:700;">$${totalUsd.toFixed(2)}</div>
+      <div style="font-size:14px; color:#f59e0b; font-weight:600;">Bs. ${totalVes.toFixed(2)}</div>
+      <div style="font-size:11px; color:var(--text-muted); font-weight:500;">Equiv. € ${totalEur.toFixed(2)}</div>
+    `;
+  }
 
   // Elementos
   if (tableBody) {

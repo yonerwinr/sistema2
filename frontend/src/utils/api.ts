@@ -223,6 +223,11 @@ export const api = {
     sendManualReminder: (id: number) => request<{ message: string }>(`/sales/${id}/remind`, {
       method: 'POST',
     }),
+    getExchangeRates: () => request<{ usdToVes: number; eurToVes: number }>('/sales/settings/rates'),
+    updateExchangeRates: (body: { usdToVes: number; eurToVes: number }) => request<{ message: string }>('/sales/settings/rates', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
   },
 
   // Estadísticas (Dashboard Admin)
