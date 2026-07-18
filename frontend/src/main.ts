@@ -711,6 +711,11 @@ function renderInvoiceSuccessModal(): string {
             ✉️ Factura enviada automáticamente al correo
           </div>
 
+          <!-- Enviar/Reenviar por Correo Electrónico Manual -->
+          <button class="btn btn-secondary w-100" id="success-manual-email-btn" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; margin-top: 8px;">
+            ✉️ Enviar por Correo Electrónico
+          </button>
+
           <!-- Copiar al Portapapeles (Texto Fallback) -->
           <button class="btn btn-secondary w-100" id="success-copy-btn" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; margin-top: 8px;">
             📄 Copiar Factura en Texto
@@ -1044,6 +1049,39 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
     if (emailBtn) emailBtn.href = result.emailPreviewUrl;
   } else {
     if (emailBox) emailBox.style.display = 'none';
+  }
+
+  // Configurar botón manual de correo electrónico
+  const manualEmailBtn = document.getElementById('success-manual-email-btn') as HTMLButtonElement;
+  if (manualEmailBtn) {
+    const newManualEmailBtn = manualEmailBtn.cloneNode(true) as HTMLButtonElement;
+    manualEmailBtn.parentNode?.replaceChild(newManualEmailBtn, manualEmailBtn);
+
+    newManualEmailBtn.addEventListener('click', async () => {
+      let targetEmail = clientEmail || '';
+      
+      const inputEmail = prompt('Ingrese el correo electrónico al cual desea enviar la factura:', targetEmail);
+      if (inputEmail === null) return; // cancelado
+      
+      if (!inputEmail || !inputEmail.includes('@')) {
+        alert('Por favor, ingrese un correo electrónico válido.');
+        return;
+      }
+
+      newManualEmailBtn.disabled = true;
+      newManualEmailBtn.innerText = 'Enviando...';
+
+      try {
+        await api.sales.resendEmail(result.saleId, inputEmail);
+        alert(`¡Factura enviada con éxito a ${inputEmail}!`);
+      } catch (err: any) {
+        console.error(err);
+        alert(err.message || 'Error al enviar la factura por correo.');
+      } finally {
+        newManualEmailBtn.disabled = false;
+        newManualEmailBtn.innerText = '✉️ Enviar por Correo Electrónico';
+      }
+    });
   }
 
   // Generar y configurar la imagen de la factura

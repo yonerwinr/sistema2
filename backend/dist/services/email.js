@@ -55,6 +55,7 @@ async function getTransporter() {
 async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
     try {
         const client = await getTransporter();
+        const subtotal = items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
         const itemsHtml = items.map(item => `
       <tr>
         <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${item.name}</td>
@@ -239,8 +240,8 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
       <body>
         <div class="container">
           <div class="header">
-            <h1>Comprobante de Pago</h1>
-            <p>¡Gracias por tu compra!</p>
+            <h1>${sale.is_quotation === 1 ? 'Cotización al Mayor' : 'Comprobante de Pago'}</h1>
+            <p>${sale.is_quotation === 1 ? 'Detalle de la cotización solicitada' : '¡Gracias por tu compra!'}</p>
           </div>
           <div class="content">
             ${isResend ? `
@@ -250,38 +251,28 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
             ` : ''}
             <div class="info-grid">
               <div class="info-col">
-                <div class="label">Facturado a:</div>
+                <div class="label">${sale.is_quotation === 1 ? 'Cotizado a:' : 'Facturado a:'}</div>
                 <div class="value"><strong>${sale.customer_name || 'Cliente General'}</strong></div>
-                ${sale.customer_phone ? `<div class="value">${sale.customer_phone}</div>` : ''}
-                ${sale.customer_email ? `<div class="value">${sale.customer_email}</div>` : ''}
+                <div>${sale.customer_phone || ''}</div>
+                <div>${sale.customer_email || ''}</div>
               </div>
-              <div class="info-col right">
-                <div class="label">No. Factura:</div>
-                <div class="value">#${sale.id}</div>
-                <div class="label" style="margin-top: 12px;">Fecha:</div>
-                <div class="value">${invoiceDate}</div>
-              </div>
-            </div>
-
-            <div class="info-grid" style="margin-top: -12px; margin-bottom: 24px;">
               <div class="info-col">
-                <div class="label">Tipo de Compra:</div>
-                <div class="value" style="text-transform: uppercase;">${sale.type}</div>
-              </div>
-              <div class="info-col right">
-                <div class="label">Metodo de Pago:</div>
-                <div class="value" style="text-transform: uppercase;">${sale.payment_method}</div>
+                <div class="label">Detalles del Documento:</div>
+                <div>Fecha: <strong>${invoiceDate}</strong></div>
+                <div>Tipo: <strong>${sale.is_quotation === 1 ? 'COTIZACIÓN' : sale.type.toUpperCase()}</strong></div>
+                <div>Método Pago: <strong style="text-transform: uppercase;">${sale.payment_method}</strong></div>
+                ${sale.status === 'pending' ? `<div>Estado Pago: <strong style="color:#ef4444;">PENDIENTE (Deuda)</strong></div>` : ''}
               </div>
             </div>
 
-            <div class="table-container">
-              <table>
+            <div class="totals" style="margin-top: 24px;">
+              <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
                 <thead>
-                  <tr>
-                    <th style="text-align: left;">Producto</th>
-                    <th style="text-align: center; width: 60px;">Cant.</th>
-                    <th style="text-align: right; width: 80px;">P. Unit</th>
-                    <th style="text-align: right; width: 100px;">Total</th>
+                  <tr style="background-color: #f8fafc;">
+                    <th style="padding: 12px; text-align: left; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; border-bottom: 2px solid #e2e8f0;">Producto</th>
+                    <th style="padding: 12px; text-align: center; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; width: 80px;">Cant.</th>
+                    <th style="padding: 12px; text-align: right; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; width: 100px;">Precio Un.</th>
+                    <th style="padding: 12px; text-align: right; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; width: 100px;">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -290,16 +281,35 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
               </table>
             </div>
 
-            <div class="totals">
-              <div class="total-box">
-                <div class="total-label">TOTAL NETO</div>
-                <div class="total-value">$${Number(sale.total).toFixed(2)}</div>
-              </div>
+            <div class="totals-summary" style="margin-top: 20px;">
+              <table style="width: 250px; float: right; font-size: 13px; margin-top: 16px;">
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Subtotal:</td>
+                  <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #2d3748;">$${subtotal.toFixed(2)}</td>
+                </tr>
+                ${Number(sale.discount) > 0 ? `
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">Descuento:</td>
+                  <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #ef4444;">-$${Number(sale.discount).toFixed(2)}</td>
+                </tr>
+                ` : ''}
+                ${Number(sale.tax) > 0 ? `
+                <tr>
+                  <td style="padding: 6px 0; color: #64748b;">IVA (16%):</td>
+                  <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #2d3748;">$${Number(sale.tax).toFixed(2)}</td>
+                </tr>
+                ` : ''}
+                <tr style="border-top: 1px solid #e2e8f0;">
+                  <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #4f46e5;">TOTAL:</td>
+                  <td style="padding: 10px 0; text-align: right; font-size: 18px; font-weight: 700; color: #4f46e5;">$${Number(sale.total).toFixed(2)}</td>
+                </tr>
+              </table>
+              <div style="clear: both;"></div>
             </div>
           </div>
           <div class="footer">
-            Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
-            <br>&copy; ${new Date().getFullYear()} POS Online. Todos los derechos reservados.
+            <p>Este es un correo automático generado por nuestro Sistema POS y Tienda Online.</p>
+            <p>&copy; ${new Date().getFullYear()} POS Online. Todos los derechos reservados.</p>
           </div>
         </div>
       </body>
@@ -307,20 +317,21 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
     `;
         const plainTextContent = `
 ${isResend ? `⚠️ ESTE CORREO ES UN REENVÍO DE LA FACTURA ORIGINAL EMITIDA EL ${invoiceDate}.\n` : ''}=========================================
-📄 COMPROBANTE DE COMPRA - FACTURA #${sale.id}
+📄 ${sale.is_quotation === 1 ? 'COTIZACIÓN AL MAYOR' : 'COMPROBANTE DE COMPRA - FACTURA'} #${sale.id}
 =========================================
-¡Gracias por tu compra!
+${sale.is_quotation === 1 ? 'Detalle de cotización' : '¡Gracias por tu compra!'}
 
-Facturado a: ${sale.customer_name || 'Cliente General'}
+${sale.is_quotation === 1 ? 'Cotizado a:' : 'Facturado a:'} ${sale.customer_name || 'Cliente General'}
 Fecha: ${invoiceDate}
-Tipo de Compra: ${sale.type.toUpperCase()}
+Tipo: ${sale.is_quotation === 1 ? 'COTIZACIÓN' : sale.type.toUpperCase()}
 Metodo de Pago: ${sale.payment_method.toUpperCase()}
-
+${sale.status === 'pending' ? 'Estado Pago: PENDIENTE (Deuda)\n' : ''}
 Detalle de Productos:
 ${items.map(item => `- ${item.name} x${item.quantity} ($${Number(item.price).toFixed(2)}) = $${(Number(item.price) * item.quantity).toFixed(2)}`).join('\n')}
 
 -----------------------------------------
-TOTAL NETO: $${Number(sale.total).toFixed(2)}
+SUBTOTAL: $${subtotal.toFixed(2)}
+${Number(sale.discount) > 0 ? `DESCUENTO: -$${Number(sale.discount).toFixed(2)}\n` : ''}${Number(sale.tax) > 0 ? `IVA (16%): $${Number(sale.tax).toFixed(2)}\n` : ''}TOTAL: $${Number(sale.total).toFixed(2)}
 =========================================
 Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
 © ${new Date().getFullYear()} POS Online. Todos los derechos reservados.
@@ -328,7 +339,9 @@ Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
         const info = await client.sendMail({
             from: fromAddress,
             to: toEmail,
-            subject: `${isResend ? '[REENVÍO] ' : ''}Factura de compra #${sale.id} - POS Online`,
+            subject: sale.is_quotation === 1
+                ? `Cotización al mayor #${sale.id} - POS Online`
+                : `${isResend ? '[REENVÍO] ' : ''}Factura de compra #${sale.id} - POS Online`,
             text: plainTextContent,
             html: htmlContent
         });

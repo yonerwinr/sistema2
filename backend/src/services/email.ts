@@ -52,6 +52,7 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
 export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[], isResend: boolean = false): Promise<string> {
   try {
     const client = await getTransporter();
+    const subtotal = items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
 
     const itemsHtml = items.map(item => `
       <tr>
