@@ -46,6 +46,30 @@ async function runMigrations() {
       console.error('Error al modificar columna role:', err.message);
     }
 
+    // Verificar y agregar columna ci a la tabla users
+    try {
+      const [userCols]: any = await conn.query('SHOW COLUMNS FROM users');
+      const userColNames = userCols.map((c: any) => c.Field);
+      if (!userColNames.includes('ci')) {
+        await conn.query('ALTER TABLE users ADD COLUMN ci VARCHAR(30) NULL UNIQUE');
+        console.log('Columna "ci" agregada a la tabla users.');
+      }
+    } catch (err: any) {
+      console.error('Error al agregar columna ci a la tabla users:', err.message);
+    }
+
+    // Verificar y agregar columna customer_ci a la tabla sales
+    try {
+      const [salesCols]: any = await conn.query('SHOW COLUMNS FROM sales');
+      const salesColNames = salesCols.map((c: any) => c.Field);
+      if (!salesColNames.includes('customer_ci')) {
+        await conn.query('ALTER TABLE sales ADD COLUMN customer_ci VARCHAR(30) NULL');
+        console.log('Columna "customer_ci" agregada a la tabla sales.');
+      }
+    } catch (err: any) {
+      console.error('Error al agregar columna customer_ci a la tabla sales:', err.message);
+    }
+
     // Modificar columna payment_method para permitir VARCHAR(50)
     try {
       await conn.query("ALTER TABLE sales MODIFY COLUMN payment_method VARCHAR(50) NOT NULL DEFAULT 'cash'");

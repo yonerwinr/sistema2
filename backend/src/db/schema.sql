@@ -8,8 +8,9 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    role ENUM('admin', 'customer') DEFAULT 'customer',
+    role ENUM('admin', 'customer', 'seller') DEFAULT 'customer',
     phone VARCHAR(20) NULL,
+    ci VARCHAR(30) NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS sales (
     type ENUM('online', 'pos') NOT NULL DEFAULT 'pos',
     status ENUM('pending', 'completed', 'cancelled') NOT NULL DEFAULT 'completed',
     coupon_code VARCHAR(50) NULL,
+    customer_ci VARCHAR(30) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;

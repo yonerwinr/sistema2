@@ -9,27 +9,39 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secreta_pos_online_token_key
 
 // Registro de Usuario (Clientes)
 router.post('/register', async (req, res) => {
-  const { name, email, password, phone } = req.body;
+  const { name, email, password, phone, ci } = req.body;
 
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: 'Nombre, correo y contrasena son obligatorios' });
+  if (!name || !email || !password || !ci) {
+    return res.status(400).json({ message: 'Nombre, correo, contraseña y cédula son obligatorios' });
+  }
+
+  // Validar formato de cédula V-12345678 o E-12345678
+  const ciPattern = /^[VE]-\d{5,10}$/;
+  if (!ciPattern.test(ci)) {
+    return res.status(400).json({ message: 'Formato de cédula inválido. Debe comenzar con V- o E- seguido de 5 a 10 dígitos numéricos (ej: V-12345678)' });
   }
 
   try {
-    // Verificar si el usuario ya existe
+    // Verificar si el usuario ya existe por correo
     const [existing]: any = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) {
-      return res.status(400).json({ message: 'El correo electronico ya esta registrado' });
+      return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
     }
 
-    // Encriptar contrasena
+    // Verificar si la cédula ya existe
+    const [existingCI]: any = await pool.query('SELECT id FROM users WHERE ci = ?', [ci]);
+    if (existingCI.length > 0) {
+      return res.status(400).json({ message: 'La cédula de identidad ya está registrada por otro usuario' });
+    }
+
+    // Encriptar contraseña
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Insertar usuario
     const [result]: any = await pool.query(
-      'INSERT INTO users (name, email, password, role, phone) VALUES (?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, 'customer', phone || null]
+      'INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, 'customer', phone || null, ci]
     );
 
     const userId = result.insertId;
@@ -43,7 +55,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: userId, name, email, role: 'customer', phone }
+      user: { id: userId, name, email, role: 'customer', phone, ci }
     });
   } catch (error) {
     console.error('Error en registro:', error);
