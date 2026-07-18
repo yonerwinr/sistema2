@@ -328,19 +328,11 @@ Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
     `;
 
     const info = await client.sendMail({
-      from: friendlyFrom,
+      from: fromAddress,
       to: toEmail,
       subject: `${isResend ? '[REENVÍO] ' : ''}Factura de compra #${sale.id} - POS Online`,
       text: plainTextContent,
-      html: htmlContent,
-      headers: {
-        'X-Priority': '3',
-        'X-MSMail-Priority': 'Normal',
-        'Importance': 'Normal',
-        'X-Mailer': 'Nodemailer',
-        'Precedence': 'transactional',
-        'X-Auto-Response-Suppress': 'OOF, AutoReply'
-      }
+      html: htmlContent
     });
 
     const testUrl = nodemailer.getTestMessageUrl(info);
