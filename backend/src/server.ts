@@ -37,6 +37,22 @@ async function runMigrations() {
   const conn = await pool.getConnection();
   try {
     console.log('Iniciando migraciones de base de datos...');
+
+    // Modificar columna role para permitir 'seller'
+    try {
+      await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'customer', 'seller') DEFAULT 'customer'");
+      console.log('Columna "role" de la tabla users modificada para incluir "seller".');
+    } catch (err: any) {
+      console.error('Error al modificar columna role:', err.message);
+    }
+
+    // Modificar columna payment_method para permitir VARCHAR(50)
+    try {
+      await conn.query("ALTER TABLE sales MODIFY COLUMN payment_method VARCHAR(50) NOT NULL DEFAULT 'cash'");
+      console.log('Columna "payment_method" de la tabla sales modificada a VARCHAR(50).');
+    } catch (err: any) {
+      console.error('Error al modificar columna payment_method:', err.message);
+    }
     
     // Verificar si existen las columnas en la tabla sales
     const [columns]: any = await conn.query('SHOW COLUMNS FROM sales');

@@ -35,6 +35,22 @@ async function runMigrations() {
     const conn = await db_1.default.getConnection();
     try {
         console.log('Iniciando migraciones de base de datos...');
+        // Modificar columna role para permitir 'seller'
+        try {
+            await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'customer', 'seller') DEFAULT 'customer'");
+            console.log('Columna "role" de la tabla users modificada para incluir "seller".');
+        }
+        catch (err) {
+            console.error('Error al modificar columna role:', err.message);
+        }
+        // Modificar columna payment_method para permitir VARCHAR(50)
+        try {
+            await conn.query("ALTER TABLE sales MODIFY COLUMN payment_method VARCHAR(50) NOT NULL DEFAULT 'cash'");
+            console.log('Columna "payment_method" de la tabla sales modificada a VARCHAR(50).');
+        }
+        catch (err) {
+            console.error('Error al modificar columna payment_method:', err.message);
+        }
         // Verificar si existen las columnas en la tabla sales
         const [columns] = await conn.query('SHOW COLUMNS FROM sales');
         const columnNames = columns.map((c) => c.Field);

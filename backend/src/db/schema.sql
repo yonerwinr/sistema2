@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS sales (
     customer_phone VARCHAR(20) NULL,
     customer_email VARCHAR(100) NULL,
     total DECIMAL(10, 2) NOT NULL,
-    payment_method ENUM('cash', 'card', 'transfer') NOT NULL DEFAULT 'cash',
+    payment_method VARCHAR(50) NOT NULL DEFAULT 'cash',
     type ENUM('online', 'pos') NOT NULL DEFAULT 'pos',
     status ENUM('pending', 'completed', 'cancelled') NOT NULL DEFAULT 'completed',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
