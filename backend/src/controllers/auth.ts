@@ -114,10 +114,9 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Obtener todos los clientes (Solo Admin)
 router.get('/customers', authenticate, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ message: 'No autorizado. Solo administradores pueden ver la lista de clientes' });
+  if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
+    return res.status(403).json({ message: 'No autorizado. Solo administradores y vendedores pueden ver la lista de clientes' });
   }
 
   try {
