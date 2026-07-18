@@ -61,6 +61,17 @@ export interface Sale {
   status: 'pending' | 'completed' | 'cancelled';
   created_at: string;
   registered_by?: string;
+  discount?: number;
+  tax?: number;
+  is_quotation?: number;
+}
+
+export interface Coupon {
+  id: number;
+  code: string;
+  discount_percent: number;
+  active: number;
+  created_at?: string;
 }
 
 export interface SaleDetail {
@@ -110,6 +121,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
     me: () => request<User>('/auth/me'),
+    getCustomers: () => request<User[]>('/auth/customers'),
   },
 
   // Productos
@@ -147,6 +159,8 @@ export const api = {
       customerPhone?: string;
       paymentMethod: string;
       items: { productId: number; quantity: number }[];
+      discount?: number;
+      tax?: number;
     }) => request<SaleResult>('/sales/checkout', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -155,8 +169,13 @@ export const api = {
       customerName: string;
       customerEmail?: string;
       customerPhone?: string;
+      customerUserId?: number;
       paymentMethod: string;
       items: { productId: number; quantity: number }[];
+      discount?: number;
+      tax?: number;
+      isQuotation?: boolean;
+      status?: string;
     }) => request<SaleResult>('/sales/pos', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -167,6 +186,21 @@ export const api = {
     resendEmail: (id: number, email: string) => request<{ message: string; emailPreviewUrl?: string }>(`/sales/${id}/resend-email`, {
       method: 'POST',
       body: JSON.stringify({ email }),
+    }),
+    getDebtors: () => request<Sale[]>('/sales/debtors/all'),
+    updateStatus: (id: number, status: 'completed' | 'cancelled' | 'pending') => request<{ message: string }>(`/sales/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+    getQuotations: () => request<Sale[]>('/sales/quotations/all'),
+    validateCoupon: (code: string) => request<Coupon>('/sales/coupon/validate', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+    getCoupons: () => request<Coupon[]>('/sales/coupons/all'),
+    addCoupon: (code: string, discountPercent: number) => request<{ message: string }>('/sales/coupons', {
+      method: 'POST',
+      body: JSON.stringify({ code, discountPercent }),
     }),
   },
 

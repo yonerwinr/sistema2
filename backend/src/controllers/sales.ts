@@ -15,7 +15,7 @@ const router = Router();
 
 // Registrar Venta Online (Cliente / Invitado)
 router.post('/checkout', async (req: AuthRequest, res) => {
-  const { userId, customerName, customerEmail, customerPhone, paymentMethod, items } = req.body;
+  const { userId, customerName, customerEmail, customerPhone, paymentMethod, items, discount, tax } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'El carrito no puede estar vacio' });
@@ -54,18 +54,23 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       await conn.query('UPDATE products SET stock = stock - ? WHERE id = ?', [item.quantity, product.id]);
     }
 
+    // Calcular total final neto: total original menos descuento más tax
+    const finalTotal = total - (discount || 0) + (tax || 0);
+
     // Registrar la venta
     const [saleResult]: any = await conn.query(
-      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
       [
         userId || null,
         customerName || 'Cliente Online',
         customerEmail || null,
         customerPhone || null,
-        total,
+        finalTotal,
         paymentMethod || 'card',
         'online',
-        'completed' // Completado por defecto para simplificar
+        paymentMethod === 'transfer' ? 'pending' : 'completed', // Transferencia empieza como pendiente (Deudor)
+        discount || 0,
+        tax || 0
       ]
     );
 
@@ -88,9 +93,11 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       customer_name: customerName,
       customer_email: customerEmail,
       customer_phone: customerPhone,
-      total,
+      total: finalTotal,
       payment_method: paymentMethod,
       type: 'online',
+      discount: discount || 0,
+      tax: tax || 0,
       created_at: new Date()
     };
 
@@ -107,7 +114,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
     res.status(201).json({
       message: 'Venta registrada con exito',
       saleId,
-      total,
+      total: finalTotal,
       whatsappText: encodeURIComponent(waText),
       emailPreviewUrl: ''
     });
@@ -126,7 +133,7 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
     return res.status(403).json({ message: 'No autorizado. Solo administradores pueden registrar ventas POS' });
   }
 
-  const { customerName, customerEmail, customerPhone, paymentMethod, items } = req.body;
+  const { customerName, customerEmail, customerPhone, customerUserId, paymentMethod, items, discount, tax, isQuotation, status } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'Debe agregar al menos un producto' });
@@ -147,7 +154,8 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
       }
 
       const product = products[0];
-      if (product.stock < item.quantity) {
+      // Si NO es una cotización, validar stock
+      if (!isQuotation && product.stock < item.quantity) {
         throw new Error(`Stock insuficiente para "${product.name}". Disponible: ${product.stock}, solicitado: ${item.quantity}`);
       }
 
@@ -161,22 +169,30 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
         price: product.price
       });
 
-      // Restar stock
-      await conn.query('UPDATE products SET stock = stock - ? WHERE id = ?', [item.quantity, product.id]);
+      // Restar stock (solo si NO es cotización)
+      if (!isQuotation) {
+        await conn.query('UPDATE products SET stock = stock - ? WHERE id = ?', [item.quantity, product.id]);
+      }
     }
+
+    // Calcular total final neto
+    const finalTotal = total - (discount || 0) + (tax || 0);
 
     // Registrar la venta
     const [saleResult]: any = await conn.query(
-      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        req.user.id, // Admin que registro la venta
+        customerUserId || null,
         customerName || 'Consumidor Final',
         customerEmail || null,
         customerPhone || null,
-        total,
+        finalTotal,
         paymentMethod || 'cash',
         'pos',
-        'completed'
+        isQuotation ? 'pending' : (status || 'completed'),
+        discount || 0.00,
+        tax || 0.00,
+        isQuotation ? 1 : 0
       ]
     );
 
@@ -198,16 +214,19 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
       customer_name: customerName || 'Consumidor Final',
       customer_email: customerEmail,
       customer_phone: customerPhone,
-      total,
+      total: finalTotal,
       payment_method: paymentMethod,
       type: 'pos',
+      discount: discount || 0,
+      tax: tax || 0,
+      is_quotation: isQuotation ? 1 : 0,
       created_at: new Date()
     };
 
     // Generar texto para WhatsApp
     const waText = generateWhatsAppText(saleInfo, saleItemsToInsert);
 
-    // Intentar enviar correo de factura en segundo plano para no bloquear la venta POS
+    // Intentar enviar correo de factura en segundo plano para no bloquear la venta POS (si hay correo)
     if (customerEmail) {
       sendInvoiceEmail(customerEmail, saleInfo, saleItemsToInsert).catch(err => {
         console.error('Error enviando correo en POS:', err);
@@ -215,9 +234,9 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     res.status(201).json({
-      message: 'Venta POS registrada con exito',
+      message: isQuotation ? 'Cotización registrada con éxito' : 'Venta POS registrada con éxito',
       saleId,
-      total,
+      total: finalTotal,
       whatsappText: encodeURIComponent(waText),
       emailPreviewUrl: ''
     });
@@ -235,7 +254,7 @@ router.get('/history', authenticate, async (req: AuthRequest, res: Response) => 
 
   try {
     const [sales]: any = await pool.query(
-      'SELECT * FROM sales WHERE user_id = ? ORDER BY created_at DESC',
+      'SELECT * FROM sales WHERE user_id = ? AND is_quotation = 0 ORDER BY created_at DESC',
       [req.user.id]
     );
     res.json(sales);
@@ -275,6 +294,124 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Obtener todas las Cotizaciones (Solo Admin)
+router.get('/quotations/all', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  try {
+    const [sales]: any = await pool.query(
+      `SELECT s.*, u.name as registered_by 
+       FROM sales s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       WHERE s.is_quotation = 1
+       ORDER BY s.created_at DESC`
+    );
+    res.json(sales);
+  } catch (error) {
+    console.error('Error al obtener cotizaciones:', error);
+    res.status(500).json({ message: 'Error al obtener cotizaciones' });
+  }
+});
+
+// Obtener todos los Deudores (Ventas pendientes de pago, no cotizaciones) (Solo Admin)
+router.get('/debtors/all', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  try {
+    const [sales]: any = await pool.query(
+      `SELECT s.*, u.name as registered_by 
+       FROM sales s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       WHERE s.status = 'pending' AND s.is_quotation = 0
+       ORDER BY s.created_at DESC`
+    );
+    res.json(sales);
+  } catch (error) {
+    console.error('Error al obtener deudores:', error);
+    res.status(500).json({ message: 'Error al obtener deudores' });
+  }
+});
+
+// Modificar estado de una Venta (Solo Admin - ej. Completar pago de deudor)
+router.put('/:id/status', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  const { id } = req.params;
+  const { status } = req.body; // 'completed' | 'cancelled' | 'pending'
+
+  if (!['completed', 'cancelled', 'pending'].includes(status)) {
+    return res.status(400).json({ message: 'Estado inválido' });
+  }
+
+  try {
+    await pool.query('UPDATE sales SET status = ? WHERE id = ?', [status, id]);
+    res.json({ message: 'Estado de factura actualizado con éxito' });
+  } catch (error) {
+    console.error('Error al actualizar estado:', error);
+    res.status(500).json({ message: 'Error al actualizar el estado de la venta' });
+  }
+});
+
+// Validar cupón de descuento
+router.post('/coupon/validate', async (req, res) => {
+  const { code } = req.body;
+  if (!code) {
+    return res.status(400).json({ message: 'Código de cupón requerido' });
+  }
+
+  try {
+    const [coupons]: any = await pool.query('SELECT * FROM coupons WHERE code = ? AND active = 1', [code.toUpperCase()]);
+    if (coupons.length === 0) {
+      return res.status(404).json({ message: 'Cupón inválido o inactivo' });
+    }
+    res.json(coupons[0]);
+  } catch (error) {
+    console.error('Error al validar cupón:', error);
+    res.status(500).json({ message: 'Error al validar cupón' });
+  }
+});
+
+// Obtener todos los cupones (Solo Admin)
+router.get('/coupons/all', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  try {
+    const [coupons]: any = await pool.query('SELECT * FROM coupons ORDER BY created_at DESC');
+    res.json(coupons);
+  } catch (error) {
+    console.error('Error al obtener cupones:', error);
+    res.status(500).json({ message: 'Error al obtener cupones' });
+  }
+});
+
+// Agregar cupón de descuento (Admin y Usuarios)
+router.post('/coupons', authenticate, async (req: AuthRequest, res: Response) => {
+  const { code, discountPercent } = req.body;
+
+  if (!code || !discountPercent) {
+    return res.status(400).json({ message: 'Código y porcentaje de descuento son obligatorios' });
+  }
+
+  try {
+    await pool.query('INSERT INTO coupons (code, discount_percent) VALUES (?, ?)', [code.toUpperCase().trim(), discountPercent]);
+    res.status(201).json({ message: 'Cupón de descuento agregado con éxito' });
+  } catch (error: any) {
+    console.error('Error al guardar cupón:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'El cupón ya existe en el sistema' });
+    }
+    res.status(500).json({ message: 'Error al registrar cupón' });
+  }
+});
+
 // Historial de Todas las Ventas (Solo Admin)
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   if (req.user?.role !== 'admin') {
@@ -286,6 +423,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       `SELECT s.*, u.name as registered_by 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
+       WHERE s.is_quotation = 0
        ORDER BY s.created_at DESC`
     );
     res.json(sales);

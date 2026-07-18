@@ -92,4 +92,18 @@ router.get('/me', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ message: 'Error al obtener datos del usuario' });
     }
 });
+// Obtener todos los clientes (Solo Admin)
+router.get('/customers', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado. Solo administradores pueden ver la lista de clientes' });
+    }
+    try {
+        const [customers] = await db_1.default.query('SELECT id, name, email, phone FROM users WHERE role = "customer" ORDER BY name ASC');
+        res.json(customers);
+    }
+    catch (error) {
+        console.error('Error al obtener clientes:', error);
+        res.status(500).json({ message: 'Error al obtener lista de clientes' });
+    }
+});
 exports.default = router;

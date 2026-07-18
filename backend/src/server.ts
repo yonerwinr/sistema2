@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import pool from './config/db';
 import authRoutes from './controllers/auth';
 import productRoutes from './controllers/products';
 import saleRoutes from './controllers/sales';
@@ -29,10 +30,66 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Servidor POS Online funcionando correctamente' });
 });
 
+// Función de migraciones automáticas
+async function runMigrations() {
+  const conn = await pool.getConnection();
+  try {
+    console.log('Iniciando migraciones de base de datos...');
+    
+    // Verificar si existen las columnas en la tabla sales
+    const [columns]: any = await conn.query('SHOW COLUMNS FROM sales');
+    const columnNames = columns.map((c: any) => c.Field);
+    
+    if (!columnNames.includes('discount')) {
+      await conn.query('ALTER TABLE sales ADD COLUMN discount DECIMAL(10, 2) NOT NULL DEFAULT 0.00');
+      console.log('Columna "discount" agregada a la tabla sales.');
+    }
+    if (!columnNames.includes('tax')) {
+      await conn.query('ALTER TABLE sales ADD COLUMN tax DECIMAL(10, 2) NOT NULL DEFAULT 0.00');
+      console.log('Columna "tax" agregada a la tabla sales.');
+    }
+    if (!columnNames.includes('is_quotation')) {
+      await conn.query('ALTER TABLE sales ADD COLUMN is_quotation TINYINT NOT NULL DEFAULT 0');
+      console.log('Columna "is_quotation" agregada a la tabla sales.');
+    }
+
+    // Crear tabla de cupones si no existe
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS coupons (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(50) NOT NULL UNIQUE,
+        discount_percent DECIMAL(5,2) NOT NULL,
+        active TINYINT NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
+    // Insertar cupones por defecto si está vacía
+    const [existingCoupons]: any = await conn.query('SELECT id FROM coupons LIMIT 1');
+    if (existingCoupons.length === 0) {
+      await conn.query(`
+        INSERT INTO coupons (code, discount_percent) VALUES 
+        ('DESCUENTO10', 10.00),
+        ('BIENVENIDA20', 20.00),
+        ('PROMO15', 15.00)
+      `);
+      console.log('Cupones por defecto agregados.');
+    }
+
+    console.log('Migraciones completadas exitosamente.');
+  } catch (error) {
+    console.error('Error al ejecutar migraciones de base de datos:', error);
+  } finally {
+    conn.release();
+  }
+}
+
 // Arrancar Servidor
-app.listen(PORT, () => {
-  console.log(`==========================================================`);
-  console.log(`🚀 Servidor backend POS Online corriendo en puerto ${PORT}`);
-  console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
-  console.log(`==========================================================`);
+runMigrations().then(() => {
+  app.listen(PORT, () => {
+    console.log(`==========================================================`);
+    console.log(`🚀 Servidor backend POS Online corriendo en puerto ${PORT}`);
+    console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
+    console.log(`==========================================================`);
+  });
 });
