@@ -7,6 +7,7 @@ const express_1 = require("express");
 const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
 const email_1 = require("../services/email");
+const sheets_1 = require("../services/sheets");
 const router = (0, express_1.Router)();
 // Middleware de autenticación opcional para compras (permite compras de invitados y POS sin iniciar sesión si es necesario, o POS por Admin)
 // Para POS requerimos Admin, para Online podemos requerir usuario autenticado o permitir invitados.
@@ -82,6 +83,7 @@ router.post('/checkout', async (req, res) => {
             type: 'online',
             discount: discount || 0,
             tax: tax || 0,
+            amount_paid: initialPaid,
             created_at: new Date()
         };
         // Generar texto para WhatsApp
@@ -92,6 +94,10 @@ router.post('/checkout', async (req, res) => {
                 console.error('Error enviando correo en checkout:', err);
             });
         }
+        // Intentar respaldar en Google Sheets en segundo plano
+        (0, sheets_1.syncSaleToSheets)(saleInfo, saleItemsToInsert).catch(err => {
+            console.error('Error sincronizando con Google Sheets en checkout:', err);
+        });
         res.status(201).json({
             message: 'Venta registrada con exito',
             saleId,
@@ -189,6 +195,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
             discount: discount || 0,
             tax: tax || 0,
             is_quotation: isQuotation ? 1 : 0,
+            amount_paid: finalAmountPaid,
             created_at: new Date()
         };
         // Generar texto para WhatsApp
@@ -199,6 +206,10 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
                 console.error('Error enviando correo en POS:', err);
             });
         }
+        // Intentar respaldar en Google Sheets en segundo plano
+        (0, sheets_1.syncSaleToSheets)(saleInfo, saleItemsToInsert).catch(err => {
+            console.error('Error sincronizando con Google Sheets en POS:', err);
+        });
         res.status(201).json({
             message: isQuotation ? 'Cotización registrada con éxito' : 'Venta POS registrada con éxito',
             saleId,
@@ -323,6 +334,21 @@ router.put('/:id/status', auth_1.authenticate, async (req, res) => {
             newAmountPaid = Number(sale.total);
         }
         await db_1.default.query('UPDATE sales SET status = ?, amount_paid = ? WHERE id = ?', [newStatus, newAmountPaid, id]);
+        // Obtener la venta actualizada y sus ítems para sincronizar la actualización con Google Sheets
+        try {
+            const [updatedSales] = await db_1.default.query('SELECT * FROM sales WHERE id = ?', [id]);
+            const [saleItems] = await db_1.default.query(`SELECT si.*, p.name FROM sale_items si 
+         JOIN products p ON si.product_id = p.id 
+         WHERE si.sale_id = ?`, [id]);
+            if (updatedSales.length > 0) {
+                (0, sheets_1.syncSaleToSheets)(updatedSales[0], saleItems).catch(err => {
+                    console.error('[SHEETS SYNC] Error al re-sincronizar en Google Sheets:', err);
+                });
+            }
+        }
+        catch (sheetErr) {
+            console.error('[SHEETS SYNC] Error obteniendo datos para re-sincronización:', sheetErr);
+        }
         res.json({
             message: 'Estado de factura actualizado con éxito',
             status: newStatus,

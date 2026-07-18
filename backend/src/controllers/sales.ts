@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import pool from '../config/db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { sendInvoiceEmail } from '../services/email';
+import { syncSaleToSheets } from '../services/sheets';
 
 const router = Router();
 
@@ -101,6 +102,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       type: 'online',
       discount: discount || 0,
       tax: tax || 0,
+      amount_paid: initialPaid,
       created_at: new Date()
     };
 
@@ -113,6 +115,11 @@ router.post('/checkout', async (req: AuthRequest, res) => {
         console.error('Error enviando correo en checkout:', err);
       });
     }
+
+    // Intentar respaldar en Google Sheets en segundo plano
+    syncSaleToSheets(saleInfo, saleItemsToInsert).catch(err => {
+      console.error('Error sincronizando con Google Sheets en checkout:', err);
+    });
 
     res.status(201).json({
       message: 'Venta registrada con exito',
@@ -232,6 +239,7 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
       discount: discount || 0,
       tax: tax || 0,
       is_quotation: isQuotation ? 1 : 0,
+      amount_paid: finalAmountPaid,
       created_at: new Date()
     };
 
@@ -244,6 +252,11 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
         console.error('Error enviando correo en POS:', err);
       });
     }
+
+    // Intentar respaldar en Google Sheets en segundo plano
+    syncSaleToSheets(saleInfo, saleItemsToInsert).catch(err => {
+      console.error('Error sincronizando con Google Sheets en POS:', err);
+    });
 
     res.status(201).json({
       message: isQuotation ? 'Cotización registrada con éxito' : 'Venta POS registrada con éxito',
@@ -391,6 +404,24 @@ router.put('/:id/status', authenticate, async (req: AuthRequest, res: Response) 
 
     await pool.query('UPDATE sales SET status = ?, amount_paid = ? WHERE id = ?', [newStatus, newAmountPaid, id]);
     
+    // Obtener la venta actualizada y sus ítems para sincronizar la actualización con Google Sheets
+    try {
+      const [updatedSales]: any = await pool.query('SELECT * FROM sales WHERE id = ?', [id]);
+      const [saleItems]: any = await pool.query(
+        `SELECT si.*, p.name FROM sale_items si 
+         JOIN products p ON si.product_id = p.id 
+         WHERE si.sale_id = ?`,
+        [id]
+      );
+      if (updatedSales.length > 0) {
+        syncSaleToSheets(updatedSales[0], saleItems).catch(err => {
+          console.error('[SHEETS SYNC] Error al re-sincronizar en Google Sheets:', err);
+        });
+      }
+    } catch (sheetErr) {
+      console.error('[SHEETS SYNC] Error obteniendo datos para re-sincronización:', sheetErr);
+    }
+
     res.json({ 
       message: 'Estado de factura actualizado con éxito',
       status: newStatus,
