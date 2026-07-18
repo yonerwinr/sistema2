@@ -7,6 +7,7 @@ import productRoutes from './controllers/products';
 import saleRoutes from './controllers/sales';
 import statsRoutes from './controllers/stats';
 import { startReminderCron } from './services/reminders';
+import { startRatesCron } from './services/rates';
 
 dotenv.config();
 
@@ -134,5 +135,8 @@ runMigrations().then(() => {
     
     // Iniciar cron de recordatorio de deudas en segundo plano
     startReminderCron();
+    
+    // Iniciar cron de actualización automática de tasas BCV en segundo plano
+    startRatesCron();
   });
 });

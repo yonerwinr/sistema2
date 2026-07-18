@@ -8,6 +8,7 @@ const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
 const email_1 = require("../services/email");
 const sheets_1 = require("../services/sheets");
+const rates_1 = require("../services/rates");
 const router = (0, express_1.Router)();
 // Middleware de autenticación opcional para compras (permite compras de invitados y POS sin iniciar sesión si es necesario, o POS por Admin)
 // Para POS requerimos Admin, para Online podemos requerir usuario autenticado o permitir invitados.
@@ -690,6 +691,23 @@ router.put('/settings/rates', auth_1.authenticate, async (req, res) => {
     catch (error) {
         console.error('Error al guardar tasas de cambio:', error);
         res.status(500).json({ message: 'Error al guardar tasas de cambio' });
+    }
+});
+// Sincronizar tasas de cambio manualmente con el BCV (Solo Admin)
+router.post('/settings/rates/sync', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado' });
+    }
+    try {
+        const rates = await (0, rates_1.syncExchangeRatesFromBCV)();
+        res.json({
+            message: 'Tasas de cambio sincronizadas con éxito desde el BCV',
+            rates
+        });
+    }
+    catch (error) {
+        console.error('Error al sincronizar tasas manualmente:', error);
+        res.status(500).json({ message: 'Error al sincronizar tasas de cambio con el BCV', error: error.message });
     }
 });
 exports.default = router;

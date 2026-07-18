@@ -12,6 +12,7 @@ const products_1 = __importDefault(require("./controllers/products"));
 const sales_1 = __importDefault(require("./controllers/sales"));
 const stats_1 = __importDefault(require("./controllers/stats"));
 const reminders_1 = require("./services/reminders");
+const rates_1 = require("./services/rates");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
@@ -124,5 +125,7 @@ runMigrations().then(() => {
         console.log(`==========================================================`);
         // Iniciar cron de recordatorio de deudas en segundo plano
         (0, reminders_1.startReminderCron)();
+        // Iniciar cron de actualización automática de tasas BCV en segundo plano
+        (0, rates_1.startRatesCron)();
     });
 });

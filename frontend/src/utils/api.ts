@@ -228,6 +228,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+    syncExchangeRates: () => request<{ message: string; rates: { usdToVes: number; eurToVes: number } }>('/sales/settings/rates/sync', {
+      method: 'POST',
+    }),
   },
 
   // Estadísticas (Dashboard Admin)

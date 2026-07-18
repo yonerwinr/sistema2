@@ -1429,9 +1429,14 @@ function renderAdminView(): string {
               <span>€ a Bs:</span>
               <input type="number" step="0.01" id="rate-eur-input" value="${rateEurToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
             </div>
-            <button class="btn btn-primary" id="save-rates-btn" style="padding:4px 8px; font-size:10px; margin-top:4px; width:100%;">
-              Actualizar Tasas
-            </button>
+            <div style="display:flex; gap:4px;">
+              <button type="button" class="btn btn-secondary" id="sync-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:45%; background:rgba(255,255,255,0.05); color:white; border-color:var(--border-glass);" title="Sincronizar automáticamente con el BCV">
+                🔄 BCV
+              </button>
+              <button type="button" class="btn btn-primary" id="save-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:55%;">
+                Guardar
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -1539,7 +1544,7 @@ async function bindAdminEvents() {
     await renderAdminCoupons();
   }
 
-  // Guardar Tasas de Cambio
+  // Guardar Tasas de Cambio Manuales
   document.getElementById('save-rates-btn')?.addEventListener('click', async () => {
     const usdVal = parseFloat((document.getElementById('rate-usd-input') as HTMLInputElement).value);
     const eurVal = parseFloat((document.getElementById('rate-eur-input') as HTMLInputElement).value);
@@ -1551,18 +1556,49 @@ async function bindAdminEvents() {
 
     const btn = document.getElementById('save-rates-btn') as HTMLButtonElement;
     btn.disabled = true;
-    btn.innerText = 'Guardando...';
+    btn.innerText = '...';
 
     try {
       await api.sales.updateExchangeRates({ usdToVes: usdVal, eurToVes: eurVal });
       rateUsdToVes = usdVal;
       rateEurToVes = eurVal;
-      alert('Tasas de cambio oficiales actualizadas con éxito.');
+      alert('Tasas de cambio oficiales guardadas con éxito.');
       navigate('admin'); // Recargar vista admin para refrescar todo
     } catch (err: any) {
       alert(err.message || 'Error al actualizar tasas de cambio.');
       btn.disabled = false;
-      btn.innerText = 'Actualizar Tasas';
+      btn.innerText = 'Guardar';
+    }
+  });
+
+  // Sincronizar Tasas de Cambio Automáticamente desde el BCV
+  document.getElementById('sync-rates-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('sync-rates-btn') as HTMLButtonElement;
+    const saveBtn = document.getElementById('save-rates-btn') as HTMLButtonElement;
+    
+    btn.disabled = true;
+    saveBtn.disabled = true;
+    btn.innerText = '...';
+
+    try {
+      const res = await api.sales.syncExchangeRates();
+      rateUsdToVes = res.rates.usdToVes;
+      rateEurToVes = res.rates.eurToVes;
+      
+      // Actualizar inputs si existen en pantalla
+      const usdInput = document.getElementById('rate-usd-input') as HTMLInputElement;
+      const eurInput = document.getElementById('rate-eur-input') as HTMLInputElement;
+      if (usdInput) usdInput.value = rateUsdToVes.toString();
+      if (eurInput) eurInput.value = rateEurToVes.toString();
+
+      alert(`Tasas oficiales sincronizadas con el BCV con éxito!\n\nDólar: Bs. ${rateUsdToVes.toFixed(2)}\nEuro: Bs. ${rateEurToVes.toFixed(2)}`);
+      navigate('admin');
+    } catch (err: any) {
+      alert(err.message || 'Error al conectar con el servidor para sincronizar tasas BCV.');
+    } finally {
+      btn.disabled = false;
+      saveBtn.disabled = false;
+      btn.innerText = '🔄 BCV';
     }
   });
 }

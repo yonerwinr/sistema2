@@ -3,6 +3,7 @@ import pool from '../config/db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { sendInvoiceEmail, sendPlainEmail } from '../services/email';
 import { syncSaleToSheets } from '../services/sheets';
+import { syncExchangeRatesFromBCV } from '../services/rates';
 
 const router = Router();
 
@@ -836,6 +837,24 @@ router.put('/settings/rates', authenticate, async (req: AuthRequest, res: Respon
   } catch (error) {
     console.error('Error al guardar tasas de cambio:', error);
     res.status(500).json({ message: 'Error al guardar tasas de cambio' });
+  }
+});
+
+// Sincronizar tasas de cambio manualmente con el BCV (Solo Admin)
+router.post('/settings/rates/sync', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  try {
+    const rates = await syncExchangeRatesFromBCV();
+    res.json({
+      message: 'Tasas de cambio sincronizadas con éxito desde el BCV',
+      rates
+    });
+  } catch (error: any) {
+    console.error('Error al sincronizar tasas manualmente:', error);
+    res.status(500).json({ message: 'Error al sincronizar tasas de cambio con el BCV', error: error.message });
   }
 });
 
