@@ -52,7 +52,7 @@ async function getTransporter() {
     }
     return transporter;
 }
-async function sendInvoiceEmail(toEmail, sale, items) {
+async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
     try {
         const client = await getTransporter();
         const itemsHtml = items.map(item => `
@@ -243,6 +243,11 @@ async function sendInvoiceEmail(toEmail, sale, items) {
             <p>¡Gracias por tu compra!</p>
           </div>
           <div class="content">
+            ${isResend ? `
+              <div style="background-color: #fef3c7; border: 1px solid #fcd34d; color: #b45309; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 20px; font-weight: 600; text-align: center;">
+                ⚠️ Este correo es un REENVÍO de la factura original emitida el ${invoiceDate}.
+              </div>
+            ` : ''}
             <div class="info-grid">
               <div class="info-col">
                 <div class="label">Facturado a:</div>
@@ -301,7 +306,7 @@ async function sendInvoiceEmail(toEmail, sale, items) {
       </html>
     `;
         const plainTextContent = `
-=========================================
+${isResend ? `⚠️ ESTE CORREO ES UN REENVÍO DE LA FACTURA ORIGINAL EMITIDA EL ${invoiceDate}.\n` : ''}=========================================
 📄 COMPROBANTE DE COMPRA - FACTURA #${sale.id}
 =========================================
 ¡Gracias por tu compra!
@@ -323,7 +328,7 @@ Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
         const info = await client.sendMail({
             from: friendlyFrom,
             to: toEmail,
-            subject: `Factura de compra #${sale.id} - POS Online`,
+            subject: `${isResend ? '[REENVÍO] ' : ''}Factura de compra #${sale.id} - POS Online`,
             text: plainTextContent,
             html: htmlContent,
             headers: {

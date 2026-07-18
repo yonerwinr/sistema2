@@ -164,6 +164,10 @@ export const api = {
     getHistory: () => request<Sale[]>('/sales/history'),
     getDetails: (id: number) => request<SaleDetail>(`/sales/${id}`),
     getAllAdmin: () => request<Sale[]>('/sales'),
+    resendEmail: (id: number, email: string) => request<{ message: string; emailPreviewUrl?: string }>(`/sales/${id}/resend-email`, {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
   },
 
   // Estadísticas (Dashboard Admin)

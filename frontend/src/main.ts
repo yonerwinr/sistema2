@@ -1985,12 +1985,16 @@ function renderSaleDetailModal(): string {
           </table>
         </div>
 
-        <div class="flex justify-between align-center" style="border-top:1px solid var(--border-glass); padding-top:16px;">
-          <div>
+        <div class="flex justify-between align-center" style="border-top:1px solid var(--border-glass); padding-top:16px; flex-wrap: wrap; gap: 12px;">
+          <div class="flex gap-2">
             <!-- Re-envio WhatsApp -->
-            <a href="#" target="_blank" class="wa-link" id="detail-wa-btn" style="padding: 8px 12px; font-size:13px;">
+            <a href="#" target="_blank" class="wa-link" id="detail-wa-btn" style="padding: 8px 12px; font-size:13px; border-radius: var(--radius-md);">
               ${icons.whatsapp} Enviar por WhatsApp
             </a>
+            <!-- Re-envio Correo -->
+            <button class="btn btn-secondary" id="detail-email-btn" style="padding: 8px 12px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;">
+              ✉️ Reenviar por Correo
+            </button>
           </div>
           <div class="text-right">
             <div style="font-size:12px; color:var(--text-muted);">TOTAL FACTURADO</div>
@@ -2050,6 +2054,39 @@ function showSaleDetails(details: SaleDetail) {
     e.preventDefault();
     await shareInvoiceAsImage(sale, items, phoneNum);
   });
+
+  // Enlace a Correo (Re-envío)
+  const emailBtn = document.getElementById('detail-email-btn') as HTMLButtonElement;
+  if (emailBtn) {
+    const newEmailBtn = emailBtn.cloneNode(true) as HTMLButtonElement;
+    emailBtn.parentNode?.replaceChild(newEmailBtn, emailBtn);
+
+    newEmailBtn.addEventListener('click', async () => {
+      let targetEmail = sale.customer_email || '';
+      
+      const inputEmail = prompt('Ingrese el correo electrónico al cual desea reenviar la factura:', targetEmail);
+      if (inputEmail === null) return; // cancelado
+      
+      if (!inputEmail || !inputEmail.includes('@')) {
+        alert('Por favor, ingrese un correo electrónico válido.');
+        return;
+      }
+
+      newEmailBtn.disabled = true;
+      newEmailBtn.innerText = 'Reenviando...';
+
+      try {
+        await api.sales.resendEmail(sale.id, inputEmail);
+        alert(`¡Factura reenviada con éxito a ${inputEmail}!`);
+      } catch (err: any) {
+        console.error(err);
+        alert(err.message || 'Error al reenviar la factura por correo.');
+      } finally {
+        newEmailBtn.disabled = false;
+        newEmailBtn.innerText = '✉️ Reenviar por Correo';
+      }
+    });
+  }
 }
 
 function bindSaleDetailEvents() {

@@ -318,4 +318,46 @@ function generateWhatsAppText(sale: any, items: any[]): string {
   return text;
 }
 
+// Reenviar factura por correo
+router.post('/:id/resend-email', authenticate, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { email } = req.body;
+
+  try {
+    const [sales]: any = await pool.query('SELECT * FROM sales WHERE id = ?', [id]);
+    if (sales.length === 0) {
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+
+    const sale = sales[0];
+
+    // Verificar seguridad: solo el propio cliente o un admin puede ver/reenviar la factura
+    if (req.user?.role !== 'admin' && sale.user_id !== req.user?.id) {
+      return res.status(403).json({ message: 'No autorizado' });
+    }
+
+    const [items]: any = await pool.query(
+      `SELECT si.*, p.name FROM sale_items si 
+       JOIN products p ON si.product_id = p.id 
+       WHERE si.sale_id = ?`,
+      [id]
+    );
+
+    const targetEmail = email || sale.customer_email;
+    if (!targetEmail) {
+      return res.status(400).json({ message: 'No hay un correo electrónico asociado a esta venta y no se especificó ninguno.' });
+    }
+
+    const previewUrl = await sendInvoiceEmail(targetEmail, sale, items, true);
+
+    res.json({ 
+      message: 'Factura reenviada con éxito',
+      emailPreviewUrl: previewUrl || ''
+    });
+  } catch (error: any) {
+    console.error('Error al reenviar factura por correo:', error);
+    res.status(500).json({ message: 'Error al reenviar la factura por correo', error: error.message });
+  }
+});
+
 export default router;
