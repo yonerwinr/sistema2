@@ -651,10 +651,10 @@ function renderInvoiceSuccessModal(): string {
             ${icons.whatsapp} Enviar a WhatsApp (Pega la Imagen)
           </a>
 
-          <!-- Mailto Email Link -->
-          <a href="#" class="btn btn-secondary w-100" id="success-mailto-btn" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; background: rgba(99, 102, 241, 0.1); border-color: var(--primary);">
-            ✉️ Enviar Factura a mi Correo (Gratis)
-          </a>
+          <!-- Estado de Envío de Correo Automático -->
+          <div id="success-email-status-box" style="display: none; align-items: center; justify-content: center; gap: 8px; padding: 12px; border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--success); font-weight: 600; font-size: 13px; margin-top: 8px;">
+            ✉️ Factura enviada automáticamente al correo
+          </div>
 
           <!-- Copiar al Portapapeles (Texto Fallback) -->
           <button class="btn btn-secondary w-100" id="success-copy-btn" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; margin-top: 8px;">
@@ -861,20 +861,7 @@ async function shareInvoiceAsImage(sale: any, items: any[], clientPhone: string)
     const blob = await generateReceiptPNG(sale, items);
     const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
     
-    // Crear archivo para compartir
-    const file = new File([blob], `factura-${sale.id}.png`, { type: 'image/png' });
-    
-    // Verificar si el navegador admite Web Share API con archivos
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: `Factura #${sale.id}`,
-        text: `Comprobante digital de tu Factura #${sale.id}`
-      });
-      return;
-    }
-    
-    // Fallback para escritorio: copiar imagen al portapapeles y redirigir
+    // Fallback para escritorio y móvil: copiar imagen al portapapeles y redirigir
     try {
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': blob })
@@ -885,12 +872,13 @@ async function shareInvoiceAsImage(sale: any, items: any[], clientPhone: string)
       alert('Se abrirá WhatsApp. Descarga la factura en formato PNG desde el botón "Descargar" y pégala en el chat.');
     }
     
-    const waMessage = `Hola, te comparto el comprobante digital de tu Factura #${sale.id}. (Pega la imagen copiada presionando Ctrl + V).`;
+    // Mensaje de agradecimiento amigable y profesional
+    const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${sale.id} por un total de $${Number(sale.total).toFixed(2)}.\n\n*(Por favor, pega el archivo de imagen que tienes copiado en el portapapeles aquí presionando Ctrl + V o manteniendo presionado y seleccionando Pegar).*`;
     const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMessage)}`;
     window.open(waUrl, '_blank');
   } catch (error) {
     console.error('Error al compartir la factura PNG:', error);
-    alert('No se pudo compartir la factura.');
+    alert('No se pudo generar el comprobante digital de la factura.');
   }
 }
 
@@ -901,7 +889,7 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
   const totalEl = document.getElementById('success-total');
   const idEl = document.getElementById('success-id');
   const waBtn = document.getElementById('success-wa-btn') as HTMLAnchorElement;
-  const mailtoBtn = document.getElementById('success-mailto-btn') as HTMLAnchorElement;
+  const emailStatusBox = document.getElementById('success-email-status-box');
   const emailBox = document.getElementById('success-email-box');
   const emailBtn = document.getElementById('success-email-btn') as HTMLAnchorElement;
 
@@ -940,9 +928,14 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
     await shareInvoiceAsImage(saleMock, purchaseItems || [], clientPhone);
   });
 
-  // Mailto Email Link
-  if (mailtoBtn) {
-    mailtoBtn.href = `mailto:${clientEmail || ''}?subject=${encodeURIComponent('Factura de Compra #' + result.saleId)}&body=${encodeURIComponent(decodedText)}`;
+  // Mostrar estado del correo automático
+  if (emailStatusBox) {
+    if (clientEmail) {
+      emailStatusBox.style.display = 'flex';
+      emailStatusBox.innerHTML = `✉️ Factura enviada automáticamente a: ${clientEmail}`;
+    } else {
+      emailStatusBox.style.display = 'none';
+    }
   }
 
   // Correo de desarrollo preview
