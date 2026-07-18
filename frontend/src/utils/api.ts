@@ -125,6 +125,18 @@ export const api = {
     }),
     me: () => request<User>('/auth/me'),
     getCustomers: () => request<User[]>('/auth/customers'),
+    getStaff: () => request<User[]>('/auth/staff'),
+    createStaff: (body: any) => request<{ message: string }>('/auth/staff', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    updateStaff: (id: number, body: any) => request<{ message: string }>(`/auth/staff/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+    deleteStaff: (id: number) => request<{ message: string }>(`/auth/staff/${id}`, {
+      method: 'DELETE',
+    }),
   },
 
   // Productos

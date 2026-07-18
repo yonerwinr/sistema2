@@ -106,4 +106,99 @@ router.get('/customers', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ message: 'Error al obtener lista de clientes' });
     }
 });
+// Obtener todos los administradores y vendedores (Solo Admin)
+router.get('/staff', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado' });
+    }
+    try {
+        const [staff] = await db_1.default.query('SELECT id, name, email, role, phone FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC');
+        res.json(staff);
+    }
+    catch (error) {
+        console.error('Error al obtener personal:', error);
+        res.status(500).json({ message: 'Error al obtener lista de personal' });
+    }
+});
+// Crear un administrador o vendedor (Solo Admin)
+router.post('/staff', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado' });
+    }
+    const { name, email, password, role, phone } = req.body;
+    if (!name || !email || !password || !role) {
+        return res.status(400).json({ message: 'Nombre, correo, contraseña y rol son obligatorios' });
+    }
+    if (!['admin', 'seller'].includes(role)) {
+        return res.status(400).json({ message: 'Rol inválido. Debe ser admin o seller' });
+    }
+    try {
+        // Verificar si el correo ya existe
+        const [existing] = await db_1.default.query('SELECT id FROM users WHERE email = ?', [email]);
+        if (existing.length > 0) {
+            return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
+        }
+        const salt = await bcryptjs_1.default.genSalt(10);
+        const hashedPassword = await bcryptjs_1.default.hash(password, salt);
+        await db_1.default.query('INSERT INTO users (name, email, password, role, phone) VALUES (?, ?, ?, ?, ?)', [name, email, hashedPassword, role, phone || null]);
+        res.status(201).json({ message: 'Usuario de personal creado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al crear personal:', error);
+        res.status(500).json({ message: 'Error al registrar usuario en la base de datos' });
+    }
+});
+// Modificar un administrador o vendedor (Solo Admin)
+router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado' });
+    }
+    const { id } = req.params;
+    const { name, email, password, role, phone } = req.body;
+    if (!name || !email || !role) {
+        return res.status(400).json({ message: 'Nombre, correo y rol son obligatorios' });
+    }
+    if (!['admin', 'seller'].includes(role)) {
+        return res.status(400).json({ message: 'Rol inválido' });
+    }
+    try {
+        // Verificar si el correo ya existe para otro usuario
+        const [existing] = await db_1.default.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, id]);
+        if (existing.length > 0) {
+            return res.status(400).json({ message: 'El correo electrónico ya está en uso por otro usuario' });
+        }
+        if (password) {
+            const salt = await bcryptjs_1.default.genSalt(10);
+            const hashedPassword = await bcryptjs_1.default.hash(password, salt);
+            await db_1.default.query('UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ? WHERE id = ?', [name, email, hashedPassword, role, phone || null, id]);
+        }
+        else {
+            await db_1.default.query('UPDATE users SET name = ?, email = ?, role = ?, phone = ? WHERE id = ?', [name, email, role, phone || null, id]);
+        }
+        res.json({ message: 'Usuario de personal actualizado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al actualizar personal:', error);
+        res.status(500).json({ message: 'Error al actualizar usuario' });
+    }
+});
+// Eliminar un administrador o vendedor (Solo Admin)
+router.delete('/staff/:id', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado' });
+    }
+    const { id } = req.params;
+    // Evitar auto-eliminación
+    if (Number(id) === req.user.id) {
+        return res.status(400).json({ message: 'No puedes eliminar tu propio usuario administrador' });
+    }
+    try {
+        await db_1.default.query('DELETE FROM users WHERE id = ?', [id]);
+        res.json({ message: 'Usuario de personal eliminado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al eliminar personal:', error);
+        res.status(500).json({ message: 'Error al eliminar usuario' });
+    }
+});
 exports.default = router;

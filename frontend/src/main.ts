@@ -31,7 +31,7 @@ let posCart: POSCartItem[] = [];
 let posSearchQuery: string = '';
 
 // Vista activa dentro de Administración
-type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons';
+type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff';
 let activeAdminView: AdminSubView = 'stats';
 
 // Nuevas variables de estado para el control en POS
@@ -1422,6 +1422,9 @@ function renderAdminView(): string {
             <button class="sidebar-nav-btn ${activeAdminView === 'coupons' ? 'active' : ''}" id="admin-tab-coupons">
               🎟️ Cupones
             </button>
+            <button class="sidebar-nav-btn ${activeAdminView === 'staff' ? 'active' : ''}" id="admin-tab-staff">
+              👥 Vendedores
+            </button>
           ` : ''}
         </div>
 
@@ -1472,6 +1475,7 @@ async function bindAdminEvents() {
   const tabDebtors = document.getElementById('admin-tab-debtors');
   const tabQuotations = document.getElementById('admin-tab-quotations');
   const tabCoupons = document.getElementById('admin-tab-coupons');
+  const tabStaff = document.getElementById('admin-tab-staff');
 
   const clearActiveTabs = () => {
     tabStats?.classList.remove('active');
@@ -1481,6 +1485,7 @@ async function bindAdminEvents() {
     tabDebtors?.classList.remove('active');
     tabQuotations?.classList.remove('active');
     tabCoupons?.classList.remove('active');
+    tabStaff?.classList.remove('active');
   };
 
   tabStats?.addEventListener('click', async () => {
@@ -1539,6 +1544,14 @@ async function bindAdminEvents() {
     await renderAdminCoupons();
   });
 
+  tabStaff?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabStaff.classList.add('active');
+    activeAdminView = 'staff';
+    destroyCharts();
+    await renderAdminStaff();
+  });
+
   // Renderizar la subvista por defecto al cargar
   if (activeAdminView === 'stats') {
     await renderAdminStats();
@@ -1554,6 +1567,8 @@ async function bindAdminEvents() {
     await renderAdminQuotations();
   } else if (activeAdminView === 'coupons') {
     await renderAdminCoupons();
+  } else if (activeAdminView === 'staff') {
+    await renderAdminStaff();
   }
 
   // Guardar Tasas de Cambio Manuales
@@ -2238,6 +2253,7 @@ function addToPOSCart(product: Product) {
 // SUB-VISTA: CATÁLOGO PRODUCTOS (CRUD)
 // ==========================================================================
 let editingProductId: number | null = null;
+let editingStaffId: number | null = null;
 
 async function renderAdminProducts() {
   const panel = document.getElementById('dashboard-content-panel');
@@ -3173,4 +3189,210 @@ async function renderAdminCoupons() {
   } catch (error) {
     panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar cupones.</div>`;
   }
+}
+
+// ==========================================================================
+// SUB-VISTA: GESTIÓN DE PERSONAL / VENDEDORES (CRUD)
+// ==========================================================================
+let staffList: User[] = [];
+
+async function renderAdminStaff() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  try {
+    staffList = await api.auth.getStaff();
+
+    panel.innerHTML = `
+      <div class="animate-on-scroll animate-fade-up visible">
+        <div class="flex justify-between align-center mb-4" style="flex-wrap:wrap; gap:12px;">
+          <h2 style="font-size:26px; font-weight:800; margin:0;">Gestión de Vendedores</h2>
+          <button class="btn btn-primary" id="add-staff-btn">
+            ➕ Agregar Vendedor
+          </button>
+        </div>
+
+        <!-- Formulario de Personal -->
+        <div class="card mb-4" id="staff-form-card" style="display: none; background: rgba(255,255,255,0.01); border: 1px solid var(--border-glass);">
+          <h3 id="staff-form-title" class="mb-3" style="font-size:16px; font-weight:700;">Agregar Nuevo Miembro</h3>
+          <form id="staff-form">
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="staff-name">Nombre Completo</label>
+                <input type="text" class="form-control" id="staff-name" required placeholder="Ej. Juan Pérez">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="staff-email">Correo Electrónico</label>
+                <input type="email" class="form-control" id="staff-email" required placeholder="juan@sistema.com">
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="staff-phone">Teléfono / WhatsApp</label>
+                <input type="text" class="form-control" id="staff-phone" placeholder="Ej. +584120000000">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="staff-role">Privilegios / Rol</label>
+                <select class="form-control" id="staff-role" required>
+                  <option value="seller">Vendedor (Acceso exclusivo a POS)</option>
+                  <option value="admin">Administrador (Acceso total al sistema)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="staff-password" id="staff-pass-label">Contraseña</label>
+              <input type="password" class="form-control" id="staff-password" required placeholder="Min. 6 caracteres">
+              <small class="form-text text-muted" id="staff-pass-help" style="display:none; color:var(--text-secondary); margin-top:4px;">Dejar en blanco para mantener la contraseña actual.</small>
+            </div>
+
+            <div class="flex justify-end gap-4" style="margin-top:16px;">
+              <button type="button" class="btn btn-secondary" id="staff-form-cancel">Cancelar</button>
+              <button type="submit" class="btn btn-primary" id="staff-form-submit-btn">Guardar</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Tabla de Personal -->
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table-custom">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Correo</th>
+                  <th>Teléfono</th>
+                  <th>Rol</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${staffList.map(member => `
+                  <tr>
+                    <td><strong>${member.name}</strong></td>
+                    <td>${member.email}</td>
+                    <td>${member.phone || 'N/D'}</td>
+                    <td>
+                      <span class="badge-status" style="background:${member.role === 'admin' ? 'rgba(99,102,241,0.15)' : 'rgba(16,185,129,0.15)'}; color:${member.role === 'admin' ? 'var(--primary)' : 'var(--success)'}; font-size:11px; text-transform:uppercase; font-weight:700;">
+                        ${member.role === 'admin' ? 'Administrador' : 'Vendedor'}
+                      </span>
+                    </td>
+                    <td class="text-right">
+                      <button class="btn btn-secondary btn-icon edit-staff-btn" style="padding:6px 12px; font-size:12px;" data-id="${member.id}">
+                        ✏️ Editar
+                      </button>
+                      ${member.id !== currentUser?.id ? `
+                        <button class="btn btn-danger btn-icon delete-staff-btn" style="padding:6px 12px; font-size:12px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.2); color:var(--danger);" data-id="${member.id}">
+                          🗑️ Eliminar
+                        </button>
+                      ` : ''}
+                    </td>
+                  </tr>
+                `).join('')}
+                ${staffList.length === 0 ? '<tr><td colspan="5" class="text-center">No hay personal registrado.</td></tr>' : ''}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    bindStaffEvents();
+  } catch (error) {
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar lista de personal del servidor.</div>`;
+  }
+}
+
+function bindStaffEvents() {
+  const formCard = document.getElementById('staff-form-card');
+  const addBtn = document.getElementById('add-staff-btn');
+  const cancelBtn = document.getElementById('staff-form-cancel');
+  const form = document.getElementById('staff-form') as HTMLFormElement;
+  const formTitle = document.getElementById('staff-form-title');
+  const passInput = document.getElementById('staff-password') as HTMLInputElement;
+  const passHelp = document.getElementById('staff-pass-help');
+
+  addBtn?.addEventListener('click', () => {
+    editingStaffId = null;
+    form.reset();
+    if (formTitle) formTitle.innerText = 'Agregar Nuevo Miembro de Personal';
+    if (passInput) passInput.required = true;
+    if (passHelp) passHelp.style.display = 'none';
+    if (formCard) formCard.style.display = 'block';
+    formCard?.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  cancelBtn?.addEventListener('click', () => {
+    if (formCard) formCard.style.display = 'none';
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = (document.getElementById('staff-name') as HTMLInputElement).value;
+    const email = (document.getElementById('staff-email') as HTMLInputElement).value;
+    const phone = (document.getElementById('staff-phone') as HTMLInputElement).value;
+    const role = (document.getElementById('staff-role') as HTMLSelectElement).value;
+    const password = passInput.value;
+
+    const payload: any = { name, email, role, phone };
+    if (password || !editingStaffId) {
+      payload.password = password;
+    }
+
+    try {
+      if (editingStaffId) {
+        await api.auth.updateStaff(editingStaffId, payload);
+        alert('Miembro de personal actualizado con éxito.');
+      } else {
+        await api.auth.createStaff(payload);
+        alert('Miembro de personal creado con éxito.');
+      }
+
+      if (formCard) formCard.style.display = 'none';
+      await renderAdminStaff();
+    } catch (err: any) {
+      alert(err.message || 'Error al guardar personal.');
+    }
+  });
+
+  // Evento Editar
+  document.querySelectorAll('.edit-staff-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const member = staffList.find(m => m.id === id);
+      if (member) {
+        editingStaffId = member.id;
+        if (formTitle) formTitle.innerText = `Editar Personal: ${member.name}`;
+        
+        (document.getElementById('staff-name') as HTMLInputElement).value = member.name;
+        (document.getElementById('staff-email') as HTMLInputElement).value = member.email;
+        (document.getElementById('staff-phone') as HTMLInputElement).value = member.phone || '';
+        (document.getElementById('staff-role') as HTMLSelectElement).value = member.role;
+        
+        if (passInput) {
+          passInput.value = '';
+          passInput.required = false;
+        }
+        if (passHelp) passHelp.style.display = 'block';
+
+        if (formCard) formCard.style.display = 'block';
+        formCard?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+
+  // Evento Eliminar
+  document.querySelectorAll('.delete-staff-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      if (confirm('¿Estás seguro de eliminar este miembro de personal? Se eliminará permanentemente.')) {
+        try {
+          await api.auth.deleteStaff(id);
+          alert('Personal eliminado con éxito.');
+          await renderAdminStaff();
+        } catch (err: any) {
+          alert(err.message || 'Error al eliminar.');
+        }
+      }
+    });
+  });
 }
