@@ -31,8 +31,16 @@ let posCart: POSCartItem[] = [];
 let posSearchQuery: string = '';
 
 // Vista activa dentro de Administración
-type AdminSubView = 'stats' | 'pos' | 'products' | 'sales';
+type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons';
 let activeAdminView: AdminSubView = 'stats';
+
+// Nuevas variables de estado para el control en POS
+let posCustomersList: User[] = [];
+let posSelectedCustomerId: number | null = null;
+let posDiscount = 0;
+let posApplyTax = true;
+let posCouponCode = '';
+let posCouponDiscountPercent = 0;
 
 // Instancias de Chart.js para destruirlas al cambiar de pestaña
 let revenueChartInstance: Chart | null = null;
@@ -533,8 +541,17 @@ function renderCheckoutModal(): string {
             <label class="form-label">Metodo de Pago</label>
             <select class="form-control" id="checkout-payment" required>
               <option value="card">Tarjeta de Credito / Debito</option>
-              <option value="transfer">Transferencia Bancaria</option>
+              <option value="transfer">Transferencia Bancaria (Pago Pendiente)</option>
             </select>
+          </div>
+          
+          <div class="form-group mb-4">
+            <label class="form-label" for="checkout-coupon">Cupón de Descuento (Opcional)</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" class="form-control" id="checkout-coupon" placeholder="Ej. DESCUENTO10" style="text-transform: uppercase;">
+              <button type="button" class="btn btn-secondary" id="checkout-apply-coupon" style="padding: 0 16px; font-size: 13px;">Aplicar</button>
+            </div>
+            <div id="checkout-coupon-status" style="margin-top: 4px; font-size: 11px;"></div>
           </div>
 
           <div style="margin-top: 32px; display:flex; justify-content:flex-end; gap:16px;">
@@ -552,12 +569,44 @@ function bindCheckoutEvents() {
   const closeBtn = document.getElementById('checkout-close');
   const cancelBtn = document.getElementById('checkout-cancel');
 
+  let checkoutCouponPercent = 0;
+
   const closeModal = () => {
     modal?.classList.remove('open');
   };
 
   closeBtn?.addEventListener('click', closeModal);
   cancelBtn?.addEventListener('click', closeModal);
+
+  // Botón para aplicar cupón
+  const applyCouponBtn = document.getElementById('checkout-apply-coupon');
+  const couponInput = document.getElementById('checkout-coupon') as HTMLInputElement;
+  const couponStatus = document.getElementById('checkout-coupon-status');
+
+  applyCouponBtn?.addEventListener('click', async () => {
+    const code = couponInput.value.trim();
+    if (!code) {
+      if (couponStatus) {
+        couponStatus.style.color = 'var(--danger)';
+        couponStatus.innerText = 'Ingrese un código de cupón';
+      }
+      return;
+    }
+    try {
+      const coupon = await api.sales.validateCoupon(code);
+      checkoutCouponPercent = Number(coupon.discount_percent);
+      if (couponStatus) {
+        couponStatus.style.color = 'var(--success)';
+        couponStatus.innerText = `¡Cupón ${coupon.code} aplicado! (${coupon.discount_percent}% de descuento)`;
+      }
+    } catch (err: any) {
+      checkoutCouponPercent = 0;
+      if (couponStatus) {
+        couponStatus.style.color = 'var(--danger)';
+        couponStatus.innerText = err.message || 'Cupón inválido o inactivo';
+      }
+    }
+  });
 
   document.getElementById('checkout-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -576,6 +625,10 @@ function bindCheckoutEvents() {
       quantity: item.quantity
     }));
 
+    // Calcular descuento
+    const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const discount = subtotal * (checkoutCouponPercent / 100);
+
     try {
       const result = await api.sales.checkout({
         userId: currentUser?.id,
@@ -583,7 +636,9 @@ function bindCheckoutEvents() {
         customerEmail: email,
         customerPhone: phone,
         paymentMethod: payment,
-        items
+        items,
+        discount,
+        tax: 0
       });
 
       // Compra exitosa
@@ -692,7 +747,14 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     const clientHeight = 110;
     const footerHeight = 100;
     const itemsHeight = items.length * rowHeight;
-    const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight;
+    
+    const discountVal = Number(sale.discount || 0);
+    const taxVal = Number(sale.tax || 0);
+    let extraHeight = 0;
+    if (discountVal > 0) extraHeight += 18;
+    if (taxVal > 0) extraHeight += 18;
+    
+    const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight + extraHeight;
 
     canvas.width = width;
     canvas.height = height;
@@ -708,9 +770,9 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
     // Dibujar Header
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px Outfit, Segoe UI';
+    ctx.font = 'bold 20px Outfit, Segoe UI';
     ctx.textAlign = 'center';
-    ctx.fillText('COMPROBANTE DE COMPRA', width / 2, 45);
+    ctx.fillText(sale.is_quotation === 1 ? 'COTIZACIÓN AL MAYOR' : 'COMPROBANTE DE COMPRA', width / 2, 45);
 
     ctx.fillStyle = '#6366f1';
     ctx.font = '14px Outfit, Segoe UI';
@@ -718,7 +780,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px Outfit, Segoe UI';
-    ctx.fillText(`Factura: #${sale.id}`, width / 2, 95);
+    ctx.fillText(`${sale.is_quotation === 1 ? 'Cotización' : 'Factura'}: #${sale.id}`, width / 2, 95);
     ctx.fillText(`Fecha: ${new Date(sale.created_at || new Date()).toLocaleString('es-ES')}`, width / 2, 115);
 
     // Dibujar Línea divisoria
@@ -734,7 +796,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px Outfit, Segoe UI';
-    ctx.fillText('FACTURADO A:', 30, yOffset);
+    ctx.fillText(sale.is_quotation === 1 ? 'COTIZADO A:' : 'FACTURADO A:', 30, yOffset);
 
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 14px Outfit, Segoe UI';
@@ -756,12 +818,12 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     ctx.textAlign = 'right';
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10px Outfit, Segoe UI';
-    ctx.fillText('DETALLES DE PAGO:', width - 30, yOffset);
+    ctx.fillText(sale.is_quotation === 1 ? 'DETALLES COTIZACIÓN:' : 'DETALLES DE PAGO:', width - 30, yOffset);
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '12px Outfit, Segoe UI';
     ctx.fillText(`Metodo: ${sale.payment_method.toUpperCase()}`, width - 30, yOffset + 20);
-    ctx.fillText(`Tipo: ${sale.type.toUpperCase()}`, width - 30, yOffset + 40);
+    ctx.fillText(`Tipo: ${sale.is_quotation === 1 ? 'COTIZACIÓN' : sale.type.toUpperCase()}`, width - 30, yOffset + 40);
 
     // Divisor
     ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -817,15 +879,55 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     ctx.lineTo(width - 30, y);
     ctx.stroke();
 
-    y += 30;
-    ctx.textAlign = 'left';
+    // Cálculos de desglose
+    const subtotalVal = Number(sale.total) - taxVal + discountVal;
+
+    y += 15;
+    ctx.font = '11px Outfit, Segoe UI';
     ctx.fillStyle = '#94a3b8';
+    
+    // Dibujar Subtotal
+    ctx.textAlign = 'left';
+    ctx.fillText('Subtotal', 30, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(`$${subtotalVal.toFixed(2)}`, width - 30, y);
+    
+    // Dibujar Descuento
+    if (discountVal > 0) {
+      y += 18;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#f87171';
+      ctx.fillText('Descuento', 30, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(`-$${discountVal.toFixed(2)}`, width - 30, y);
+      ctx.fillStyle = '#94a3b8';
+    }
+    
+    // Dibujar IVA 16%
+    if (taxVal > 0) {
+      y += 18;
+      ctx.textAlign = 'left';
+      ctx.fillText('IVA (16%)', 30, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(`$${taxVal.toFixed(2)}`, width - 30, y);
+    }
+
+    y += 15;
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(30, y);
+    ctx.lineTo(width - 30, y);
+    ctx.stroke();
+
+    y += 25;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 13px Outfit, Segoe UI';
     ctx.fillText('TOTAL NETO', 30, y);
 
     ctx.textAlign = 'right';
     ctx.fillStyle = '#6366f1';
-    ctx.font = 'bold 22px Outfit, Segoe UI';
+    ctx.font = 'bold 20px Outfit, Segoe UI';
     ctx.fillText(`$${Number(sale.total).toFixed(2)}`, width - 30, y);
 
     // Divisor
@@ -841,7 +943,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 13px Outfit, Segoe UI';
-    ctx.fillText('¡Gracias por tu compra!', width / 2, y);
+    ctx.fillText(sale.is_quotation === 1 ? 'Cotización válida por 15 días.' : '¡Gracias por tu compra!', width / 2, y);
 
     y += 20;
     ctx.fillStyle = '#64748b';
@@ -1192,6 +1294,15 @@ function renderAdminView(): string {
         <button class="sidebar-nav-btn ${activeAdminView === 'sales' ? 'active' : ''}" id="admin-tab-sales">
           ${icons.sales} Historico Ventas
         </button>
+        <button class="sidebar-nav-btn ${activeAdminView === 'debtors' ? 'active' : ''}" id="admin-tab-debtors">
+          💸 Deudores
+        </button>
+        <button class="sidebar-nav-btn ${activeAdminView === 'quotations' ? 'active' : ''}" id="admin-tab-quotations">
+          📝 Cotizaciones
+        </button>
+        <button class="sidebar-nav-btn ${activeAdminView === 'coupons' ? 'active' : ''}" id="admin-tab-coupons">
+          🎟️ Cupones
+        </button>
       </aside>
 
       <!-- Panel de Contenido -->
@@ -1210,12 +1321,18 @@ async function bindAdminEvents() {
   const tabPOS = document.getElementById('admin-tab-pos');
   const tabProducts = document.getElementById('admin-tab-products');
   const tabSales = document.getElementById('admin-tab-sales');
+  const tabDebtors = document.getElementById('admin-tab-debtors');
+  const tabQuotations = document.getElementById('admin-tab-quotations');
+  const tabCoupons = document.getElementById('admin-tab-coupons');
 
   const clearActiveTabs = () => {
     tabStats?.classList.remove('active');
     tabPOS?.classList.remove('active');
     tabProducts?.classList.remove('active');
     tabSales?.classList.remove('active');
+    tabDebtors?.classList.remove('active');
+    tabQuotations?.classList.remove('active');
+    tabCoupons?.classList.remove('active');
   };
 
   tabStats?.addEventListener('click', async () => {
@@ -1250,6 +1367,30 @@ async function bindAdminEvents() {
     await renderAdminSales();
   });
 
+  tabDebtors?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabDebtors?.classList.add('active');
+    activeAdminView = 'debtors';
+    destroyCharts();
+    await renderAdminDebtors();
+  });
+
+  tabQuotations?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabQuotations?.classList.add('active');
+    activeAdminView = 'quotations';
+    destroyCharts();
+    await renderAdminQuotations();
+  });
+
+  tabCoupons?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabCoupons?.classList.add('active');
+    activeAdminView = 'coupons';
+    destroyCharts();
+    await renderAdminCoupons();
+  });
+
   // Renderizar la subvista por defecto al cargar
   if (activeAdminView === 'stats') {
     await renderAdminStats();
@@ -1259,6 +1400,12 @@ async function bindAdminEvents() {
     await renderAdminProducts();
   } else if (activeAdminView === 'sales') {
     await renderAdminSales();
+  } else if (activeAdminView === 'debtors') {
+    await renderAdminDebtors();
+  } else if (activeAdminView === 'quotations') {
+    await renderAdminQuotations();
+  } else if (activeAdminView === 'coupons') {
+    await renderAdminCoupons();
   }
 }
 
@@ -1455,10 +1602,21 @@ async function renderAdminPOS() {
   const panel = document.getElementById('dashboard-content-panel');
   if (!panel) return;
 
-  // Cargar lista completa de productos para el POS
   try {
+    // Cargar lista de clientes para el POS si está vacía
+    if (posCustomersList.length === 0) {
+      posCustomersList = await api.auth.getCustomers();
+    }
+    
     const posProducts = await api.products.getAll(undefined, posSearchQuery || undefined);
+    
+    // Cálculos de totales
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
+    const totalDiscount = couponDiscountAmount + posDiscount;
+    const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
+    const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
+    const posTotal = taxableSubtotal + taxAmount;
 
     panel.innerHTML = `
       <div class="pos-layout animate-on-scroll animate-fade-up visible">
@@ -1508,18 +1666,28 @@ async function renderAdminPOS() {
           <!-- Checkout POS Form -->
           <form id="pos-checkout-form">
             <div class="form-group mb-2">
-              <label class="form-label" style="font-size:10px;">Cliente (Opcional)</label>
-              <input type="text" class="form-control" id="pos-client-name" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. Consumidor Final" value="Consumidor Final">
+              <label class="form-label" style="font-size:10px;">Seleccionar Cliente Registrado</label>
+              <select class="form-control" id="pos-client-select" style="padding: 8px 12px; font-size:13px;">
+                <option value="">-- Consumidor Final / Invitado --</option>
+                ${posCustomersList.map(c => `
+                  <option value="${c.id}" ${posSelectedCustomerId === c.id ? 'selected' : ''}>${c.name} (${c.email})</option>
+                `).join('')}
+              </select>
+            </div>
+            
+            <div class="form-group mb-2">
+              <label class="form-label" style="font-size:10px;">Nombre Cliente</label>
+              <input type="text" class="form-control" id="pos-client-name" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. Consumidor Final" value="${posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.name || '') : 'Consumidor Final'}">
             </div>
             <div class="form-group mb-2">
               <label class="form-label" style="font-size:10px;">Correo (Opcional para Factura)</label>
-              <input type="email" class="form-control" id="pos-client-email" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. cliente@correo.com">
+              <input type="email" class="form-control" id="pos-client-email" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. cliente@correo.com" value="${posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.email || '') : ''}">
             </div>
             <div class="form-group mb-2">
               <label class="form-label" style="font-size:10px;">WhatsApp/Telefono (Opcional)</label>
-              <input type="tel" class="form-control" id="pos-client-phone" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. +5491122334455">
+              <input type="tel" class="form-control" id="pos-client-phone" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. +5491122334455" value="${posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.phone || '') : ''}">
             </div>
-            <div class="form-group mb-4">
+            <div class="form-group mb-2">
               <label class="form-label" style="font-size:10px;">Metodo de Pago</label>
               <select class="form-control" id="pos-client-payment" style="padding: 8px 12px; font-size:13px;">
                 <option value="cash">Efectivo</option>
@@ -1528,10 +1696,61 @@ async function renderAdminPOS() {
               </select>
             </div>
 
-            <div style="border-top:1px solid var(--border-glass); padding-top:16px; margin-bottom:16px;">
-              <div class="flex justify-between" style="font-size:18px; font-weight:700;">
-                <span>Total Venta</span>
-                <span style="color:var(--primary);">$${posSubtotal.toFixed(2)}</span>
+            <!-- Descuento y Cupón -->
+            <div class="grid-2 gap-2 mb-2">
+              <div class="form-group">
+                <label class="form-label" style="font-size:10px;">Descuento Fijo ($)</label>
+                <input type="number" step="0.01" min="0" class="form-control" id="pos-discount-input" style="padding: 8px 12px; font-size:13px;" placeholder="0.00" value="${posDiscount > 0 ? posDiscount : ''}">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size:10px;">Cupón de Descuento</label>
+                <div style="display: flex; gap: 4px;">
+                  <input type="text" class="form-control" id="pos-coupon-input" style="padding: 8px 12px; font-size:13px; text-transform: uppercase;" placeholder="CÓDIGO" value="${posCouponCode}">
+                  <button type="button" class="btn btn-secondary" id="pos-apply-coupon-btn" style="padding: 0 8px; font-size: 11px;">OK</button>
+                </div>
+              </div>
+            </div>
+            ${posCouponDiscountPercent > 0 ? `<div style="color:var(--success); font-size:10px; margin-bottom:10px;">Cupón aplicado: ${posCouponDiscountPercent}% de descuento</div>` : ''}
+
+            <!-- Opciones Avanzadas (IVA y Cotización) -->
+            <div class="mb-4">
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                <input type="checkbox" id="pos-apply-tax" ${posApplyTax ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--primary);">
+                <label for="pos-apply-tax" class="form-label" style="font-size:11px; margin: 0; cursor: pointer;">Aplicar IVA (16%)</label>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                <input type="checkbox" id="pos-is-pending" style="width: 16px; height: 16px; accent-color: var(--danger);">
+                <label for="pos-is-pending" class="form-label" style="font-size:11px; margin: 0; cursor: pointer; color: var(--danger);">Marcar como Deuda / Pago Pendiente</label>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                <input type="checkbox" id="pos-is-quotation" style="width: 16px; height: 16px; accent-color: var(--secondary);">
+                <label for="pos-is-quotation" class="form-label" style="font-size:11px; margin: 0; cursor: pointer; color: var(--secondary); font-weight:600;">Registrar como Cotización al Mayor</label>
+              </div>
+            </div>
+
+            <!-- Resumen de Totales -->
+            <div style="border-top:1px solid var(--border-glass); padding-top:16px; margin-bottom:16px; font-size: 13px;">
+              <div class="flex justify-between mb-1" style="color: var(--text-secondary);">
+                <span>Subtotal</span>
+                <span>$${posSubtotal.toFixed(2)}</span>
+              </div>
+              ${totalDiscount > 0 ? `
+              <div class="flex justify-between mb-1" style="color: var(--danger);">
+                <span>Descuento</span>
+                <span>-$${totalDiscount.toFixed(2)}</span>
+              </div>
+              ` : ''}
+              ${taxAmount > 0 ? `
+              <div class="flex justify-between mb-1" style="color: var(--text-secondary);">
+                <span>IVA (16%)</span>
+                <span>$${taxAmount.toFixed(2)}</span>
+              </div>
+              ` : ''}
+              <div class="flex justify-between" style="font-size:18px; font-weight:700; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                <span>Total</span>
+                <span style="color:var(--primary);">$${posTotal.toFixed(2)}</span>
               </div>
             </div>
 
@@ -1546,6 +1765,7 @@ async function renderAdminPOS() {
     bindPOSEvents();
 
   } catch (error) {
+    console.error(error);
     panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar POS.</div>`;
   }
 }
@@ -1606,6 +1826,70 @@ function bindPOSEvents() {
     });
   });
 
+  // Seleccionar Cliente
+  const clientSelect = document.getElementById('pos-client-select') as HTMLSelectElement;
+  clientSelect?.addEventListener('change', (e) => {
+    const val = (e.target as HTMLSelectElement).value;
+    if (val) {
+      posSelectedCustomerId = parseInt(val);
+      const client = posCustomersList.find(c => c.id === posSelectedCustomerId);
+      if (client) {
+        (document.getElementById('pos-client-name') as HTMLInputElement).value = client.name;
+        (document.getElementById('pos-client-email') as HTMLInputElement).value = client.email;
+        (document.getElementById('pos-client-phone') as HTMLInputElement).value = client.phone || '';
+      }
+    } else {
+      posSelectedCustomerId = null;
+      (document.getElementById('pos-client-name') as HTMLInputElement).value = 'Consumidor Final';
+      (document.getElementById('pos-client-email') as HTMLInputElement).value = '';
+      (document.getElementById('pos-client-phone') as HTMLInputElement).value = '';
+    }
+  });
+
+  // Descuento Fijo
+  const discountInput = document.getElementById('pos-discount-input') as HTMLInputElement;
+  discountInput?.addEventListener('change', async (e) => {
+    const val = parseFloat((e.target as HTMLInputElement).value);
+    posDiscount = isNaN(val) ? 0 : val;
+    await renderAdminPOS();
+  });
+
+  // Aplicar Cupón
+  const applyCouponBtn = document.getElementById('pos-apply-coupon-btn');
+  applyCouponBtn?.addEventListener('click', async () => {
+    const code = (document.getElementById('pos-coupon-input') as HTMLInputElement).value.trim();
+    if (!code) {
+      alert('Ingrese un código de cupón');
+      return;
+    }
+    try {
+      const coupon = await api.sales.validateCoupon(code);
+      posCouponCode = coupon.code;
+      posCouponDiscountPercent = Number(coupon.discount_percent);
+      alert(`¡Cupón ${coupon.code} aplicado! (${coupon.discount_percent}% de descuento)`);
+      await renderAdminPOS();
+    } catch (err: any) {
+      alert(err.message || 'Cupón inválido o inactivo');
+    }
+  });
+
+  // Toggle IVA
+  const applyTaxCheckbox = document.getElementById('pos-apply-tax') as HTMLInputElement;
+  applyTaxCheckbox?.addEventListener('change', async (e) => {
+    posApplyTax = (e.target as HTMLInputElement).checked;
+    await renderAdminPOS();
+  });
+
+  // Toggle Cotización
+  const isQuotationCheckbox = document.getElementById('pos-is-quotation') as HTMLInputElement;
+  isQuotationCheckbox?.addEventListener('change', (e) => {
+    const isQuote = (e.target as HTMLInputElement).checked;
+    const submitBtn = document.getElementById('pos-submit-btn');
+    if (submitBtn) {
+      submitBtn.innerText = isQuote ? 'Generar Cotización al Mayor' : 'Registrar Venta POS';
+    }
+  });
+
   // Enviar Venta POS
   document.getElementById('pos-checkout-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1614,6 +1898,9 @@ function bindPOSEvents() {
     const email = (document.getElementById('pos-client-email') as HTMLInputElement).value;
     const phone = (document.getElementById('pos-client-phone') as HTMLInputElement).value;
     const payment = (document.getElementById('pos-client-payment') as HTMLSelectElement).value;
+
+    const isQuotation = (document.getElementById('pos-is-quotation') as HTMLInputElement).checked;
+    const isPending = (document.getElementById('pos-is-pending') as HTMLInputElement).checked;
 
     const items = posCart.map(item => ({
       productId: item.product.id,
@@ -1624,18 +1911,36 @@ function bindPOSEvents() {
     btn.disabled = true;
     btn.innerText = 'Registrando...';
 
+    // Totales finales a pasar
+    const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
+    const totalDiscount = couponDiscountAmount + posDiscount;
+    const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
+    const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
+
     try {
       const result = await api.sales.checkoutPOS({
         customerName: name,
         customerEmail: email,
         customerPhone: phone,
+        customerUserId: posSelectedCustomerId || undefined,
         paymentMethod: payment,
-        items
+        items,
+        discount: totalDiscount,
+        tax: taxAmount,
+        isQuotation,
+        status: isPending ? 'pending' : 'completed'
       });
 
-      // Venta exitosa
+      // Venta exitosa, limpiar estados
       posCart = [];
       posSearchQuery = '';
+      posSelectedCustomerId = null;
+      posDiscount = 0;
+      posApplyTax = true;
+      posCouponCode = '';
+      posCouponDiscountPercent = 0;
+      
       await loadProducts(); // recargar
       
       // Mostrar modal de éxito
@@ -1643,14 +1948,20 @@ function bindPOSEvents() {
         const prod = productsList.find(p => p.id === item.productId);
         return { name: prod ? prod.name : 'Producto', quantity: item.quantity, price: prod ? prod.price : 0 };
       });
-      showInvoiceSuccess(result, phone, email, itemsFormatted);
+      
+      // Modificar temporalmente para ver si es cotización
+      showInvoiceSuccess({
+        ...result,
+        customerName: name,
+        is_quotation: isQuotation ? 1 : 0
+      }, phone, email, itemsFormatted);
 
       // Renderizar POS de nuevo
       await renderAdminPOS();
     } catch (error: any) {
       alert(error.message || 'Error al registrar venta POS');
       btn.disabled = false;
-      btn.innerText = 'Registrar Venta POS';
+      btn.innerText = isQuotation ? 'Generar Cotización al Mayor' : 'Registrar Venta POS';
     }
   });
 }
@@ -2095,4 +2406,268 @@ function bindSaleDetailEvents() {
   closeBtn?.addEventListener('click', () => {
     modal?.classList.remove('open');
   });
+}
+
+// ==========================================================================
+// SUB-VISTA: DEUDORES (PAGOS PENDIENTES)
+// ==========================================================================
+async function renderAdminDebtors() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando lista de deudores...</div>`;
+
+  try {
+    const debtors = await api.sales.getDebtors();
+
+    panel.innerHTML = `
+      <div class="card animate-on-scroll animate-fade-up visible">
+        <div class="flex justify-between align-center mb-4">
+          <h2 style="font-size:20px; font-weight:700;">💸 Control de Deudores (Pagos Pendientes)</h2>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table-custom">
+            <thead>
+              <tr>
+                <th>Factura ID</th>
+                <th>Cliente</th>
+                <th>Contacto</th>
+                <th>Método Registro</th>
+                <th class="text-right">Total Pendiente</th>
+                <th>Fecha Emisión</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${debtors.map(sale => `
+                <tr>
+                  <td><strong>#${sale.id}</strong></td>
+                  <td><strong>${sale.customer_name}</strong></td>
+                  <td>
+                    <div style="font-size:12px;">${sale.customer_email || ''}</div>
+                    <div style="font-size:12px; color:var(--text-muted);">${sale.customer_phone || ''}</div>
+                  </td>
+                  <td><span class="badge" style="background:rgba(255,255,255,0.05); color:white; font-size:11px; padding:2px 6px;">${sale.type.toUpperCase()}</span></td>
+                  <td class="text-right" style="font-weight:700; color:var(--danger);">$${Number(sale.total).toFixed(2)}</td>
+                  <td>${new Date(sale.created_at).toLocaleString('es-ES')}</td>
+                  <td class="text-center">
+                    <button class="btn btn-primary mark-as-paid-btn" data-id="${sale.id}" style="padding: 6px 12px; font-size:11px;">
+                      ✓ Registrar Pago (Completar)
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+              ${debtors.length === 0 ? '<tr><td colspan="7" class="text-center">No hay clientes deudores o pagos pendientes.</td></tr>' : ''}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    // Bind mark as paid events
+    document.querySelectorAll('.mark-as-paid-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        if (confirm(`¿Estás seguro de marcar la factura #${id} como completada y pagada?`)) {
+          try {
+            await api.sales.updateStatus(id, 'completed');
+            alert('¡Pago registrado con éxito!');
+            await renderAdminDebtors();
+          } catch (err: any) {
+            alert(err.message || 'Error al actualizar estado del pago.');
+          }
+        }
+      });
+    });
+
+  } catch (error) {
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar la lista de deudores.</div>`;
+  }
+}
+
+// ==========================================================================
+// SUB-VISTA: COTIZACIONES AL MAYOR
+// ==========================================================================
+async function renderAdminQuotations() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando cotizaciones al mayor...</div>`;
+
+  try {
+    const quotes = await api.sales.getQuotations();
+
+    panel.innerHTML = `
+      <div class="card animate-on-scroll animate-fade-up visible">
+        <div class="flex justify-between align-center mb-4">
+          <h2 style="font-size:20px; font-weight:700;">📝 Cotizaciones al Mayor</h2>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table-custom">
+            <thead>
+              <tr>
+                <th>Cotización ID</th>
+                <th>Cliente</th>
+                <th>Contacto</th>
+                <th class="text-right">Monto Cotizado</th>
+                <th>Fecha de Creación</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${quotes.map(sale => `
+                <tr>
+                  <td><strong>#${sale.id}</strong></td>
+                  <td><strong>${sale.customer_name}</strong></td>
+                  <td>
+                    <div style="font-size:12px;">${sale.customer_email || ''}</div>
+                    <div style="font-size:12px; color:var(--text-muted);">${sale.customer_phone || ''}</div>
+                  </td>
+                  <td class="text-right" style="font-weight:700; color:var(--primary);">$${Number(sale.total).toFixed(2)}</td>
+                  <td>${new Date(sale.created_at).toLocaleString('es-ES')}</td>
+                  <td class="text-center" style="display:flex; justify-content:center; gap:8px;">
+                    <button class="btn btn-secondary view-quote-details-btn" data-id="${sale.id}" style="padding: 6px 12px; font-size:11px;">
+                      🔍 Ver Productos
+                    </button>
+                    <button class="btn btn-primary send-quote-wa-btn" data-id="${sale.id}" style="padding: 6px 12px; font-size:11px; background:#25d366; border-color:#25d366;">
+                      WhatsApp
+                    </button>
+                  </td>
+                </tr>
+              `).join('')}
+              ${quotes.length === 0 ? '<tr><td colspan="6" class="text-center">No se han registrado cotizaciones al mayor.</td></tr>' : ''}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    // Bind view quote details
+    document.querySelectorAll('.view-quote-details-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        try {
+          const details = await api.sales.getDetails(id);
+          showSaleDetails(details);
+          const headerId = document.getElementById('detail-header-id');
+          if (headerId) headerId.innerText = `Detalle de Cotización #${details.sale.id}`;
+        } catch (err: any) {
+          alert(err.message || 'Error al obtener cotización.');
+        }
+      });
+    });
+
+    // Bind send quote to WhatsApp
+    document.querySelectorAll('.send-quote-wa-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        try {
+          const details = await api.sales.getDetails(id);
+          const phone = details.sale.customer_phone || '';
+          const cleanedPhone = phone.replace(/\+/g, '').replace(/\s/g, '');
+          
+          await shareInvoiceAsImage(details.sale, details.items, cleanedPhone);
+        } catch (err: any) {
+          alert(err.message || 'Error al enviar cotización.');
+        }
+      });
+    });
+
+  } catch (error) {
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar cotizaciones.</div>`;
+  }
+}
+
+// ==========================================================================
+// SUB-VISTA: GESTIÓN DE CUPONES DE DESCUENTO
+// ==========================================================================
+async function renderAdminCoupons() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando cupones de descuento...</div>`;
+
+  try {
+    const coupons = await api.sales.getCoupons();
+
+    panel.innerHTML = `
+      <div class="grid-2 gap-4 animate-on-scroll animate-fade-up visible">
+        <!-- Formulario Crear Cupón -->
+        <div class="card" style="padding: 24px; align-self: flex-start;">
+          <h3 class="mb-4" style="font-size:18px; font-weight:700;">🎟️ Crear Nuevo Cupón</h3>
+          
+          <form id="create-coupon-form">
+            <div class="form-group">
+              <label class="form-label" for="coupon-code-input">Código del Cupón</label>
+              <input type="text" class="form-control" id="coupon-code-input" required placeholder="Ej. LIQUIDACION30" style="text-transform: uppercase;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="coupon-percent-input">Porcentaje de Descuento (%)</label>
+              <input type="number" min="1" max="100" class="form-control" id="coupon-percent-input" required placeholder="Ej. 30">
+            </div>
+            <button type="submit" class="btn btn-primary w-100" id="coupon-submit-btn">
+              Crear Cupón
+            </button>
+          </form>
+        </div>
+
+        <!-- Lista de Cupones -->
+        <div class="card" style="padding: 24px;">
+          <h3 class="mb-4" style="font-size:18px; font-weight:700;">Cupones Registrados</h3>
+          
+          <div class="table-responsive">
+            <table class="table-custom" style="font-size: 13px;">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th class="text-center">Descuento</th>
+                  <th class="text-center">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${coupons.map(cp => `
+                  <tr>
+                    <td><strong>${cp.code}</strong></td>
+                    <td class="text-center" style="font-weight:700; color:var(--primary);">${cp.discount_percent}%</td>
+                    <td class="text-center">
+                      <span class="badge" style="background:${cp.active === 1 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color:${cp.active === 1 ? 'var(--success)' : 'var(--danger)'}; padding:2px 6px; font-size:11px;">
+                        ${cp.active === 1 ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                  </tr>
+                `).join('')}
+                ${coupons.length === 0 ? '<tr><td colspan="3" class="text-center">No hay cupones registrados.</td></tr>' : ''}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Bind submit coupon
+    document.getElementById('create-coupon-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const code = (document.getElementById('coupon-code-input') as HTMLInputElement).value;
+      const percent = parseFloat((document.getElementById('coupon-percent-input') as HTMLInputElement).value);
+
+      const submitBtn = document.getElementById('coupon-submit-btn') as HTMLButtonElement;
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Creando...';
+
+      try {
+        await api.sales.addCoupon(code, percent);
+        alert('Cupón de descuento creado con éxito.');
+        await renderAdminCoupons();
+      } catch (err: any) {
+        alert(err.message || 'Error al crear cupón.');
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Crear Cupón';
+      }
+    });
+
+  } catch (error) {
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar cupones.</div>`;
+  }
 }
