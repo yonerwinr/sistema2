@@ -856,6 +856,44 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
   });
 }
 
+async function shareInvoiceAsImage(sale: any, items: any[], clientPhone: string) {
+  try {
+    const blob = await generateReceiptPNG(sale, items);
+    const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
+    
+    // Crear archivo para compartir
+    const file = new File([blob], `factura-${sale.id}.png`, { type: 'image/png' });
+    
+    // Verificar si el navegador admite Web Share API con archivos
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: `Factura #${sale.id}`,
+        text: `Comprobante digital de tu Factura #${sale.id}`
+      });
+      return;
+    }
+    
+    // Fallback para escritorio: copiar imagen al portapapeles y redirigir
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ]);
+      alert('¡Comprobante de factura copiado al portapapeles! A continuación se abrirá WhatsApp. Presiona Ctrl + V para pegar y enviar la imagen.');
+    } catch (err) {
+      console.warn('Clipboard image write failed:', err);
+      alert('Se abrirá WhatsApp. Descarga la factura en formato PNG desde el botón "Descargar" y pégala en el chat.');
+    }
+    
+    const waMessage = `Hola, te comparto el comprobante digital de tu Factura #${sale.id}. (Pega la imagen copiada presionando Ctrl + V).`;
+    const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMessage)}`;
+    window.open(waUrl, '_blank');
+  } catch (error) {
+    console.error('Error al compartir la factura PNG:', error);
+    alert('No se pudo compartir la factura.');
+  }
+}
+
 async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?: string, purchaseItems?: { name: string, quantity: number, price: number }[]) {
   const modal = document.getElementById('success-modal');
   modal?.classList.add('open');
@@ -870,13 +908,39 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
   if (totalEl) totalEl.innerText = `$${Number(result.total).toFixed(2)}`;
   if (idEl) idEl.innerText = `ID de Venta: #${result.saleId}`;
 
-  // WhatsApp Link - Mensaje explicando que pegue la imagen
-  const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
-  const waMessage = `Hola, te adjunto el comprobante digital de compra de tu Factura #${result.saleId} por un valor de $${Number(result.total).toFixed(2)}. (Por favor, pega el archivo de imagen que tienes copiado en el portapapeles).`;
-  waBtn.href = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMessage)}`;
+  // WhatsApp Link - Interceptado por click
+  const decodedText = decodeURIComponent(result.whatsappText);
+  waBtn.setAttribute('data-invoice-text', decodedText);
+  
+  const newWaBtn = waBtn.cloneNode(true) as HTMLAnchorElement;
+  waBtn.parentNode?.replaceChild(newWaBtn, waBtn);
+  
+  newWaBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    
+    // Inferencia de datos de pago
+    let payMethod = 'tarjeta';
+    if (decodedText.toLowerCase().includes('efectivo') || decodedText.toLowerCase().includes('cash')) payMethod = 'efectivo';
+    else if (decodedText.toLowerCase().includes('transfer')) payMethod = 'transferencia';
+
+    let saleType = 'online';
+    if (decodedText.toLowerCase().includes('pos')) saleType = 'pos';
+
+    const saleMock = {
+      id: result.saleId,
+      customer_name: result.customerName || 'Cliente General',
+      customer_phone: clientPhone,
+      customer_email: clientEmail,
+      total: result.total,
+      payment_method: payMethod,
+      type: saleType,
+      created_at: new Date()
+    };
+    
+    await shareInvoiceAsImage(saleMock, purchaseItems || [], clientPhone);
+  });
 
   // Mailto Email Link
-  const decodedText = decodeURIComponent(result.whatsappText);
   if (mailtoBtn) {
     mailtoBtn.href = `mailto:${clientEmail || ''}?subject=${encodeURIComponent('Factura de Compra #' + result.saleId)}&body=${encodeURIComponent(decodedText)}`;
   }
@@ -969,10 +1033,14 @@ function bindSuccessEvents() {
 
   // Copiar al Portapapeles
   document.getElementById('success-copy-btn')?.addEventListener('click', () => {
-    const waBtn = document.getElementById('success-wa-btn') as HTMLAnchorElement;
+    const waBtn = document.getElementById('success-wa-btn');
     if (waBtn) {
-      const urlParams = new URLSearchParams(waBtn.href.split('?')[1]);
-      const text = urlParams.get('text');
+      let text = waBtn.getAttribute('data-invoice-text');
+      // Si no está el atributo, intentar obtenerlo de la URL por retrocompatibilidad
+      if (!text && (waBtn as HTMLAnchorElement).href && (waBtn as HTMLAnchorElement).href.includes('?')) {
+        const urlParams = new URLSearchParams((waBtn as HTMLAnchorElement).href.split('?')[1]);
+        text = urlParams.get('text');
+      }
       if (text) {
         navigator.clipboard.writeText(decodeURIComponent(text))
           .then(() => {
@@ -1259,11 +1327,15 @@ async function renderAdminStats() {
         <div class="charts-grid">
           <div class="card chart-card">
             <h3 class="mb-4" style="font-size: 16px; font-weight:700;">Ingresos en los últimos 7 días</h3>
-            <canvas id="revenueChart"></canvas>
+            <div class="chart-container" style="position: relative; height: 280px; width: 100%;">
+              <canvas id="revenueChart"></canvas>
+            </div>
           </div>
           <div class="card chart-card">
             <h3 class="mb-4" style="font-size: 16px; font-weight:700;">Metodos de Pago</h3>
-            <canvas id="paymentChart"></canvas>
+            <div class="chart-container" style="position: relative; height: 280px; width: 100%;">
+              <canvas id="paymentChart"></canvas>
+            </div>
           </div>
         </div>
 
@@ -1977,26 +2049,16 @@ function showSaleDetails(details: SaleDetail) {
     `).join('');
   }
 
-  // Enlace a WhatsApp (Re-envío)
-  // Generar texto para whatsapp
-  let waText = `*📄 FACTURA DE COMPRA #${sale.id}*\n`;
-  waText += `-------------------------------------\n`;
-  waText += `*Cliente:* ${sale.customer_name}\n`;
-  waText += `*Fecha:* ${new Date(sale.created_at).toLocaleString('es-ES')}\n`;
-  waText += `*Metodo de Pago:* ${sale.payment_method.toUpperCase()}\n`;
-  waText += `*Tipo:* ${sale.type.toUpperCase()}\n`;
-  waText += `-------------------------------------\n`;
-  waText += `*Detalle de Productos:*\n`;
-  items.forEach(item => {
-    const itemTotal = (Number(item.price) * item.quantity).toFixed(2);
-    waText += `- ${item.name} x${item.quantity} ($${Number(item.price).toFixed(2)}) = *$${itemTotal}*\n`;
-  });
-  waText += `-------------------------------------\n`;
-  waText += `*TOTAL NETO:* *$${Number(sale.total).toFixed(2)}*\n\n`;
-  waText += `¡Gracias por preferirnos!`;
-
+  // Enlace a WhatsApp (Re-envío) - Enviando la imagen de la factura en su lugar
   const phoneNum = sale.customer_phone ? sale.customer_phone.replace(/\+/g, '').replace(/\s/g, '') : '';
-  waBtn.href = `https://wa.me/${phoneNum}?text=${encodeURIComponent(waText)}`;
+  
+  const newWaBtn = waBtn.cloneNode(true) as HTMLAnchorElement;
+  waBtn.parentNode?.replaceChild(newWaBtn, waBtn);
+
+  newWaBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await shareInvoiceAsImage(sale, items, phoneNum);
+  });
 }
 
 function bindSaleDetailEvents() {

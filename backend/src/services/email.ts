@@ -70,6 +70,7 @@ export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[])
       <html>
       <head>
         <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Factura de Compra #${sale.id}</title>
         <style>
           body {
@@ -77,8 +78,11 @@ export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[])
             background-color: #f7fafc;
             margin: 0;
             padding: 0;
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
           }
           .container {
+            width: 100%;
             max-width: 600px;
             margin: 40px auto;
             background: #ffffff;
@@ -178,6 +182,56 @@ export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[])
             font-size: 12px;
             color: #a0aec0;
             border-top: 1px solid #edf2f7;
+          }
+          
+          @media only screen and (max-width: 600px) {
+            .container {
+              margin: 12px auto !important;
+              border-radius: 8px !important;
+              width: 92% !important;
+            }
+            .header {
+              padding: 24px 16px !important;
+            }
+            .content {
+              padding: 16px !important;
+            }
+            .info-grid {
+              display: block !important;
+              margin-bottom: 12px !important;
+            }
+            .info-col {
+              display: block !important;
+              width: 100% !important;
+              text-align: left !important;
+              margin-bottom: 16px !important;
+            }
+            .info-col.right {
+              text-align: left !important;
+            }
+            .table-container {
+              border-radius: 6px !important;
+              overflow-x: auto !important;
+              -webkit-overflow-scrolling: touch;
+            }
+            table {
+              font-size: 13px !important;
+              min-width: 480px !important;
+            }
+            th, td {
+              padding: 10px 8px !important;
+            }
+            .totals {
+              text-align: center !important;
+              margin-top: 16px !important;
+            }
+            .total-box {
+              display: block !important;
+              padding: 12px 16px !important;
+            }
+            .total-value {
+              font-size: 20px !important;
+            }
           }
         </style>
       </head>

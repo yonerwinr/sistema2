@@ -78,22 +78,18 @@ router.post('/checkout', async (req, res) => {
         };
         // Generar texto para WhatsApp
         const waText = generateWhatsAppText(saleInfo, saleItemsToInsert);
-        // Intentar enviar correo de factura
-        let emailPreviewUrl = '';
+        // Intentar enviar correo de factura en segundo plano para no bloquear el checkout
         if (customerEmail) {
-            try {
-                emailPreviewUrl = await (0, email_1.sendInvoiceEmail)(customerEmail, saleInfo, saleItemsToInsert);
-            }
-            catch (err) {
+            (0, email_1.sendInvoiceEmail)(customerEmail, saleInfo, saleItemsToInsert).catch(err => {
                 console.error('Error enviando correo en checkout:', err);
-            }
+            });
         }
         res.status(201).json({
             message: 'Venta registrada con exito',
             saleId,
             total,
             whatsappText: encodeURIComponent(waText),
-            emailPreviewUrl
+            emailPreviewUrl: ''
         });
     }
     catch (error) {
@@ -169,22 +165,18 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
         };
         // Generar texto para WhatsApp
         const waText = generateWhatsAppText(saleInfo, saleItemsToInsert);
-        // Intentar enviar correo de factura
-        let emailPreviewUrl = '';
+        // Intentar enviar correo de factura en segundo plano para no bloquear la venta POS
         if (customerEmail) {
-            try {
-                emailPreviewUrl = await (0, email_1.sendInvoiceEmail)(customerEmail, saleInfo, saleItemsToInsert);
-            }
-            catch (err) {
+            (0, email_1.sendInvoiceEmail)(customerEmail, saleInfo, saleItemsToInsert).catch(err => {
                 console.error('Error enviando correo en POS:', err);
-            }
+            });
         }
         res.status(201).json({
             message: 'Venta POS registrada con exito',
             saleId,
             total,
             whatsappText: encodeURIComponent(waText),
-            emailPreviewUrl
+            emailPreviewUrl: ''
         });
     }
     catch (error) {
