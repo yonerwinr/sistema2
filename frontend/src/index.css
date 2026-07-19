@@ -387,24 +387,63 @@ body::after {
   margin: 0 auto 32px auto;
 }
 
-/* Tienda Grid y Filtros */
+/* Tienda Grid y Filtros - Rediseño Moderno FacilitoApp */
 .store-container {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   padding-bottom: 80px;
 }
 
-@media (max-width: 900px) {
-  .store-container {
-    grid-template-columns: 1fr;
-  }
+/* Hamburguesa Toggle Button y Menú Responsivo */
+.nav-toggle-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
 }
 
-.sidebar-filters {
-  position: sticky;
-  top: 100px;
-  height: fit-content;
+.nav-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+@media (max-width: 768px) {
+  .nav-toggle-btn {
+    display: flex !important;
+  }
+  .nav-links {
+    display: none !important; /* Ocultar inicialmente en móvil */
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background: var(--bg-glass-active);
+    border-bottom: 1px solid var(--border-glass);
+    padding: 20px 24px;
+    gap: 16px;
+    z-index: 99;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    align-items: stretch !important;
+  }
+  .nav-links.open {
+    display: flex !important; /* Mostrar cuando se hace toggle */
+  }
+  .nav-links .cart-icon-container {
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+  .navbar-container {
+    position: relative;
+  }
 }
 
 .filter-category-btn {

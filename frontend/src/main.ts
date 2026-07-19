@@ -65,7 +65,8 @@ const icons = {
   plus: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
   minus: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
   trash: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`,
-  whatsapp: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.859 0c3.166.001 6.141 1.233 8.377 3.469 2.235 2.237 3.466 5.214 3.466 8.384-.003 6.536-5.328 11.86-11.859 11.86-1.996-.001-3.956-.508-5.7-1.472L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.277 0 9.585-4.293 9.588-9.569a9.54 9.54 0 0 0-2.8-6.78A9.52 9.52 0 0 0 11.86 1.62c-5.278 0-9.587 4.293-9.59 9.57a9.508 9.508 0 0 0 1.488 4.787l-.98 3.585 3.679-.963zm12.33-4.996c-.3-.15-1.77-.875-2.046-.975-.276-.1-.477-.15-.677.15-.2.3-.775.975-.95 1.175-.175.2-.35.225-.65.075-.3-.15-1.265-.467-2.41-1.485-.89-.792-1.49-1.77-1.665-2.07-.175-.3-.019-.462.13-.61.135-.133.3-.35.45-.525.15-.175.2-.3.3-.5s.05-.375-.025-.525c-.075-.15-.677-1.63-.927-2.23-.243-.586-.492-.507-.677-.517-.174-.01-.375-.012-.576-.012-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.11 3.22 5.11 4.52.714.31 1.27.495 1.7.63.717.227 1.37.195 1.885.118.575-.085 1.77-.725 2.02-1.39.25-.665.25-1.23.175-1.39-.075-.16-.275-.26-.575-.41z"/></svg>`
+  whatsapp: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.003 5.324 5.328 0 11.859 0c3.166.001 6.141 1.233 8.377 3.469 2.235 2.237 3.466 5.214 3.466 8.384-.003 6.536-5.328 11.86-11.859 11.86-1.996-.001-3.956-.508-5.7-1.472L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.725 1.45 5.277 0 9.585-4.293 9.588-9.569a9.54 9.54 0 0 0-2.8-6.78A9.52 9.52 0 0 0 11.86 1.62c-5.278 0-9.587 4.293-9.59 9.57a9.508 9.508 0 0 0 1.488 4.787l-.98 3.585 3.679-.963zm12.33-4.996c-.3-.15-1.77-.875-2.046-.975-.276-.1-.477-.15-.677.15-.2.3-.775.975-.95 1.175-.175.2-.35.225-.65.075-.3-.15-1.265-.467-2.41-1.485-.89-.792-1.49-1.77-1.665-2.07-.175-.3-.019-.462.13-.61.135-.133.3-.35.45-.525.15-.175.2-.3.3-.5s.05-.375-.025-.525c-.075-.15-.677-1.63-.927-2.23-.243-.586-.492-.507-.677-.517-.174-.01-.375-.012-.576-.012-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.11 3.22 5.11 4.52.714.31 1.27.495 1.7.63.717.227 1.37.195 1.885.118.575-.085 1.77-.725 2.02-1.39.25-.665.25-1.23.175-1.39-.075-.16-.275-.26-.575-.41z"/></svg>`,
+  menu: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>`
 };
 
 // ==========================================================================
@@ -201,7 +202,13 @@ function renderNavbar(): string {
           <img src="/logofacilito.png" style="height:36px; width:36px; object-fit:contain; border-radius:50%; background:rgba(255,255,255,0.1); padding:2px;" class="animate-float" alt="FacilitoApp Logo">
           <span style="font-weight:900; letter-spacing:-0.5px;">FacilitoApp</span>
         </a>
-        <div class="nav-links">
+        
+        <!-- Botón Toggle Menú Hamburguesa Móvil -->
+        <button id="nav-toggle-btn" class="nav-toggle-btn" aria-label="Abrir menú de navegación" style="display:none;">
+          ${icons.menu}
+        </button>
+
+        <div class="nav-links" id="nav-links-menu">
           <a class="nav-link ${currentView === 'store' ? 'active' : ''}" id="link-store">Tienda</a>
           
           ${currentUser ? `
@@ -245,6 +252,18 @@ function renderFooter(): string {
 // SECCIÓN DE EVENTOS COMUNES
 // ==========================================================================
 function bindGeneralEvents() {
+  // Menú Hamburguesa Toggle en móvil
+  document.getElementById('nav-toggle-btn')?.addEventListener('click', () => {
+    document.getElementById('nav-links-menu')?.classList.toggle('open');
+  });
+
+  // Cerrar menú móvil al hacer clic en cualquier enlace
+  document.querySelectorAll('#nav-links-menu .nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+      document.getElementById('nav-links-menu')?.classList.remove('open');
+    });
+  });
+
   document.getElementById('nav-logo')?.addEventListener('click', (e) => {
     e.preventDefault();
     navigate('store');
@@ -342,34 +361,31 @@ function renderStoreView(): string {
       </div>
     </section>
 
-    <div class="container store-container">
-      <!-- Filtros Laterales -->
-      <aside class="card sidebar-filters animate-on-scroll animate-slide-right">
-        <h3 class="mb-4" style="font-size: 16px; font-weight: 700; text-transform: uppercase;">Filtrar</h3>
+    <div class="container store-container" style="display:flex; flex-direction:column; gap:24px;">
+      <!-- Barra de Filtros Horizontal Superior (Modern E-Commerce Layout) -->
+      <div class="store-filter-bar card" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 24px; position: sticky; top: 75px; z-index: 10; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(18,24,39,0.85); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+        <!-- Buscador Elegante -->
+        <div style="position: relative; flex: 1; min-width: 240px; max-width: 320px;">
+          <input type="text" class="form-control" id="store-search" placeholder="🔍 Buscar productos..." value="${searchQuery}" style="padding-left: 14px; border-radius: 50px; background: rgba(255,255,255,0.03);">
+        </div>
         
-        <!-- Buscador -->
-        <div class="form-group">
-          <input type="text" class="form-control" id="store-search" placeholder="Buscar producto..." value="${searchQuery}">
+        <!-- Categorías Horizontales -->
+        <div class="categories-container" style="display: flex; gap: 8px; overflow-x: auto; max-width: 100%; white-space: nowrap; padding-bottom: 2px; -webkit-overflow-scrolling: touch; border: none; background: transparent;">
+          ${categories.map(cat => `
+            <button class="filter-category-btn ${selectedCategory === (cat === 'Todas' ? '' : cat) ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}" style="padding: 8px 16px; border-radius: 50px; font-size: 13px; font-weight: 600; border: 1px solid var(--border-glass); background: ${selectedCategory === (cat === 'Todas' ? '' : cat) ? 'var(--primary)' : 'rgba(255,255,255,0.02)'}; color: ${selectedCategory === (cat === 'Todas' ? '' : cat) ? '#000' : 'var(--text-secondary)'}; transition: all 0.3s ease; cursor:pointer;">
+              ${cat}
+            </button>
+          `).join('')}
         </div>
+      </div>
 
-        <div class="form-group">
-          <label class="form-label">Categorias</label>
-          <div class="categories-container">
-            ${categories.map(cat => `
-              <button class="filter-category-btn ${selectedCategory === (cat === 'Todas' ? '' : cat) ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}">
-                ${cat}
-              </button>
-            `).join('')}
-          </div>
-        </div>
-      </aside>
-
-      <!-- Grid de Productos -->
-      <section>
+      <!-- Grid de Productos (Ancho Completo) -->
+      <section style="width: 100%;">
         <div class="products-grid stagger-container">
           ${productsHtml.length > 0 ? productsHtml : `
-            <div class="card text-center" style="grid-column: 1 / -1; padding: 60px;">
-              <p style="color: var(--text-secondary); font-size: 16px;">No se encontraron productos en esta categoria.</p>
+            <div class="card text-center" style="grid-column: 1 / -1; padding: 60px; text-align: center; color: var(--text-secondary);">
+              <span style="font-size: 48px; display:block; margin-bottom:12px;">🐒🔍</span>
+              No se encontraron productos en esta categoría.
             </div>
           `}
         </div>
