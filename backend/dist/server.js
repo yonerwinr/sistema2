@@ -29,7 +29,7 @@ app.use('/api/sales', sales_1.default);
 app.use('/api/stats', stats_1.default);
 // Ruta raiz de prueba
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Servidor POS Online funcionando correctamente' });
+    res.json({ status: 'ok', message: 'Servidor FacilitoApp funcionando correctamente 🐒' });
 });
 // Función de migraciones automáticas
 async function runMigrations() {
@@ -206,7 +206,7 @@ async function runMigrations() {
 runMigrations().then(() => {
     app.listen(PORT, () => {
         console.log(`==========================================================`);
-        console.log(`🚀 Servidor backend POS Online corriendo en puerto ${PORT}`);
+        console.log(`🚀 Servidor backend FacilitoApp corriendo en puerto ${PORT} 🐒`);
         console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
         console.log(`==========================================================`);
         // Iniciar cron de recordatorio de deudas en segundo plano

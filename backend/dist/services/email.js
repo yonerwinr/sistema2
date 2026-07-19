@@ -98,7 +98,7 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
       </tr>
     `).join('');
         const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@sistema-pos-online.local';
-        const friendlyFrom = `"Sistema POS & Tienda" <${fromAddress}>`;
+        const friendlyFrom = `"FacilitoApp 🐒" <${fromAddress}>`;
         const invoiceDate = new Date(sale.created_at || new Date()).toLocaleString('es-ES');
         const htmlContent = `
       <!DOCTYPE html>
@@ -127,7 +127,7 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
             border: 1px solid #edf2f7;
           }
           .header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, #ff7a00 0%, #8b5cf6 100%);
             padding: 32px;
             text-align: center;
             color: #ffffff;
@@ -206,7 +206,7 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
           }
           .total-value {
             font-size: 24px;
-            color: #4f46e5;
+            color: #ff7a00;
             font-weight: 700;
             margin-top: 4px;
           }
@@ -334,8 +334,8 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
                 </tr>
                 ` : ''}
                 <tr style="border-top: 1px solid #e2e8f0;">
-                  <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #4f46e5;">TOTAL USD:</td>
-                  <td style="padding: 10px 0; text-align: right; font-size: 18px; font-weight: 700; color: #4f46e5;">$${Number(sale.total).toFixed(2)}</td>
+                  <td style="padding: 10px 0; font-size: 16px; font-weight: 700; color: #ff7a00;">TOTAL USD:</td>
+                  <td style="padding: 10px 0; text-align: right; font-size: 18px; font-weight: 700; color: #ff7a00;">$${Number(sale.total).toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td style="padding: 6px 0; color: #f59e0b; font-weight: 700;">TOTAL Bs. (BCV):</td>
@@ -350,8 +350,8 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
             </div>
           </div>
           <div class="footer">
-            <p>Este es un correo automático generado por nuestro Sistema POS y Tienda Online.</p>
-            <p>&copy; ${new Date().getFullYear()} POS Online. Todos los derechos reservados.</p>
+            <p>Este es un correo automático generado por FacilitoApp 🐒.</p>
+            <p>&copy; ${new Date().getFullYear()} FacilitoApp. Todos los derechos reservados.</p>
           </div>
         </div>
       </body>
@@ -359,7 +359,7 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
     `;
         const plainTextContent = `
 ${isResend ? `⚠️ ESTE CORREO ES UN REENVÍO DE LA FACTURA ORIGINAL EMITIDA EL ${invoiceDate}.\n` : ''}=========================================
-📄 ${sale.is_quotation === 1 ? 'COTIZACIÓN AL MAYOR' : 'COMPROBANTE DE COMPRA - FACTURA'} #${sale.id}
+📄 ${sale.is_quotation === 1 ? 'COTIZACIÓN AL MAYOR' : 'COMPROBANTE DE COMPRA'} #${sale.id}
 =========================================
 ${sale.is_quotation === 1 ? 'Detalle de cotización' : '¡Gracias por tu compra!'}
 
@@ -375,15 +375,15 @@ ${items.map(item => `- ${item.name} x${item.quantity} ($${Number(item.price).toF
 SUBTOTAL: $${subtotal.toFixed(2)}
 ${Number(sale.discount) > 0 ? `DESCUENTO: -$${Number(sale.discount).toFixed(2)}\n` : ''}${Number(sale.tax) > 0 ? `IVA (16%): $${Number(sale.tax).toFixed(2)}\n` : ''}TOTAL: $${Number(sale.total).toFixed(2)}
 =========================================
-Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
-© ${new Date().getFullYear()} POS Online. Todos los derechos reservados.
+Este es un correo automático generado por FacilitoApp 🐒.
+© ${new Date().getFullYear()} FacilitoApp. Todos los derechos reservados.
     `;
         const info = await client.sendMail({
             from: fromAddress,
             to: toEmail,
             subject: sale.is_quotation === 1
-                ? `Cotización al mayor #${sale.id} - POS Online`
-                : `${isResend ? '[REENVÍO] ' : ''}Factura de compra #${sale.id} - POS Online`,
+                ? `Cotización al mayor #${sale.id} - FacilitoApp 🐒`
+                : `${isResend ? '[REENVÍO] ' : ''}Comprobante de compra #${sale.id} - FacilitoApp 🐒`,
             text: plainTextContent,
             html: htmlContent
         });
@@ -408,9 +408,9 @@ Este es un correo automatico generado por nuestro Sistema POS y Tienda Online.
 async function sendPlainEmail(to, subject, text) {
     try {
         const mailTransporter = await getTransporter();
-        const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@pos-online.com';
+        const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@facilitoapp.com';
         const mailOptions = {
-            from: `"Recordatorio de Pago" <${fromEmail}>`,
+            from: `"Recordatorio de Pago - FacilitoApp 🐒" <${fromEmail}>`,
             to,
             subject,
             text

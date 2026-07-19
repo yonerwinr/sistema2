@@ -197,8 +197,9 @@ function renderNavbar(): string {
     </div>
     <nav class="navbar">
       <div class="container navbar-container">
-        <a class="logo" href="#" id="nav-logo">
-          <span>🛍️</span> POS Hibrido
+        <a class="logo" href="#" id="nav-logo" style="display:flex; align-items:center; gap:8px;">
+          <img src="/logofacilito.png" style="height:36px; width:36px; object-fit:contain; border-radius:50%; background:rgba(255,255,255,0.1); padding:2px;" class="animate-float" alt="FacilitoApp Logo">
+          <span style="font-weight:900; letter-spacing:-0.5px;">FacilitoApp</span>
         </a>
         <div class="nav-links">
           <a class="nav-link ${currentView === 'store' ? 'active' : ''}" id="link-store">Tienda</a>
@@ -234,7 +235,7 @@ function renderFooter(): string {
   return `
     <footer style="background: var(--bg-secondary); border-top: 1px solid var(--border-glass); padding: 24px 0; text-align: center; font-size: 13px; color: var(--text-secondary); margin-top: auto;">
       <div class="container">
-        <p>&copy; ${new Date().getFullYear()} POS Online. Construido con HTML, CSS, JavaScript y TypeScript.</p>
+        <p>&copy; ${new Date().getFullYear()} FacilitoApp 🐒. La forma más fácil de gestionar tu negocio. ¡Tan fácil que hasta un monito puede usarlo! 💻📱</p>
       </div>
     </footer>
   `;
@@ -315,10 +316,27 @@ function renderStoreView(): string {
   }).join('');
 
   return `
-    <section class="hero-section animate-on-scroll animate-zoom-in">
-      <div class="container">
-        <h1 class="hero-title">Tu Tienda Digital Moderna</h1>
-        <p class="hero-subtitle">Encuentra los dispositivos mas avanzados del mercado con entrega inmediata, facturacion digital y soporte completo.</p>
+    <section class="hero-section animate-on-scroll animate-zoom-in" style="position:relative; overflow:hidden; padding: 60px 0; background: linear-gradient(135deg, rgba(255,122,0,0.1) 0%, rgba(139,92,246,0.1) 100%); border-radius: var(--radius-lg); border: 1px solid var(--border-glass); margin-bottom: 30px;">
+      <div class="container" style="display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap-reverse;">
+        <div style="flex: 1; min-width: 300px;">
+          <h1 class="hero-title" style="font-size: 38px; line-height: 1.1; margin-bottom: 12px; font-weight:900; text-align:left;">
+            ¡Todo es más fácil en <span style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">FacilitoApp</span>! 🐒
+          </h1>
+          <p class="hero-subtitle" style="font-size: 15px; color: var(--text-secondary); max-width: 550px; margin-bottom: 20px; text-align:left;">
+            Tu solución inteligente para compras en línea y punto de venta. Tan rápido, interactivo y automático... ¡que hasta nuestra mascota sabe usarlo! 💻📱
+          </p>
+          <div style="display:flex; gap:12px;">
+            <span class="badge" style="background: rgba(255,122,0,0.15); color: var(--primary); padding: 6px 12px; border-radius: 50px; font-weight:700; font-size:11px; border: 1px solid rgba(255,122,0,0.25);">🐒 Rápido</span>
+            <span class="badge" style="background: rgba(139,92,246,0.15); color: var(--secondary); padding: 6px 12px; border-radius: 50px; font-weight:700; font-size:11px; border: 1px solid rgba(139,92,246,0.25);">💻 Automático</span>
+            <span class="badge" style="background: rgba(6,182,212,0.15); color: var(--accent); padding: 6px 12px; border-radius: 50px; font-weight:700; font-size:11px; border: 1px solid rgba(6,182,212,0.25);">📱 Divertido</span>
+          </div>
+        </div>
+        <div style="flex: 0 0 auto; margin: 0 auto; display:flex; justify-content:center; align-items:center;" class="animate-float">
+          <div style="position:relative; width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, rgba(255,122,0,0.2) 0%, transparent 70%); display:flex; justify-content:center; align-items:center;">
+            <img src="/logofacilito.png" style="width:110px; height:110px; object-fit:contain; border-radius: 50%; border: 3px solid var(--primary); box-shadow: 0 8px 24px rgba(255,122,0,0.3); background: var(--bg-secondary);" alt="Mascota FacilitoApp">
+            <span style="position:absolute; bottom:-5px; right:-5px; font-size:24px;">👋</span>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -811,7 +829,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     ctx.fillRect(0, 0, width, height);
 
     // Borde brillante de estilo glassmorphism
-    ctx.strokeStyle = '#6366f1'; // indigo
+    ctx.strokeStyle = '#ff7a00'; // naranja
     ctx.lineWidth = 4;
     ctx.strokeRect(2, 2, width - 4, height - 4);
 
@@ -821,9 +839,9 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     ctx.textAlign = 'center';
     ctx.fillText(sale.is_quotation === 1 ? 'COTIZACIÓN AL MAYOR' : 'COMPROBANTE DE COMPRA', width / 2, 45);
 
-    ctx.fillStyle = '#6366f1';
-    ctx.font = '14px Outfit, Segoe UI';
-    ctx.fillText('POS & E-COMMERCE HIBRIDO', width / 2, 70);
+    ctx.fillStyle = '#ff7a00';
+    ctx.font = 'bold 15px Outfit, Segoe UI';
+    ctx.fillText('FACILITOAPP 🐒', width / 2, 70);
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px Outfit, Segoe UI';
@@ -1017,7 +1035,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     y += 20;
     ctx.fillStyle = '#64748b';
     ctx.font = '10px Outfit, Segoe UI';
-    ctx.fillText('Documento digital no tributario.', width / 2, y);
+    ctx.fillText('Documento digital generado por FacilitoApp.', width / 2, y);
 
     // Convertir canvas a Blob y retornar
     canvas.toBlob((blob) => {
@@ -1270,6 +1288,11 @@ function renderAuthView(): string {
   return `
     <div class="auth-container">
       <div class="card auth-card animate-on-scroll animate-zoom-in">
+        <div style="text-align:center; margin-bottom: 20px;">
+          <img src="/logofacilito.png" class="animate-float" style="width: 76px; height: 76px; border-radius:50%; border:2px solid var(--primary); box-shadow: 0 4px 15px rgba(255,122,0,0.25); background:var(--bg-secondary); object-fit:contain;" alt="Logo">
+          <h2 style="font-weight:900; margin-top:10px; font-size: 24px; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing:-0.5px;">FacilitoApp</h2>
+          <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">¡Ingresa y disfruta del control total de tus ventas! 🐒</p>
+        </div>
         <div class="auth-tabs">
           <button class="auth-tab-btn ${activeAuthTab === 'login' ? 'active' : ''}" id="tab-login-btn">Iniciar Sesion</button>
           <button class="auth-tab-btn ${activeAuthTab === 'register' ? 'active' : ''}" id="tab-register-btn">Registrarse</button>

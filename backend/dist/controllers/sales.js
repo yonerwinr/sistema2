@@ -615,7 +615,7 @@ router.get('/', auth_1.authenticate, async (req, res) => {
 // Helper para formatear texto de WhatsApp
 function generateWhatsAppText(sale, items) {
     const dateStr = new Date(sale.created_at).toLocaleString('es-ES');
-    let text = `*📄 FACTURA DE COMPRA #${sale.id}*\n`;
+    let text = `*📄 COMPROBANTE - FACILITOAPP #${sale.id}* 🐒\n`;
     text += `-------------------------------------\n`;
     text += `*Cliente:* ${sale.customer_name}\n`;
     text += `*Fecha:* ${dateStr}\n`;
@@ -632,7 +632,7 @@ function generateWhatsAppText(sale, items) {
     });
     text += `-------------------------------------\n`;
     text += `*TOTAL NETO:* *$${Number(sale.total).toFixed(2)}*\n\n`;
-    text += `¡Gracias por preferirnos! Si tienes dudas contactanos.`;
+    text += `¡Gracias por elegir FacilitoApp! 🐒 Si tienes dudas contáctanos.`;
     return text;
 }
 // Reenviar factura por correo
