@@ -29,7 +29,8 @@ async function syncSaleToSheets(sale, items) {
         total: Number(sale.total).toFixed(2),
         amountPaid: Number(sale.amount_paid || 0).toFixed(2),
         amountPending: Math.max(0, Number(sale.total) - Number(sale.amount_paid || 0)).toFixed(2),
-        items: itemsFormatted
+        items: itemsFormatted,
+        sellerName: sale.seller_name || 'Online (Tienda)'
     };
     try {
         const response = await fetch(webhookUrl, {

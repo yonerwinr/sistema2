@@ -61,6 +61,7 @@ export interface Sale {
   status: 'pending' | 'completed' | 'cancelled';
   created_at: string;
   registered_by?: string;
+  seller_name?: string;
   discount?: number;
   tax?: number;
   is_quotation?: number;

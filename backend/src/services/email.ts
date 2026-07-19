@@ -65,7 +65,14 @@ export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[],
       if (usdSetting) rateUsdToVes = parseFloat(usdSetting.settings_value);
       if (eurSetting) rateEurToVes = parseFloat(eurSetting.settings_value);
 
-      if (sale.user_id) {
+      if (sale.seller_name) {
+        registeredBy = sale.seller_name;
+      } else if (sale.seller_id) {
+        const [userRows]: any = await pool.query('SELECT name FROM users WHERE id = ?', [sale.seller_id]);
+        if (userRows.length > 0) {
+          registeredBy = userRows[0].name;
+        }
+      } else if (sale.user_id) {
         const [userRows]: any = await pool.query('SELECT name FROM users WHERE id = ?', [sale.user_id]);
         if (userRows.length > 0) {
           registeredBy = userRows[0].name;

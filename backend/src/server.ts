@@ -70,6 +70,18 @@ async function runMigrations() {
       console.error('Error al agregar columna customer_ci a la tabla sales:', err.message);
     }
 
+    // Verificar y agregar columna seller_id a la tabla sales
+    try {
+      const [salesCols]: any = await conn.query('SHOW COLUMNS FROM sales');
+      const salesColNames = salesCols.map((c: any) => c.Field);
+      if (!salesColNames.includes('seller_id')) {
+        await conn.query('ALTER TABLE sales ADD COLUMN seller_id INT NULL, ADD FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE SET NULL');
+        console.log('Columna "seller_id" agregada a la tabla sales.');
+      }
+    } catch (err: any) {
+      console.error('Error al agregar columna seller_id a la tabla sales:', err.message);
+    }
+
     // Modificar columna payment_method para permitir VARCHAR(50)
     try {
       await conn.query("ALTER TABLE sales MODIFY COLUMN payment_method VARCHAR(50) NOT NULL DEFAULT 'cash'");

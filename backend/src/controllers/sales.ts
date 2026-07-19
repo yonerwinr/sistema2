@@ -141,6 +141,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       discount: discount || 0,
       tax: tax || 0,
       amount_paid: initialPaid,
+      seller_name: 'Online (Tienda)',
       created_at: new Date()
     };
 
@@ -289,7 +290,8 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
           tax = ?, 
           is_quotation = ?, 
           amount_paid = ?,
-          coupon_code = ?
+          coupon_code = ?,
+          seller_id = ?
          WHERE id = ?`,
         [
           customerUserId || null,
@@ -304,13 +306,14 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
           isQuotation ? 1 : 0,
           finalAmountPaid,
           couponCode ? couponCode.toUpperCase().trim() : null,
+          req.user?.id || null,
           saleId
         ]
       );
     } else {
       // Registrar la venta nueva
       const [saleResult]: any = await conn.query(
-        'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code, seller_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           customerUserId || null,
           customerName || 'Consumidor Final',
@@ -324,7 +327,8 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
           tax || 0.00,
           isQuotation ? 1 : 0,
           finalAmountPaid,
-          couponCode ? couponCode.toUpperCase().trim() : null
+          couponCode ? couponCode.toUpperCase().trim() : null,
+          req.user?.id || null
         ]
       );
       saleId = saleResult.insertId;
@@ -353,6 +357,7 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
       tax: tax || 0,
       is_quotation: isQuotation ? 1 : 0,
       amount_paid: finalAmountPaid,
+      seller_name: req.user?.name || 'Vendedor',
       created_at: new Date()
     };
 
@@ -407,9 +412,10 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const [sales]: any = await pool.query(
-      `SELECT s.*, u.name as registered_by 
+      `SELECT s.*, u.name as registered_by, seller.name as seller_name 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
        WHERE s.id = ?`, 
       [id]
     );
@@ -446,9 +452,10 @@ router.get('/quotations/all', authenticate, async (req: AuthRequest, res: Respon
 
   try {
     const [sales]: any = await pool.query(
-      `SELECT s.*, u.name as registered_by 
+      `SELECT s.*, u.name as registered_by, seller.name as seller_name 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
        WHERE s.is_quotation = 1
        ORDER BY s.created_at DESC`
     );
@@ -467,9 +474,10 @@ router.get('/debtors/all', authenticate, async (req: AuthRequest, res: Response)
 
   try {
     const [sales]: any = await pool.query(
-      `SELECT s.*, u.name as registered_by 
+      `SELECT s.*, u.name as registered_by, seller.name as seller_name 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
        WHERE s.status = 'pending' AND s.is_quotation = 0
        ORDER BY s.created_at DESC`
     );
@@ -525,7 +533,13 @@ router.put('/:id/status', authenticate, async (req: AuthRequest, res: Response) 
     
     // Obtener la venta actualizada y sus ítems para sincronizar la actualización con Google Sheets
     try {
-      const [updatedSales]: any = await pool.query('SELECT * FROM sales WHERE id = ?', [id]);
+      const [updatedSales]: any = await pool.query(
+        `SELECT s.*, seller.name as seller_name 
+         FROM sales s 
+         LEFT JOIN users seller ON s.seller_id = seller.id 
+         WHERE s.id = ?`, 
+        [id]
+      );
       const [saleItems]: any = await pool.query(
         `SELECT si.*, p.name FROM sale_items si 
          JOIN products p ON si.product_id = p.id 
@@ -699,9 +713,10 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
   try {
     const [sales]: any = await pool.query(
-      `SELECT s.*, u.name as registered_by 
+      `SELECT s.*, u.name as registered_by, seller.name as seller_name 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
        WHERE s.is_quotation = 0
        ORDER BY s.created_at DESC`
     );
@@ -721,6 +736,9 @@ function generateWhatsAppText(sale: any, items: any[]): string {
   text += `*Fecha:* ${dateStr}\n`;
   text += `*Metodo de Pago:* ${sale.payment_method.toUpperCase()}\n`;
   text += `*Tipo:* ${sale.type.toUpperCase()}\n`;
+  if (sale.seller_name) {
+    text += `*Vendedor:* ${sale.seller_name}\n`;
+  }
   text += `-------------------------------------\n`;
   text += `*Detalle de Productos:*\n`;
 
@@ -741,7 +759,13 @@ router.post('/:id/resend-email', authenticate, async (req: AuthRequest, res: Res
   const { email } = req.body;
 
   try {
-    const [sales]: any = await pool.query('SELECT * FROM sales WHERE id = ?', [id]);
+    const [sales]: any = await pool.query(
+      `SELECT s.*, seller.name as seller_name 
+       FROM sales s 
+       LEFT JOIN users seller ON s.seller_id = seller.id 
+       WHERE s.id = ?`, 
+      [id]
+    );
     if (sales.length === 0) {
       return res.status(404).json({ message: 'Venta no encontrada' });
     }

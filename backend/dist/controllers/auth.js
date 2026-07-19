@@ -12,27 +12,37 @@ const router = (0, express_1.Router)();
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secreta_pos_online_token_key_987654321';
 // Registro de Usuario (Clientes)
 router.post('/register', async (req, res) => {
-    const { name, email, password, phone } = req.body;
-    if (!name || !email || !password) {
-        return res.status(400).json({ message: 'Nombre, correo y contrasena son obligatorios' });
+    const { name, email, password, phone, ci } = req.body;
+    if (!name || !email || !password || !ci) {
+        return res.status(400).json({ message: 'Nombre, correo, contraseña y cédula son obligatorios' });
+    }
+    // Validar formato de cédula V-12345678 o E-12345678
+    const ciPattern = /^[VE]-\d{5,10}$/;
+    if (!ciPattern.test(ci)) {
+        return res.status(400).json({ message: 'Formato de cédula inválido. Debe comenzar con V- o E- seguido de 5 a 10 dígitos numéricos (ej: V-12345678)' });
     }
     try {
-        // Verificar si el usuario ya existe
+        // Verificar si el usuario ya existe por correo
         const [existing] = await db_1.default.query('SELECT id FROM users WHERE email = ?', [email]);
         if (existing.length > 0) {
-            return res.status(400).json({ message: 'El correo electronico ya esta registrado' });
+            return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
         }
-        // Encriptar contrasena
+        // Verificar si la cédula ya existe
+        const [existingCI] = await db_1.default.query('SELECT id FROM users WHERE ci = ?', [ci]);
+        if (existingCI.length > 0) {
+            return res.status(400).json({ message: 'La cédula de identidad ya está registrada por otro usuario' });
+        }
+        // Encriptar contraseña
         const salt = await bcryptjs_1.default.genSalt(10);
         const hashedPassword = await bcryptjs_1.default.hash(password, salt);
         // Insertar usuario
-        const [result] = await db_1.default.query('INSERT INTO users (name, email, password, role, phone) VALUES (?, ?, ?, ?, ?)', [name, email, hashedPassword, 'customer', phone || null]);
+        const [result] = await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, ?, ?, ?, ?)', [name, email, hashedPassword, 'customer', phone || null, ci]);
         const userId = result.insertId;
         // Generar token JWT
         const token = jsonwebtoken_1.default.sign({ id: userId, email, role: 'customer', name }, JWT_SECRET, { expiresIn: '7d' });
         res.status(201).json({
             token,
-            user: { id: userId, name, email, role: 'customer', phone }
+            user: { id: userId, name, email, role: 'customer', phone, ci }
         });
     }
     catch (error) {

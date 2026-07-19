@@ -69,7 +69,16 @@ async function sendInvoiceEmail(toEmail, sale, items, isResend = false) {
                 rateUsdToVes = parseFloat(usdSetting.settings_value);
             if (eurSetting)
                 rateEurToVes = parseFloat(eurSetting.settings_value);
-            if (sale.user_id) {
+            if (sale.seller_name) {
+                registeredBy = sale.seller_name;
+            }
+            else if (sale.seller_id) {
+                const [userRows] = await db_1.default.query('SELECT name FROM users WHERE id = ?', [sale.seller_id]);
+                if (userRows.length > 0) {
+                    registeredBy = userRows[0].name;
+                }
+            }
+            else if (sale.user_id) {
                 const [userRows] = await db_1.default.query('SELECT name FROM users WHERE id = ?', [sale.user_id]);
                 if (userRows.length > 0) {
                     registeredBy = userRows[0].name;

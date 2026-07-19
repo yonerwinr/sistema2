@@ -1,26 +1,51 @@
 import pool from '../config/db';
 
 export async function syncExchangeRatesFromBCV(): Promise<{ usdToVes: number; eurToVes: number }> {
-  console.log('[RATES SERVICE] Sincronizando tasas de cambio desde BCV (DolarApi)...');
+  console.log('[RATES SERVICE] Sincronizando tasas de cambio desde BCV...');
   try {
-    const res = await fetch('https://ve.dolarapi.com/v1/cotizaciones');
-    if (!res.ok) {
-      throw new Error(`Error en respuesta de DolarApi: ${res.statusText}`);
+    let usdRate = 0;
+    let eurRate = 0;
+    let success = false;
+
+    // Intentar primero con DolarVZLA (más actualizado y en tiempo real con la web del BCV)
+    try {
+      const res = await fetch('https://rates.dolarvzla.com/bcv/current.json');
+      if (res.ok) {
+        const data: any = await res.json();
+        if (data?.current?.usd && data?.current?.eur) {
+          usdRate = parseFloat(data.current.usd);
+          eurRate = parseFloat(data.current.eur);
+          if (!isNaN(usdRate) && !isNaN(eurRate)) {
+            success = true;
+            console.log('[RATES SERVICE] Sincronizado exitosamente desde DolarVZLA.');
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn('[RATES SERVICE] Error intentando sincronizar con DolarVZLA:', e.message);
     }
 
-    const data: any = await res.json();
-    const usdItem = data.find((item: any) => item.moneda === 'USD' && item.fuente === 'oficial');
-    const eurItem = data.find((item: any) => item.moneda === 'EUR' && item.fuente === 'oficial');
+    // Fallback a DolarApi si DolarVZLA falló
+    if (!success) {
+      console.log('[RATES SERVICE] Intentando fallback con DolarApi...');
+      const res = await fetch('https://ve.dolarapi.com/v1/cotizaciones');
+      if (!res.ok) {
+        throw new Error(`Error en respuesta de DolarApi: ${res.statusText}`);
+      }
+      const data: any = await res.json();
+      const usdItem = data.find((item: any) => item.moneda === 'USD' && item.fuente === 'oficial');
+      const eurItem = data.find((item: any) => item.moneda === 'EUR' && item.fuente === 'oficial');
 
-    if (!usdItem || !eurItem) {
-      throw new Error('No se encontraron las cotizaciones oficiales de USD/EUR en la respuesta.');
-    }
+      if (!usdItem || !eurItem) {
+        throw new Error('No se encontraron las cotizaciones oficiales de USD/EUR en DolarApi.');
+      }
 
-    const usdRate = parseFloat(usdItem.promedio);
-    const eurRate = parseFloat(eurItem.promedio);
+      usdRate = parseFloat(usdItem.promedio);
+      eurRate = parseFloat(eurItem.promedio);
 
-    if (isNaN(usdRate) || isNaN(eurRate)) {
-      throw new Error('Las tasas obtenidas no son números válidos.');
+      if (isNaN(usdRate) || isNaN(eurRate)) {
+        throw new Error('Las tasas obtenidas de DolarApi no son números válidos.');
+      }
     }
 
     // Guardar en la base de datos

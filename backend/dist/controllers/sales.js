@@ -116,6 +116,7 @@ router.post('/checkout', async (req, res) => {
             discount: discount || 0,
             tax: tax || 0,
             amount_paid: initialPaid,
+            seller_name: 'Online (Tienda)',
             created_at: new Date()
         };
         // Generar texto para WhatsApp
@@ -241,7 +242,8 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
           tax = ?, 
           is_quotation = ?, 
           amount_paid = ?,
-          coupon_code = ?
+          coupon_code = ?,
+          seller_id = ?
          WHERE id = ?`, [
                 customerUserId || null,
                 customerName || 'Consumidor Final',
@@ -255,12 +257,13 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
                 isQuotation ? 1 : 0,
                 finalAmountPaid,
                 couponCode ? couponCode.toUpperCase().trim() : null,
+                req.user?.id || null,
                 saleId
             ]);
         }
         else {
             // Registrar la venta nueva
-            const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+            const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code, seller_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
                 customerUserId || null,
                 customerName || 'Consumidor Final',
                 customerEmail || null,
@@ -273,7 +276,8 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
                 tax || 0.00,
                 isQuotation ? 1 : 0,
                 finalAmountPaid,
-                couponCode ? couponCode.toUpperCase().trim() : null
+                couponCode ? couponCode.toUpperCase().trim() : null,
+                req.user?.id || null
             ]);
             saleId = saleResult.insertId;
         }
@@ -295,6 +299,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
             tax: tax || 0,
             is_quotation: isQuotation ? 1 : 0,
             amount_paid: finalAmountPaid,
+            seller_name: req.user?.name || 'Vendedor',
             created_at: new Date()
         };
         // Generar texto para WhatsApp
@@ -341,9 +346,10 @@ router.get('/history', auth_1.authenticate, async (req, res) => {
 router.get('/:id', auth_1.authenticate, async (req, res) => {
     const { id } = req.params;
     try {
-        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by 
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by, seller.name as seller_name 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
        WHERE s.id = ?`, [id]);
         if (sales.length === 0) {
             return res.status(404).json({ message: 'Venta no encontrada' });
@@ -369,9 +375,10 @@ router.get('/quotations/all', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado' });
     }
     try {
-        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by 
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by, seller.name as seller_name 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
        WHERE s.is_quotation = 1
        ORDER BY s.created_at DESC`);
         res.json(sales);
@@ -387,9 +394,10 @@ router.get('/debtors/all', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado' });
     }
     try {
-        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by 
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by, seller.name as seller_name 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
        WHERE s.status = 'pending' AND s.is_quotation = 0
        ORDER BY s.created_at DESC`);
         res.json(sales);
@@ -438,7 +446,10 @@ router.put('/:id/status', auth_1.authenticate, async (req, res) => {
         await db_1.default.query('UPDATE sales SET status = ?, amount_paid = ? WHERE id = ?', [newStatus, newAmountPaid, id]);
         // Obtener la venta actualizada y sus ítems para sincronizar la actualización con Google Sheets
         try {
-            const [updatedSales] = await db_1.default.query('SELECT * FROM sales WHERE id = ?', [id]);
+            const [updatedSales] = await db_1.default.query(`SELECT s.*, seller.name as seller_name 
+         FROM sales s 
+         LEFT JOIN users seller ON s.seller_id = seller.id 
+         WHERE s.id = ?`, [id]);
             const [saleItems] = await db_1.default.query(`SELECT si.*, p.name FROM sale_items si 
          JOIN products p ON si.product_id = p.id 
          WHERE si.sale_id = ?`, [id]);
@@ -588,9 +599,10 @@ router.get('/', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado' });
     }
     try {
-        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by 
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by, seller.name as seller_name 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
        WHERE s.is_quotation = 0
        ORDER BY s.created_at DESC`);
         res.json(sales);
@@ -609,6 +621,9 @@ function generateWhatsAppText(sale, items) {
     text += `*Fecha:* ${dateStr}\n`;
     text += `*Metodo de Pago:* ${sale.payment_method.toUpperCase()}\n`;
     text += `*Tipo:* ${sale.type.toUpperCase()}\n`;
+    if (sale.seller_name) {
+        text += `*Vendedor:* ${sale.seller_name}\n`;
+    }
     text += `-------------------------------------\n`;
     text += `*Detalle de Productos:*\n`;
     items.forEach(item => {
@@ -625,7 +640,10 @@ router.post('/:id/resend-email', auth_1.authenticate, async (req, res) => {
     const { id } = req.params;
     const { email } = req.body;
     try {
-        const [sales] = await db_1.default.query('SELECT * FROM sales WHERE id = ?', [id]);
+        const [sales] = await db_1.default.query(`SELECT s.*, seller.name as seller_name 
+       FROM sales s 
+       LEFT JOIN users seller ON s.seller_id = seller.id 
+       WHERE s.id = ?`, [id]);
         if (sales.length === 0) {
             return res.status(404).json({ message: 'Venta no encontrada' });
         }

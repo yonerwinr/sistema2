@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS sales (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NULL,
+    seller_id INT NULL,
     customer_name VARCHAR(100) NULL,
     customer_phone VARCHAR(20) NULL,
     customer_email VARCHAR(100) NULL,
@@ -40,7 +41,8 @@ CREATE TABLE IF NOT EXISTS sales (
     coupon_code VARCHAR(50) NULL,
     customer_ci VARCHAR(30) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- Tabla de Detalles de la Venta (Productos vendidos)

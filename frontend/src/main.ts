@@ -871,7 +871,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
     ctx.font = '12px Outfit, Segoe UI';
     ctx.fillText(`Metodo: ${sale.payment_method.toUpperCase()}`, width - 30, yOffset + 20);
     ctx.fillText(`Tipo: ${sale.is_quotation === 1 ? 'COTIZACIÓN' : sale.type.toUpperCase()}`, width - 30, yOffset + 40);
-    ctx.fillText(`Cajero: ${sale.registered_by || 'Online'}`, width - 30, yOffset + 60);
+    ctx.fillText(`Cajero: ${sale.seller_name || 'Online'}`, width - 30, yOffset + 60);
 
     // Divisor
     ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -1100,6 +1100,7 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
       total: result.total,
       payment_method: payMethod,
       type: saleType,
+      seller_name: currentUser?.name || 'Online',
       created_at: new Date()
     };
     
@@ -1181,6 +1182,7 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
         total: result.total,
         payment_method: payMethod,
         type: saleType,
+        seller_name: currentUser?.name || 'Online',
         created_at: new Date()
       };
 
@@ -2486,7 +2488,7 @@ async function renderAdminSales() {
                     <td><span class="badge-status" style="background:rgba(255,255,255,0.05); color:white;">${sale.type.toUpperCase()}</span></td>
                     <td>
                       <span style="font-weight: 600; color: var(--text-secondary); font-size:12px;">
-                        👤 ${sale.registered_by || 'Online (Tienda)'}
+                        👤 ${sale.seller_name || 'Online (Tienda)'}
                       </span>
                     </td>
                     <td><span style="text-transform:uppercase; font-size:12px; font-weight:600;">${sale.payment_method}</span></td>
@@ -2618,7 +2620,7 @@ function showSaleDetails(details: SaleDetail) {
   if (clientEmail) clientEmail.innerText = sale.customer_email ? `Email: ${sale.customer_email}` : '';
   if (typeEl) typeEl.innerText = sale.type.toUpperCase();
   if (paymentEl) paymentEl.innerText = sale.payment_method;
-  if (registeredByEl) registeredByEl.innerText = sale.registered_by || 'Online (Tienda)';
+  if (registeredByEl) registeredByEl.innerText = sale.seller_name || 'Online (Tienda)';
   if (totalVal) {
     const totalUsd = Number(sale.total);
     const totalVes = totalUsd * rateUsdToVes;
