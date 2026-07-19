@@ -1308,6 +1308,16 @@ function renderAuthView(): string {
             <button type="submit" class="btn btn-primary w-100 mt-4" id="reg-submit-btn">Crear Cuenta</button>
           </form>
         `}
+
+        <div style="margin: 20px 0; text-align: center; color: var(--text-muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span style="flex-grow: 1; height: 1px; background: var(--border-glass);"></span>
+          <span>O continuar con</span>
+          <span style="flex-grow: 1; height: 1px; background: var(--border-glass);"></span>
+        </div>
+
+        <div style="display: flex; justify-content: center; margin-top: 10px;">
+          <div id="google-signin-btn"></div>
+        </div>
       </div>
     </div>
   `;
@@ -1375,6 +1385,54 @@ function bindAuthEvents() {
       btn.innerText = 'Crear Cuenta';
     }
   });
+
+  // Integración de Google Sign-In (Login y Registro)
+  const initGoogleBtn = () => {
+    const google = (window as any).google;
+    if (google) {
+      google.accounts.id.initialize({
+        client_id: (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '1008719970978-hb24n2dstb40o45upg4689qqt56n74hs.apps.googleusercontent.com',
+        callback: async (response: any) => {
+          const credential = response.credential;
+          try {
+            const googleBtn = document.getElementById('google-signin-btn');
+            if (googleBtn) googleBtn.style.pointerEvents = 'none';
+
+            const res = await api.auth.loginGoogle(credential);
+            localStorage.setItem('token', res.token);
+            currentUser = res.user;
+
+            if (currentUser.role === 'admin') {
+              activeAdminView = 'stats';
+              navigate('admin');
+            } else {
+              navigate('store');
+            }
+          } catch (error: any) {
+            alert(error.message || 'Error en la autenticación con Google');
+            const googleBtn = document.getElementById('google-signin-btn');
+            if (googleBtn) googleBtn.style.pointerEvents = 'auto';
+          }
+        }
+      });
+
+      const btnDiv = document.getElementById('google-signin-btn');
+      if (btnDiv) {
+        google.accounts.id.renderButton(btnDiv, {
+          theme: 'filled_blue',
+          size: 'large',
+          text: activeAuthTab === 'login' ? 'signin_with' : 'signup_with',
+          shape: 'rectangular',
+          width: 300
+        });
+      }
+    } else {
+      // Reintentar en 100ms si el script externo de Google aún está cargando
+      setTimeout(initGoogleBtn, 100);
+    }
+  };
+
+  initGoogleBtn();
 }
 
 // ==========================================================================

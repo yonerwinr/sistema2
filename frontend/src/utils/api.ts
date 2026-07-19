@@ -124,6 +124,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+    loginGoogle: (credential: string) => request<{ token: string; user: User }>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ credential }),
+    }),
     me: () => request<User>('/auth/me'),
     getCustomers: () => request<User[]>('/auth/customers'),
     getStaff: () => request<User[]>('/auth/staff'),

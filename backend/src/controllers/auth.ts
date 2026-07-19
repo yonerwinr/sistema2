@@ -109,6 +109,75 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Autenticación con Google (Login / Registro integrado)
+router.post('/google', async (req, res) => {
+  const { credential } = req.body;
+
+  if (!credential) {
+    return res.status(400).json({ message: 'La credencial de Google es obligatoria' });
+  }
+
+  try {
+    const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+    if (!googleRes.ok) {
+      return res.status(400).json({ message: 'Token de Google inválido o expirado' });
+    }
+
+    const payload: any = await googleRes.json();
+    const { email, name, email_verified, aud } = payload;
+
+    if (!email_verified) {
+      return res.status(400).json({ message: 'El correo electrónico de Google no está verificado' });
+    }
+
+    // Validar GOOGLE_CLIENT_ID si está configurado en .env
+    const expectedClientId = process.env.GOOGLE_CLIENT_ID;
+    if (expectedClientId && aud !== expectedClientId) {
+      return res.status(400).json({ message: 'El cliente de Google no coincide con el configurado' });
+    }
+
+    // Buscar si el usuario ya existe por correo
+    const [users]: any = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    let user;
+
+    if (users.length > 0) {
+      user = users[0];
+    } else {
+      // Registrar un nuevo cliente desde Google
+      const [result]: any = await pool.query(
+        'INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, NULL, ?, NULL, NULL)',
+        [name, email, 'customer']
+      );
+
+      const userId = result.insertId;
+      const [newUsers]: any = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+      user = newUsers[0];
+    }
+
+    // Generar token JWT del sistema
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role, name: user.name },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        ci: user.ci
+      }
+    });
+  } catch (error) {
+    console.error('Error en login de Google:', error);
+    res.status(500).json({ message: 'Error interno del servidor al procesar la autenticación de Google' });
+  }
+});
+
 // Obtener datos del usuario logueado
 router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {

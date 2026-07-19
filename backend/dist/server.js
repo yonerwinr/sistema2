@@ -43,6 +43,14 @@ async function runMigrations() {
         catch (err) {
             console.error('Error al modificar columna role:', err.message);
         }
+        // Modificar columna password de la tabla users para que sea nullable (para login con Google)
+        try {
+            await conn.query('ALTER TABLE users MODIFY COLUMN password VARCHAR(255) NULL');
+            console.log('Columna "password" de la tabla users modificada para permitir NULL (soporte Google).');
+        }
+        catch (err) {
+            console.error('Error al modificar columna password en la tabla users:', err.message);
+        }
         // Verificar y agregar columna ci a la tabla users
         try {
             const [userCols] = await conn.query('SHOW COLUMNS FROM users');
