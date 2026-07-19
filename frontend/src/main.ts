@@ -294,6 +294,8 @@ function renderStoreView(): string {
       <div class="card product-card animate-on-scroll animate-fade-up">
         <div class="product-image-container">
           <img class="product-image" src="${prod.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=600&auto=format&fit=crop'}" alt="${prod.name}">
+          ${isLowStock ? `<span class="product-badge danger">¡Pocos 🐒!</span>` : ''}
+          ${prod.code ? `<span class="product-badge info">${prod.code}</span>` : ''}
         </div>
         <div class="product-info">
           <div class="product-category">${prod.category || 'General'}</div>
@@ -303,11 +305,11 @@ function renderStoreView(): string {
             <div>
               <div class="product-price">$${Number(prod.price).toFixed(2)}</div>
               <div class="product-stock ${isLowStock ? 'low-stock' : ''}">
-                ${isLowStock ? `¡Solo ${prod.stock} disponibles!` : `Stock: ${prod.stock}`}
+                ${isLowStock ? `¡Solo ${prod.stock} disp.!` : `Stock: ${prod.stock}`}
               </div>
             </div>
-            <button class="btn btn-primary btn-icon add-to-cart-btn" data-id="${prod.id}">
-              ${icons.plus}
+            <button class="btn btn-primary add-to-cart-btn" data-id="${prod.id}" style="padding: 8px 14px; border-radius: 50px; font-size: 12px; font-weight:700; display:flex; align-items:center; gap:6px;">
+              ${icons.plus} Agregar
             </button>
           </div>
         </div>
@@ -352,7 +354,7 @@ function renderStoreView(): string {
 
         <div class="form-group">
           <label class="form-label">Categorias</label>
-          <div class="flex flex-col gap-2">
+          <div class="categories-container">
             ${categories.map(cat => `
               <button class="filter-category-btn ${selectedCategory === (cat === 'Todas' ? '' : cat) ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}">
                 ${cat}
