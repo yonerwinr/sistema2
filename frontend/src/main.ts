@@ -820,246 +820,272 @@ function renderInvoiceSuccessModal(): string {
 
 function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return reject('No se pudo inicializar canvas');
+    // Cargar la imagen del logotipo
+    const logoImg = new Image();
+    logoImg.src = '/logofacilito.png';
 
-    const width = 450;
-    const rowHeight = 30;
-    const headerHeight = 130;
-    const clientHeight = 110;
-    const footerHeight = 100;
-    const itemsHeight = items.length * rowHeight;
-    
-    const discountVal = Number(sale.discount || 0);
-    const taxVal = Number(sale.tax || 0);
-    let extraHeight = 0;
-    if (discountVal > 0) extraHeight += 18;
-    if (taxVal > 0) extraHeight += 18;
-    
-    const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight + extraHeight + 40;
+    const onLogoLoaded = (loaded: boolean) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject('No se pudo inicializar canvas');
 
-    canvas.width = width;
-    canvas.height = height;
-
-    // Pintar fondo oscuro elegante
-    ctx.fillStyle = '#0f172a'; // slate-900
-    ctx.fillRect(0, 0, width, height);
-
-    // Borde brillante de estilo glassmorphism
-    ctx.strokeStyle = '#ff7a00'; // naranja
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, width - 4, height - 4);
-
-    // Dibujar Header
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 20px Outfit, Segoe UI';
-    ctx.textAlign = 'center';
-    ctx.fillText(sale.is_quotation === 1 ? 'COTIZACIÓN AL MAYOR' : 'COMPROBANTE DE COMPRA', width / 2, 45);
-
-    ctx.fillStyle = '#ff7a00';
-    ctx.font = 'bold 15px Outfit, Segoe UI';
-    ctx.fillText('FACILITOAPP 🐒', width / 2, 70);
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '13px Outfit, Segoe UI';
-    ctx.fillText(`${sale.is_quotation === 1 ? 'Cotización' : 'Factura'}: #${sale.id}`, width / 2, 95);
-    ctx.fillText(`Fecha: ${new Date(sale.created_at || new Date()).toLocaleString('es-ES')}`, width / 2, 115);
-
-    // Dibujar Línea divisoria
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(30, 135);
-    ctx.lineTo(width - 30, 135);
-    ctx.stroke();
-
-    // Dibujar Datos del Cliente
-    let yOffset = 160;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '10px Outfit, Segoe UI';
-    ctx.fillText(sale.is_quotation === 1 ? 'COTIZADO A:' : 'FACTURADO A:', 30, yOffset);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 14px Outfit, Segoe UI';
-    ctx.fillText(sale.customer_name || 'Cliente General', 30, yOffset + 20);
-
-    ctx.font = '12px Outfit, Segoe UI';
-    ctx.fillStyle = '#e2e8f0';
-    let nextY = yOffset + 40;
-    if (sale.customer_phone) {
-      ctx.fillText(`Tel: ${sale.customer_phone}`, 30, nextY);
-      nextY += 20;
-    }
-    if (sale.customer_email) {
-      ctx.fillText(`Email: ${sale.customer_email}`, 30, nextY);
-      nextY += 20;
-    }
-
-    // Datos del pago (derecha)
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '10px Outfit, Segoe UI';
-    ctx.fillText(sale.is_quotation === 1 ? 'DETALLES COTIZACIÓN:' : 'DETALLES DE PAGO:', width - 30, yOffset);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '12px Outfit, Segoe UI';
-    ctx.fillText(`Metodo: ${sale.payment_method.toUpperCase()}`, width - 30, yOffset + 20);
-    ctx.fillText(`Tipo: ${sale.is_quotation === 1 ? 'COTIZACIÓN' : sale.type.toUpperCase()}`, width - 30, yOffset + 40);
-    ctx.fillText(`Cajero: ${sale.seller_name || 'Online'}`, width - 30, yOffset + 60);
-
-    // Divisor
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.beginPath();
-    ctx.moveTo(30, nextY + 10);
-    ctx.lineTo(width - 30, nextY + 10);
-    ctx.stroke();
-
-    // Tabla de ítems
-    let y = nextY + 35;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = 'bold 11px Outfit, Segoe UI';
-    ctx.fillText('PRODUCTO', 30, y);
-    ctx.textAlign = 'center';
-    ctx.fillText('CANT', 250, y);
-    ctx.textAlign = 'right';
-    ctx.fillText('TOTAL', width - 30, y);
-
-    y += 15;
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.beginPath();
-    ctx.moveTo(30, y);
-    ctx.lineTo(width - 30, y);
-    ctx.stroke();
-
-    y += 20;
-    ctx.font = '12px Outfit, Segoe UI';
-    items.forEach(item => {
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#ffffff';
+      const width = 450;
+      const rowHeight = 30;
+      const headerHeight = loaded ? 200 : 130;
+      const clientHeight = 110;
+      const footerHeight = 100;
+      const itemsHeight = items.length * rowHeight;
       
-      // Cortar nombre si es muy largo
-      let name = item.name;
-      if (name.length > 25) name = name.substring(0, 22) + '...';
-      ctx.fillText(name, 30, y);
+      const discountVal = Number(sale.discount || 0);
+      const taxVal = Number(sale.tax || 0);
+      let extraHeight = 0;
+      if (discountVal > 0) extraHeight += 18;
+      if (taxVal > 0) extraHeight += 18;
+      
+      const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight + extraHeight + 40;
 
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText(item.quantity.toString(), 250, y);
+      canvas.width = width;
+      canvas.height = height;
 
-      ctx.textAlign = 'right';
+      // Pintar fondo oscuro elegante
+      ctx.fillStyle = '#0f172a'; // slate-900
+      ctx.fillRect(0, 0, width, height);
+
+      // Borde brillante de estilo glassmorphism
+      ctx.strokeStyle = '#ff7a00'; // naranja
+      ctx.lineWidth = 4;
+      ctx.strokeRect(2, 2, width - 4, height - 4);
+
+      let textY = 45;
+
+      // Dibujar Logo si se cargó con éxito
+      if (loaded) {
+        try {
+          ctx.drawImage(logoImg, width / 2 - 30, 20, 60, 60);
+          textY = 110;
+        } catch (e) {
+          console.error('Error dibujando el logo en la factura:', e);
+        }
+      }
+
+      // Dibujar Header
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(`$${(Number(item.price) * item.quantity).toFixed(2)}`, width - 30, y);
+      ctx.font = 'bold 20px Outfit, Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.fillText(sale.is_quotation === 1 ? 'COTIZACIÓN AL MAYOR' : 'COMPROBANTE DE COMPRA', width / 2, textY);
 
-      y += rowHeight;
-    });
+      ctx.fillStyle = '#ff7a00';
+      ctx.font = 'bold 15px Outfit, Segoe UI';
+      ctx.fillText('FACILITOAPP 🐒', width / 2, textY + 25);
 
-    // Divisor de Totales
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.beginPath();
-    ctx.moveTo(30, y);
-    ctx.lineTo(width - 30, y);
-    ctx.stroke();
-
-    // Cálculos de desglose
-    const subtotalVal = Number(sale.total) - taxVal + discountVal;
-
-    y += 15;
-    ctx.font = '11px Outfit, Segoe UI';
-    ctx.fillStyle = '#94a3b8';
-    
-    // Dibujar Subtotal
-    ctx.textAlign = 'left';
-    ctx.fillText('Subtotal', 30, y);
-    ctx.textAlign = 'right';
-    ctx.fillText(`$${subtotalVal.toFixed(2)}`, width - 30, y);
-    
-    // Dibujar Descuento
-    if (discountVal > 0) {
-      y += 18;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#f87171';
-      ctx.fillText('Descuento', 30, y);
-      ctx.textAlign = 'right';
-      ctx.fillText(`-$${discountVal.toFixed(2)}`, width - 30, y);
       ctx.fillStyle = '#94a3b8';
-    }
-    
-    // Dibujar IVA 16%
-    if (taxVal > 0) {
+      ctx.font = '13px Outfit, Segoe UI';
+      ctx.fillText(`${sale.is_quotation === 1 ? 'Cotización' : 'Factura'}: #${sale.id}`, width / 2, textY + 50);
+      ctx.fillText(`Fecha: ${new Date(sale.created_at || new Date()).toLocaleString('es-ES')}`, width / 2, textY + 70);
+
+      // Dibujar Línea divisoria
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(30, headerHeight + 5);
+      ctx.lineTo(width - 30, headerHeight + 5);
+      ctx.stroke();
+
+      // Dibujar Datos del Cliente
+      let yOffset = headerHeight + 30;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '10px Outfit, Segoe UI';
+      ctx.fillText(sale.is_quotation === 1 ? 'COTIZADO A:' : 'FACTURADO A:', 30, yOffset);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px Outfit, Segoe UI';
+      ctx.fillText(sale.customer_name || 'Cliente General', 30, yOffset + 20);
+
+      ctx.font = '12px Outfit, Segoe UI';
+      ctx.fillStyle = '#e2e8f0';
+      let nextY = yOffset + 40;
+      if (sale.customer_phone) {
+        ctx.fillText(`Tel: ${sale.customer_phone}`, 30, nextY);
+        nextY += 20;
+      }
+      if (sale.customer_email) {
+        ctx.fillText(`Email: ${sale.customer_email}`, 30, nextY);
+        nextY += 20;
+      }
+
+      // Datos del pago (derecha)
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '10px Outfit, Segoe UI';
+      ctx.fillText(sale.is_quotation === 1 ? 'DETALLES COTIZACIÓN:' : 'DETALLES DE PAGO:', width - 30, yOffset);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '12px Outfit, Segoe UI';
+      ctx.fillText(`Metodo: ${sale.payment_method.toUpperCase()}`, width - 30, yOffset + 20);
+      ctx.fillText(`Tipo: ${sale.is_quotation === 1 ? 'COTIZACIÓN' : sale.type.toUpperCase()}`, width - 30, yOffset + 40);
+      ctx.fillText(`Cajero: ${sale.seller_name || 'Online'}`, width - 30, yOffset + 60);
+
+      // Divisor
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      ctx.moveTo(30, nextY + 10);
+      ctx.lineTo(width - 30, nextY + 10);
+      ctx.stroke();
+
+      // Tabla de ítems
+      let y = nextY + 35;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 11px Outfit, Segoe UI';
+      ctx.fillText('PRODUCTO', 30, y);
+      ctx.textAlign = 'center';
+      ctx.fillText('CANT', 250, y);
+      ctx.textAlign = 'right';
+      ctx.fillText('TOTAL', width - 30, y);
+
+      y += 15;
+      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.beginPath();
+      ctx.moveTo(30, y);
+      ctx.lineTo(width - 30, y);
+      ctx.stroke();
+
+      y += 20;
+      ctx.font = '12px Outfit, Segoe UI';
+      items.forEach(item => {
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#ffffff';
+        
+        // Cortar nombre si es muy largo
+        let name = item.name;
+        if (name.length > 25) name = name.substring(0, 22) + '...';
+        ctx.fillText(name, 30, y);
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(item.quantity.toString(), 250, y);
+
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`$${(Number(item.price) * item.quantity).toFixed(2)}`, width - 30, y);
+
+        y += rowHeight;
+      });
+
+      // Divisor de Totales
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      ctx.moveTo(30, y);
+      ctx.lineTo(width - 30, y);
+      ctx.stroke();
+
+      // Cálculos de desglose
+      const subtotalVal = Number(sale.total) - taxVal + discountVal;
+
+      y += 15;
+      ctx.font = '11px Outfit, Segoe UI';
+      ctx.fillStyle = '#94a3b8';
+      
+      // Dibujar Subtotal
+      ctx.textAlign = 'left';
+      ctx.fillText('Subtotal', 30, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(`$${subtotalVal.toFixed(2)}`, width - 30, y);
+      
+      // Dibujar Descuento
+      if (discountVal > 0) {
+        y += 18;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#f87171';
+        ctx.fillText('Descuento', 30, y);
+        ctx.textAlign = 'right';
+        ctx.fillText(`-$${discountVal.toFixed(2)}`, width - 30, y);
+        ctx.fillStyle = '#94a3b8';
+      }
+      
+      // Dibujar IVA 16%
+      if (taxVal > 0) {
+        y += 18;
+        ctx.textAlign = 'left';
+        ctx.fillText('IVA (16%)', 30, y);
+        ctx.textAlign = 'right';
+        ctx.fillText(`$${taxVal.toFixed(2)}`, width - 30, y);
+      }
+
+      y += 15;
+      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.beginPath();
+      ctx.moveTo(30, y);
+      ctx.lineTo(width - 30, y);
+      ctx.stroke();
+
+      y += 25;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px Outfit, Segoe UI';
+      ctx.fillText('TOTAL NETO (USD)', 30, y);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ff7a00'; // Naranja FacilitoApp
+      ctx.font = 'bold 18px Outfit, Segoe UI';
+      ctx.fillText(`$${Number(sale.total).toFixed(2)}`, width - 30, y);
+
+      const totalVes = Number(sale.total) * rateUsdToVes;
+      const totalEur = totalVes / rateEurToVes;
+
       y += 18;
       ctx.textAlign = 'left';
-      ctx.fillText('IVA (16%)', 30, y);
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 11px Outfit, Segoe UI';
+      ctx.fillText('Equivalente Bs. (BCV)', 30, y);
+
       ctx.textAlign = 'right';
-      ctx.fillText(`$${taxVal.toFixed(2)}`, width - 30, y);
-    }
+      ctx.fillText(`Bs. ${totalVes.toFixed(2)}`, width - 30, y);
 
-    y += 15;
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.beginPath();
-    ctx.moveTo(30, y);
-    ctx.lineTo(width - 30, y);
-    ctx.stroke();
+      y += 16;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '10px Outfit, Segoe UI';
+      ctx.fillText('Equivalente EUR (€)', 30, y);
 
-    y += 25;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px Outfit, Segoe UI';
-    ctx.fillText('TOTAL NETO (USD)', 30, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(`€ ${totalEur.toFixed(2)}`, width - 30, y);
 
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#6366f1';
-    ctx.font = 'bold 18px Outfit, Segoe UI';
-    ctx.fillText(`$${Number(sale.total).toFixed(2)}`, width - 30, y);
+      // Divisor
+      y += 20;
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      ctx.moveTo(30, y);
+      ctx.lineTo(width - 30, y);
+      ctx.stroke();
 
-    const totalVes = Number(sale.total) * rateUsdToVes;
-    const totalEur = totalVes / rateEurToVes;
+      // Footer
+      y += 35;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 13px Outfit, Segoe UI';
+      ctx.fillText(sale.is_quotation === 1 ? 'Cotización válida por 15 días.' : '¡Gracias por tu compra!', width / 2, y);
 
-    y += 18;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#f59e0b';
-    ctx.font = 'bold 11px Outfit, Segoe UI';
-    ctx.fillText('Equivalente Bs. (BCV)', 30, y);
+      y += 20;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px Outfit, Segoe UI';
+      ctx.fillText('Documento digital generado por FacilitoApp.', width / 2, y);
 
-    ctx.textAlign = 'right';
-    ctx.fillText(`Bs. ${totalVes.toFixed(2)}`, width - 30, y);
+      // Convertir canvas a Blob y retornar
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject('Error al exportar blob');
+      }, 'image/png');
+    };
 
-    y += 16;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '10px Outfit, Segoe UI';
-    ctx.fillText('Equivalente EUR (€)', 30, y);
+    logoImg.onload = () => {
+      onLogoLoaded(true);
+    };
 
-    ctx.textAlign = 'right';
-    ctx.fillText(`€ ${totalEur.toFixed(2)}`, width - 30, y);
-
-    // Divisor
-    y += 20;
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-    ctx.beginPath();
-    ctx.moveTo(30, y);
-    ctx.lineTo(width - 30, y);
-    ctx.stroke();
-
-    // Footer
-    y += 35;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 13px Outfit, Segoe UI';
-    ctx.fillText(sale.is_quotation === 1 ? 'Cotización válida por 15 días.' : '¡Gracias por tu compra!', width / 2, y);
-
-    y += 20;
-    ctx.fillStyle = '#64748b';
-    ctx.font = '10px Outfit, Segoe UI';
-    ctx.fillText('Documento digital generado por FacilitoApp.', width / 2, y);
-
-    // Convertir canvas a Blob y retornar
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject('Error al exportar blob');
-    }, 'image/png');
+    logoImg.onerror = () => {
+      onLogoLoaded(false);
+    };
   });
 }
 
