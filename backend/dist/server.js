@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const path_1 = __importDefault(require("path"));
 const db_1 = __importDefault(require("./config/db"));
 const auth_1 = __importDefault(require("./controllers/auth"));
 const products_1 = __importDefault(require("./controllers/products"));
@@ -20,7 +21,7 @@ const PORT = process.env.PORT || 5000;
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 // Servir imagenes estaticas o assets si es necesario
-// app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
 // Rutas de la API
 app.use('/api/auth', auth_1.default);
 app.use('/api/products', products_1.default);
@@ -86,6 +87,18 @@ async function runMigrations() {
         }
         catch (err) {
             console.error('Error al agregar columna seller_id a la tabla sales:', err.message);
+        }
+        // Verificar y agregar columna code a la tabla products
+        try {
+            const [prodCols] = await conn.query('SHOW COLUMNS FROM products');
+            const prodColNames = prodCols.map((c) => c.Field);
+            if (!prodColNames.includes('code')) {
+                await conn.query('ALTER TABLE products ADD COLUMN code VARCHAR(50) NULL UNIQUE');
+                console.log('Columna "code" agregada a la tabla products.');
+            }
+        }
+        catch (err) {
+            console.error('Error al agregar columna code a la tabla products:', err.message);
         }
         // Modificar columna payment_method para permitir VARCHAR(50)
         try {

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Tabla de Productos
 CREATE TABLE IF NOT EXISTS products (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) NULL UNIQUE,
     name VARCHAR(150) NOT NULL,
     description TEXT NULL,
     price DECIMAL(10, 2) NOT NULL,

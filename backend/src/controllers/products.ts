@@ -1,8 +1,32 @@
 import { Router, Response } from 'express';
+import multer from 'multer';
+import path from 'path';
 import pool from '../config/db';
 import { authenticate, isAdmin, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Configuración de almacenamiento para Multer (Imágenes Locales)
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, '../../uploads')); // backend/uploads
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage });
+
+// Subida de imagen local (Solo Admin)
+router.post('/upload', authenticate, isAdmin, upload.single('image'), (req: any, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No se subió ninguna imagen' });
+  }
+  const imageUrl = `/uploads/${req.file.filename}`;
+  res.json({ imageUrl });
+});
 
 // Obtener todos los productos (Público)
 router.get('/', async (req, res) => {
@@ -20,8 +44,8 @@ router.get('/', async (req, res) => {
         params.push(category);
       }
       if (search) {
-        conditions.push(' (name LIKE ? OR description LIKE ?)');
-        params.push(`%${search}%`, `%${search}%`);
+        conditions.push(' (name LIKE ? OR description LIKE ? OR code = ?)');
+        params.push(`%${search}%`, `%${search}%`, search);
       }
 
       query += conditions.join(' AND');
@@ -54,20 +78,29 @@ router.get('/:id', async (req, res) => {
 
 // Crear producto (Solo Admin)
 router.post('/', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
-  const { name, description, price, stock, image_url, category } = req.body;
+  const { code, name, description, price, stock, image_url, category } = req.body;
 
   if (!name || price === undefined || stock === undefined) {
     return res.status(400).json({ message: 'Nombre, precio e inventario son obligatorios' });
   }
 
   try {
+    // Validar código duplicado si se proporciona
+    if (code) {
+      const [existing]: any = await pool.query('SELECT id FROM products WHERE code = ?', [code]);
+      if (existing.length > 0) {
+        return res.status(400).json({ message: `El código "${code}" ya está registrado por otro producto` });
+      }
+    }
+
     const [result]: any = await pool.query(
-      'INSERT INTO products (name, description, price, stock, image_url, category) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description || null, price, stock, image_url || null, category || null]
+      'INSERT INTO products (code, name, description, price, stock, image_url, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [code || null, name, description || null, price, stock, image_url || null, category || null]
     );
 
     res.status(201).json({
       id: result.insertId,
+      code,
       name,
       description,
       price,
@@ -84,16 +117,24 @@ router.post('/', authenticate, isAdmin, async (req: AuthRequest, res: Response) 
 // Actualizar producto (Solo Admin)
 router.put('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { name, description, price, stock, image_url, category } = req.body;
+  const { code, name, description, price, stock, image_url, category } = req.body;
 
   if (!name || price === undefined || stock === undefined) {
     return res.status(400).json({ message: 'Nombre, precio e inventario son obligatorios' });
   }
 
   try {
+    // Validar código duplicado si se proporciona y no es del mismo producto
+    if (code) {
+      const [existing]: any = await pool.query('SELECT id FROM products WHERE code = ? AND id != ?', [code, id]);
+      if (existing.length > 0) {
+        return res.status(400).json({ message: `El código "${code}" ya está registrado por otro producto` });
+      }
+    }
+
     const [result]: any = await pool.query(
-      'UPDATE products SET name = ?, description = ?, price = ?, stock = ?, image_url = ?, category = ? WHERE id = ?',
-      [name, description || null, price, stock, image_url || null, category || null, id]
+      'UPDATE products SET code = ?, name = ?, description = ?, price = ?, stock = ?, image_url = ?, category = ? WHERE id = ?',
+      [code || null, name, description || null, price, stock, image_url || null, category || null, id]
     );
 
     if (result.affectedRows === 0) {
@@ -102,6 +143,7 @@ router.put('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Response
 
     res.json({
       id: parseInt(id),
+      code,
       name,
       description,
       price,

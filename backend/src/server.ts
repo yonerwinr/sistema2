@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import pool from './config/db';
 import authRoutes from './controllers/auth';
 import productRoutes from './controllers/products';
@@ -19,7 +20,7 @@ app.use(cors());
 app.use(express.json());
 
 // Servir imagenes estaticas o assets si es necesario
-// app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Rutas de la API
 app.use('/api/auth', authRoutes);
@@ -88,6 +89,18 @@ async function runMigrations() {
       }
     } catch (err: any) {
       console.error('Error al agregar columna seller_id a la tabla sales:', err.message);
+    }
+
+    // Verificar y agregar columna code a la tabla products
+    try {
+      const [prodCols]: any = await conn.query('SHOW COLUMNS FROM products');
+      const prodColNames = prodCols.map((c: any) => c.Field);
+      if (!prodColNames.includes('code')) {
+        await conn.query('ALTER TABLE products ADD COLUMN code VARCHAR(50) NULL UNIQUE');
+        console.log('Columna "code" agregada a la tabla products.');
+      }
+    } catch (err: any) {
+      console.error('Error al agregar columna code a la tabla products:', err.message);
     }
 
     // Modificar columna payment_method para permitir VARCHAR(50)

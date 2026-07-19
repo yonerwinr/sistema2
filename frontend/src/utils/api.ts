@@ -41,6 +41,7 @@ export interface User {
 
 export interface Product {
   id: number;
+  code?: string;
   name: string;
   description: string;
   price: number;
@@ -168,6 +169,19 @@ export const api = {
     delete: (id: number) => request<{ message: string }>(`/products/${id}`, {
       method: 'DELETE',
     }),
+    uploadImage: async (formData: FormData) => {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/products/upload`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al subir la imagen');
+      }
+      return data as { imageUrl: string };
+    },
   },
 
   // Ventas / Compras

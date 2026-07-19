@@ -2346,6 +2346,11 @@ async function renderAdminProducts() {
             </div>
           </div>
 
+          <div class="form-group mb-2">
+            <label class="form-label" for="prod-code">Código de Barras / SKU (Opcional)</label>
+            <input type="text" class="form-control" id="prod-code" placeholder="Ej. 7501009001 o SKU-AIR-M3">
+          </div>
+
           <div class="form-group">
             <label class="form-label" for="prod-desc">Descripcion</label>
             <textarea class="form-control" id="prod-desc" rows="3" placeholder="Detalle del producto..."></textarea>
@@ -2362,12 +2367,18 @@ async function renderAdminProducts() {
             </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label" for="prod-img">Enlace Imagen (URL)</label>
-            <input type="url" class="form-control" id="prod-img" placeholder="https://images.unsplash.com/...">
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label" for="prod-image-file">Subir Imagen Local (Opcional)</label>
+              <input type="file" class="form-control" id="prod-image-file" accept="image/*" style="padding: 6px 12px; font-size: 13px;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="prod-img">O Enlace Imagen (URL)</label>
+              <input type="url" class="form-control" id="prod-img" placeholder="https://images.unsplash.com/...">
+            </div>
           </div>
 
-          <div class="flex justify-end gap-4">
+          <div class="flex justify-end gap-4 mt-4">
             <button type="button" class="btn btn-secondary" id="prod-form-cancel">Cancelar</button>
             <button type="submit" class="btn btn-primary" id="prod-form-submit">Guardar Producto</button>
           </div>
@@ -2394,7 +2405,11 @@ async function renderAdminProducts() {
                   <td>
                     <img src="${prod.image_url}" style="width:48px; height:48px; object-fit:cover; border-radius:8px;" alt="${prod.name}">
                   </td>
-                  <td><strong>${prod.name}</strong><br><small style="color:var(--text-secondary); max-width:200px; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.description || ''}</small></td>
+                  <td>
+                    <strong>${prod.name}</strong>
+                    ${prod.code ? `<br><small style="color:var(--primary); font-weight:600; font-size:11px;">🏷️ ${prod.code}</small>` : ''}
+                    <br><small style="color:var(--text-secondary); max-width:200px; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.description || ''}</small>
+                  </td>
                   <td>${prod.category || 'General'}</td>
                   <td><strong>$${Number(prod.price).toFixed(2)}</strong></td>
                   <td class="text-center" style="font-weight:600; ${prod.stock < 5 ? 'color:var(--danger)' : ''}">${prod.stock}</td>
@@ -2440,16 +2455,34 @@ function bindProductCRUDEvents() {
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const name = (document.getElementById('prod-name') as HTMLInputElement).value;
-    const category = (document.getElementById('prod-category') as HTMLInputElement).value;
-    const description = (document.getElementById('prod-desc') as HTMLTextAreaElement).value;
-    const price = parseFloat((document.getElementById('prod-price') as HTMLInputElement).value);
-    const stock = parseInt((document.getElementById('prod-stock') as HTMLInputElement).value);
-    const image_url = (document.getElementById('prod-img') as HTMLInputElement).value;
-
-    const payload = { name, category, description, price, stock, image_url };
+    const submitBtn = document.getElementById('prod-form-submit') as HTMLButtonElement;
+    const cancelBtn = document.getElementById('prod-form-cancel') as HTMLButtonElement;
+    submitBtn.disabled = true;
+    cancelBtn.disabled = true;
+    const originalText = submitBtn.innerText;
+    submitBtn.innerText = 'Guardando...';
 
     try {
+      const name = (document.getElementById('prod-name') as HTMLInputElement).value;
+      const category = (document.getElementById('prod-category') as HTMLInputElement).value;
+      const description = (document.getElementById('prod-desc') as HTMLTextAreaElement).value;
+      const price = parseFloat((document.getElementById('prod-price') as HTMLInputElement).value);
+      const stock = parseInt((document.getElementById('prod-stock') as HTMLInputElement).value);
+      let image_url = (document.getElementById('prod-img') as HTMLInputElement).value;
+      const code = (document.getElementById('prod-code') as HTMLInputElement).value.trim();
+
+      // Procesar archivo local si existe
+      const fileInput = document.getElementById('prod-image-file') as HTMLInputElement;
+      if (fileInput && fileInput.files && fileInput.files.length > 0) {
+        submitBtn.innerText = 'Subiendo imagen...';
+        const formData = new FormData();
+        formData.append('image', fileInput.files[0]);
+        const uploadRes = await api.products.uploadImage(formData);
+        image_url = uploadRes.imageUrl;
+      }
+
+      const payload = { code: code || undefined, name, category, description, price, stock, image_url };
+
       if (editingProductId) {
         await api.products.update(editingProductId, payload);
         alert('Producto actualizado con exito');
@@ -2463,6 +2496,10 @@ function bindProductCRUDEvents() {
       await renderAdminProducts();
     } catch (err: any) {
       alert(err.message || 'Error al guardar producto');
+    } finally {
+      submitBtn.disabled = false;
+      cancelBtn.disabled = false;
+      submitBtn.innerText = originalText;
     }
   });
 
@@ -2477,10 +2514,15 @@ function bindProductCRUDEvents() {
 
         (document.getElementById('prod-name') as HTMLInputElement).value = prod.name;
         (document.getElementById('prod-category') as HTMLInputElement).value = prod.category || '';
+        (document.getElementById('prod-code') as HTMLInputElement).value = prod.code || '';
         (document.getElementById('prod-desc') as HTMLTextAreaElement).value = prod.description || '';
         (document.getElementById('prod-price') as HTMLInputElement).value = prod.price.toString();
         (document.getElementById('prod-stock') as HTMLInputElement).value = prod.stock.toString();
         (document.getElementById('prod-img') as HTMLInputElement).value = prod.image_url || '';
+        
+        // Limpiar el selector de archivo local
+        const fileInput = document.getElementById('prod-image-file') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
 
         if (formCard) formCard.style.display = 'block';
         formCard?.scrollIntoView({ behavior: 'smooth' });
