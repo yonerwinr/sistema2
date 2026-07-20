@@ -82,6 +82,20 @@ export interface Coupon {
   created_at?: string;
 }
 
+export interface Expense {
+  id: number;
+  name: string;
+  description?: string | null;
+  amount: number;
+  amount_ves?: number | null;
+  currency: string;
+  expense_type: 'monthly' | 'unexpected';
+  is_active: boolean;
+  start_date?: string | null;
+  next_due_date?: string | null;
+  created_at?: string;
+}
+
 export interface AuditLog {
   id: number;
   user_id?: number;
@@ -291,6 +305,21 @@ export const api = {
     }),
     syncExchangeRates: () => request<{ message: string; rates: { usdToVes: number; eurToVes: number; binanceUsdToVes: number } }>('/sales/settings/rates/sync', {
       method: 'POST',
+    }),
+  },
+
+  expenses: {
+    getAll: () => request<Expense[]>('/expenses'),
+    create: (body: Partial<Expense>) => request<Expense>('/expenses', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    update: (id: number, body: Partial<Expense>) => request<Expense>(`/expenses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+    delete: (id: number) => request<{ message: string }>(`/expenses/${id}`, {
+      method: 'DELETE',
     }),
   },
 

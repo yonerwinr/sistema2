@@ -31,7 +31,7 @@ let posCart: POSCartItem[] = [];
 let posSearchQuery: string = '';
 
 // Vista activa dentro de Administración
-type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff';
+type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses';
 let activeAdminView: AdminSubView = 'stats';
 
 // Nuevas variables de estado para el control en POS
@@ -1761,6 +1761,11 @@ function renderAdminDashboard(): string {
               🎟️ Cupones
             </button>
           ` : ''}
+          ${currentUser.role === 'admin' ? `
+            <button class="sidebar-nav-btn ${activeAdminView === 'expenses' ? 'active' : ''}" id="admin-tab-expenses">
+              💼 Gastos
+            </button>
+          ` : ''}
           ${hasPermission('staff') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'staff' ? 'active' : ''}" id="admin-tab-staff">
               👥 Vendedores
@@ -1819,6 +1824,7 @@ async function bindAdminEvents() {
   const tabDebtors = document.getElementById('admin-tab-debtors');
   const tabQuotations = document.getElementById('admin-tab-quotations');
   const tabCoupons = document.getElementById('admin-tab-coupons');
+  const tabExpenses = document.getElementById('admin-tab-expenses');
   const tabStaff = document.getElementById('admin-tab-staff');
 
   const clearActiveTabs = () => {
@@ -1829,6 +1835,7 @@ async function bindAdminEvents() {
     tabDebtors?.classList.remove('active');
     tabQuotations?.classList.remove('active');
     tabCoupons?.classList.remove('active');
+    tabExpenses?.classList.remove('active');
     tabStaff?.classList.remove('active');
   };
 
@@ -1911,6 +1918,8 @@ async function bindAdminEvents() {
     await renderAdminQuotations();
   } else if (activeAdminView === 'coupons') {
     await renderAdminCoupons();
+  } else if (activeAdminView === 'expenses') {
+    await renderAdminExpenses();
   } else if (activeAdminView === 'staff') {
     await renderAdminStaff();
   }

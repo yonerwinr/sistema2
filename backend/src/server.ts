@@ -7,6 +7,7 @@ import authRoutes from './controllers/auth';
 import productRoutes from './controllers/products';
 import saleRoutes from './controllers/sales';
 import statsRoutes from './controllers/stats';
+import expenseRoutes from './controllers/expenses';
 import { startReminderCron } from './services/reminders';
 import { startRatesCron } from './services/rates';
 
@@ -27,6 +28,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 // Ruta raiz de prueba
 app.get('/api/health', (req, res) => {
@@ -243,6 +245,23 @@ async function runMigrations() {
       CREATE TABLE IF NOT EXISTS settings (
         settings_key VARCHAR(50) PRIMARY KEY,
         settings_value TEXT NOT NULL
+      ) ENGINE=InnoDB;
+    `);
+
+    // Crear tabla de gastos si no existe
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS expenses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        description TEXT NULL,
+        amount DECIMAL(10, 2) NOT NULL,
+        amount_ves DECIMAL(12, 2) NULL,
+        currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+        expense_type VARCHAR(20) NOT NULL DEFAULT 'unexpected',
+        is_active TINYINT NOT NULL DEFAULT 1,
+        start_date DATE NULL,
+        next_due_date DATE NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB;
     `);
 
