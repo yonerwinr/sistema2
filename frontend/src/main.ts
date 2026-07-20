@@ -2991,10 +2991,61 @@ async function renderAdminProducts() {
             <textarea class="form-control" id="prod-desc" rows="3" placeholder="Detalle del producto..."></textarea>
           </div>
 
+          <!-- Calculadora Inteligente de Costo & Precio (Dólar Negro / Binance vs BCV) -->
+          <div class="card mb-4" style="background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.25); padding: 14px; border-radius: 10px;">
+            <div style="font-size: 13px; font-weight: 800; color: #f59e0b; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+              <span>🧮 Calculadora de Precio (Dólar Negro / Binance vs BCV)</span>
+              <span style="font-size: 10px; opacity: 0.8; font-weight: 500;">Ajuste Automático a Dólar BCV</span>
+            </div>
+            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">
+              Si compraste la mercancía a Tasa Paralela / Binance, ingresa el costo en dólar negro y las tasas de la fecha para calcular el porcentaje de recargo e imputarlo al precio final en Dólar BCV:
+            </p>
+
+            <div class="grid-3 gap-2 mb-3">
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px; font-weight: 700;">Fecha de Compra</label>
+                <input type="date" class="form-control" id="calc-purchase-date" style="font-size: 12px; padding: 6px 10px;" value="${new Date().toISOString().split('T')[0]}">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px; font-weight: 700;">Tasa BCV (Bs.)</label>
+                <input type="number" step="0.01" min="0.01" class="form-control" id="calc-bcv-rate" style="font-size: 12px; padding: 6px 10px;" value="${rateUsdToVes}">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px; font-weight: 700; color: #f59e0b;">Tasa Compra Binance (Bs.)</label>
+                <input type="number" step="0.01" min="0.01" class="form-control" id="calc-binance-rate" style="font-size: 12px; padding: 6px 10px; border-color: rgba(245,158,11,0.4); color: #f59e0b; font-weight: 700;" value="${rateBinanceToVes}">
+              </div>
+            </div>
+
+            <div class="grid-3 gap-2 mb-3">
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px; font-weight: 700;">Costo en Dólar Negro ($)</label>
+                <input type="number" step="0.01" min="0" class="form-control" id="calc-black-cost" style="font-size: 12px; padding: 6px 10px;" placeholder="Ej. 10.00">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px; font-weight: 700;">Margen Ganancia (%)</label>
+                <input type="number" step="1" min="0" class="form-control" id="calc-profit-margin" style="font-size: 12px; padding: 6px 10px;" placeholder="0" value="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px; font-weight: 700; color: var(--success);">Diferencial Recargo (%)</label>
+                <input type="text" readonly class="form-control" id="calc-markup-percent" style="font-size: 12px; padding: 6px 10px; font-weight: 700; color: var(--success);" value="0.00%">
+              </div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; border: 1px dashed var(--border-glass); display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Precio Resultante (Dólar BCV):</div>
+                <div style="font-size: 18px; font-weight: 800; color: var(--primary);" id="calc-result-price-display">$0.00</div>
+              </div>
+              <button type="button" class="btn btn-secondary" id="apply-calc-price-btn" style="font-size: 11px; padding: 6px 12px; background: var(--primary); color: white; border: none; font-weight: 700;">
+                ⚡ Usar este Precio
+              </button>
+            </div>
+          </div>
+
           <div class="grid-2">
             <div class="form-group">
-              <label class="form-label" for="prod-price">Precio ($)</label>
-              <input type="number" class="form-control" id="prod-price" required step="0.01" min="0" placeholder="Ej. 1099.00">
+              <label class="form-label" for="prod-price">Precio Final en Dólar BCV ($)</label>
+              <input type="number" class="form-control" id="prod-price" required step="0.01" min="0" placeholder="Ej. 11.00">
             </div>
             <div class="form-group">
               <label class="form-label" for="prod-stock">Stock Inicial</label>
@@ -3075,12 +3126,64 @@ function bindProductCRUDEvents() {
   const form = document.getElementById('product-form') as HTMLFormElement;
   const formTitle = document.getElementById('product-form-title');
 
+  // Función para re-calcular precio en Dólar BCV según Tasa Dólar Negro vs BCV
+  function updateProductPriceCalc() {
+    const bcvInput = document.getElementById('calc-bcv-rate') as HTMLInputElement;
+    const binanceInput = document.getElementById('calc-binance-rate') as HTMLInputElement;
+    const blackCostInput = document.getElementById('calc-black-cost') as HTMLInputElement;
+    const profitMarginInput = document.getElementById('calc-profit-margin') as HTMLInputElement;
+
+    const bcvRate = parseFloat(bcvInput?.value || '0') || rateUsdToVes;
+    const binanceRate = parseFloat(binanceInput?.value || '0') || rateBinanceToVes;
+    const blackCost = parseFloat(blackCostInput?.value || '0') || 0;
+    const profitMargin = parseFloat(profitMarginInput?.value || '0') || 0;
+
+    if (bcvRate > 0 && binanceRate > 0) {
+      const markupDiffRatio = (binanceRate - bcvRate) / bcvRate;
+      const markupPercent = markupDiffRatio * 100;
+      
+      const markupDisplay = document.getElementById('calc-markup-percent') as HTMLInputElement;
+      if (markupDisplay) {
+        markupDisplay.value = `${markupPercent >= 0 ? '+' : ''}${markupPercent.toFixed(2)}%`;
+      }
+
+      if (blackCost > 0) {
+        // Costo equivalente en dólar BCV
+        const costUsdBcv = blackCost * (binanceRate / bcvRate);
+        const finalPriceBcv = costUsdBcv * (1 + profitMargin / 100);
+
+        const priceDisplay = document.getElementById('calc-result-price-display');
+        if (priceDisplay) {
+          priceDisplay.innerText = `$${finalPriceBcv.toFixed(2)}`;
+        }
+
+        // Auto-llenar el input de precio final del producto
+        const prodPriceInput = document.getElementById('prod-price') as HTMLInputElement;
+        if (prodPriceInput) {
+          prodPriceInput.value = finalPriceBcv.toFixed(2);
+        }
+      }
+    }
+  }
+
+  ['calc-purchase-date', 'calc-bcv-rate', 'calc-binance-rate', 'calc-black-cost', 'calc-profit-margin'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', updateProductPriceCalc);
+    document.getElementById(id)?.addEventListener('change', updateProductPriceCalc);
+  });
+
+  document.getElementById('apply-calc-price-btn')?.addEventListener('click', () => {
+    updateProductPriceCalc();
+    const prodPriceInput = document.getElementById('prod-price') as HTMLInputElement;
+    if (prodPriceInput) prodPriceInput.focus();
+  });
+
   addBtn?.addEventListener('click', () => {
     editingProductId = null;
     form.reset();
     if (formTitle) formTitle.innerText = 'Agregar Nuevo Producto';
     if (formCard) formCard.style.display = 'block';
     formCard?.scrollIntoView({ behavior: 'smooth' });
+    updateProductPriceCalc();
   });
 
   cancelBtn?.addEventListener('click', () => {
