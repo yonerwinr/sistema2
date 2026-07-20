@@ -1895,6 +1895,14 @@ async function bindAdminEvents() {
     await renderAdminCoupons();
   });
 
+  tabExpenses?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabExpenses?.classList.add('active');
+    activeAdminView = 'expenses';
+    destroyCharts();
+    await renderAdminExpenses();
+  });
+
   tabStaff?.addEventListener('click', async () => {
     clearActiveTabs();
     tabStaff.classList.add('active');
@@ -4579,6 +4587,246 @@ async function renderAdminCoupons() {
 
   } catch (error) {
     panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar cupones.</div>`;
+  }
+}
+
+// ==========================================================================
+// SUB-VISTA: GESTIÓN DE GASTOS
+// ==========================================================================
+async function renderAdminExpenses() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando gastos...</div>`;
+
+  try {
+    const expenses = await api.expenses.getAll();
+
+    panel.innerHTML = `
+      <div class="animate-on-scroll animate-fade-up visible">
+        <div class="flex justify-between align-center mb-4" style="flex-wrap:wrap; gap:12px;">
+          <h2 style="font-size:26px; font-weight:800; margin:0;">Gestión de Gastos</h2>
+          <button class="btn btn-primary" id="add-expense-btn">➕ Agregar Gasto</button>
+        </div>
+
+        <div class="card mb-4" id="expense-form-card" style="display:none; background: rgba(255,255,255,0.01); border: 1px solid var(--border-glass);">
+          <h3 id="expense-form-title" class="mb-3" style="font-size:16px; font-weight:700;">Agregar Nuevo Gasto</h3>
+          <form id="expense-form">
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="expense-name">Nombre</label>
+                <input type="text" class="form-control" id="expense-name" required placeholder="Ej. Mensualidad de hosting">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="expense-type">Tipo</label>
+                <select class="form-control" id="expense-type">
+                  <option value="monthly">Mensual</option>
+                  <option value="unexpected">Imprevisto</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="expense-amount">Monto</label>
+                <input type="number" step="0.01" min="0" class="form-control" id="expense-amount" required placeholder="100">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="expense-currency">Moneda</label>
+                <select class="form-control" id="expense-currency">
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="VES">VES</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="expense-description">Descripción</label>
+              <textarea class="form-control" id="expense-description" rows="2" placeholder="Ej. Pago mensual de servidor o técnico del aire"></textarea>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="expense-start-date">Fecha de Inicio</label>
+                <input type="date" class="form-control" id="expense-start-date">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="expense-next-due-date">Próximo Pago</label>
+                <input type="date" class="form-control" id="expense-next-due-date">
+              </div>
+            </div>
+
+            <div class="form-group mb-3">
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" id="expense-active" checked> Activo / Cobrar normalmente
+              </label>
+            </div>
+
+            <div class="flex justify-end gap-4" style="margin-top:16px;">
+              <button type="button" class="btn btn-secondary" id="expense-form-cancel">Cancelar</button>
+              <button type="submit" class="btn btn-primary" id="expense-form-submit">Guardar Gasto</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table-custom" style="font-size:13px;">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Tipo</th>
+                  <th>Monto</th>
+                  <th>Moneda</th>
+                  <th>Equivalente en BS</th>
+                  <th>Próximo pago</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${expenses.map(exp => `
+                  <tr>
+                    <td>
+                      <strong>${exp.name}</strong>
+                      ${exp.description ? `<br><small style="color:var(--text-secondary);">${exp.description}</small>` : ''}
+                    </td>
+                    <td>${exp.expense_type === 'monthly' ? 'Mensual' : 'Imprevisto'}</td>
+                    <td><strong>${Number(exp.amount).toFixed(2)}</strong></td>
+                    <td>${exp.currency}</td>
+                    <td>${exp.amount_ves !== null && exp.amount_ves !== undefined ? `Bs. ${Number(exp.amount_ves).toFixed(2)}` : '—'}</td>
+                    <td>${exp.next_due_date || '—'}</td>
+                    <td>
+                      <span class="badge" style="background:${exp.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color:${exp.is_active ? 'var(--success)' : 'var(--danger)'}; padding:2px 6px; font-size:11px;">
+                        ${exp.is_active ? 'Activo' : 'Suspendido'}
+                      </span>
+                    </td>
+                    <td>
+                      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button class="btn btn-secondary edit-expense-btn" data-id="${exp.id}" style="padding:6px 10px; font-size:11px;">✏️</button>
+                        <button class="btn btn-danger delete-expense-btn" data-id="${exp.id}" style="padding:6px 10px; font-size:11px;">🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('')}
+                ${expenses.length === 0 ? '<tr><td colspan="8" class="text-center">No hay gastos registrados.</td></tr>' : ''}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    let editingExpenseId: number | null = null;
+
+    const formCard = document.getElementById('expense-form-card');
+    const form = document.getElementById('expense-form') as HTMLFormElement;
+    const formTitle = document.getElementById('expense-form-title');
+    const addBtn = document.getElementById('add-expense-btn');
+    const cancelBtn = document.getElementById('expense-form-cancel');
+
+    const resetForm = () => {
+      if (form) form.reset();
+      const activeCheckbox = document.getElementById('expense-active') as HTMLInputElement | null;
+      if (activeCheckbox) activeCheckbox.checked = true;
+      const startDate = document.getElementById('expense-start-date') as HTMLInputElement | null;
+      if (startDate) startDate.value = new Date().toISOString().slice(0, 10);
+      const nextDueDate = document.getElementById('expense-next-due-date') as HTMLInputElement | null;
+      if (nextDueDate) nextDueDate.value = '';
+      editingExpenseId = null;
+      if (formTitle) formTitle.innerText = 'Agregar Nuevo Gasto';
+      if (formCard) formCard.style.display = 'none';
+    };
+
+    addBtn?.addEventListener('click', () => {
+      if (formCard) formCard.style.display = 'block';
+      formCard?.scrollIntoView({ behavior: 'smooth' });
+      if (formTitle) formTitle.innerText = 'Agregar Nuevo Gasto';
+      editingExpenseId = null;
+      const startDate = document.getElementById('expense-start-date') as HTMLInputElement | null;
+      if (startDate && !startDate.value) startDate.value = new Date().toISOString().slice(0, 10);
+    });
+
+    cancelBtn?.addEventListener('click', resetForm);
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = document.getElementById('expense-form-submit') as HTMLButtonElement;
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Guardando...';
+
+      try {
+        const payload: Partial<import('./utils/api').Expense> = {
+          name: (document.getElementById('expense-name') as HTMLInputElement).value.trim(),
+          description: (document.getElementById('expense-description') as HTMLTextAreaElement).value.trim(),
+          amount: parseFloat((document.getElementById('expense-amount') as HTMLInputElement).value),
+          currency: (document.getElementById('expense-currency') as HTMLSelectElement).value,
+          expense_type: ((document.getElementById('expense-type') as HTMLSelectElement).value === 'monthly' ? 'monthly' : 'unexpected'),
+          is_active: (document.getElementById('expense-active') as HTMLInputElement).checked,
+          start_date: (document.getElementById('expense-start-date') as HTMLInputElement).value || null,
+          next_due_date: (document.getElementById('expense-next-due-date') as HTMLInputElement).value || null,
+        };
+
+        const amountValue = parseFloat((document.getElementById('expense-amount') as HTMLInputElement).value);
+        if (!payload.name || Number.isNaN(amountValue)) {
+          throw new Error('Nombre y monto válidos son obligatorios.');
+        }
+        payload.amount = amountValue;
+
+        if (editingExpenseId) {
+          await api.expenses.update(editingExpenseId, payload);
+          alert('Gasto actualizado con éxito.');
+        } else {
+          await api.expenses.create(payload);
+          alert('Gasto creado con éxito.');
+        }
+
+        await renderAdminExpenses();
+      } catch (err: any) {
+        alert(err.message || 'Error al guardar gasto');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Guardar Gasto';
+      }
+    });
+
+    document.querySelectorAll('.edit-expense-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        const expense = expenses.find(item => item.id === id);
+        if (!expense) return;
+
+        editingExpenseId = expense.id;
+        if (formTitle) formTitle.innerText = `Editar Gasto: ${expense.name}`;
+        (document.getElementById('expense-name') as HTMLInputElement).value = expense.name;
+        (document.getElementById('expense-description') as HTMLTextAreaElement).value = expense.description || '';
+        (document.getElementById('expense-amount') as HTMLInputElement).value = expense.amount.toString();
+        (document.getElementById('expense-currency') as HTMLSelectElement).value = expense.currency;
+        (document.getElementById('expense-type') as HTMLSelectElement).value = expense.expense_type;
+        (document.getElementById('expense-active') as HTMLInputElement).checked = expense.is_active;
+        (document.getElementById('expense-start-date') as HTMLInputElement).value = expense.start_date || '';
+        (document.getElementById('expense-next-due-date') as HTMLInputElement).value = expense.next_due_date || '';
+        if (formCard) formCard.style.display = 'block';
+        formCard?.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    document.querySelectorAll('.delete-expense-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        if (!confirm('¿Deseas eliminar este gasto?')) return;
+        try {
+          await api.expenses.delete(id);
+          alert('Gasto eliminado.');
+          await renderAdminExpenses();
+        } catch (err: any) {
+          alert(err.message || 'Error al eliminar gasto');
+        }
+      });
+    });
+  } catch (error) {
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar gastos.</div>`;
   }
 }
 

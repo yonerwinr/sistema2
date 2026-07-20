@@ -12,6 +12,7 @@ const auth_1 = __importDefault(require("./controllers/auth"));
 const products_1 = __importDefault(require("./controllers/products"));
 const sales_1 = __importDefault(require("./controllers/sales"));
 const stats_1 = __importDefault(require("./controllers/stats"));
+const expenses_1 = __importDefault(require("./controllers/expenses"));
 const reminders_1 = require("./services/reminders");
 const rates_1 = require("./services/rates");
 dotenv_1.default.config();
@@ -27,6 +28,7 @@ app.use('/api/auth', auth_1.default);
 app.use('/api/products', products_1.default);
 app.use('/api/sales', sales_1.default);
 app.use('/api/stats', stats_1.default);
+app.use('/api/expenses', expenses_1.default);
 // Ruta raiz de prueba
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Servidor FacilitoApp funcionando correctamente 🐒' });
@@ -154,10 +156,10 @@ async function runMigrations() {
         catch (err) {
             console.error('Error al agregar columna code a la tabla products:', err.message);
         }
-        // Modificar columna payment_method para permitir VARCHAR(50)
+        // Modificar columna payment_method para permitir TEXT (pagos mixtos ilimitados)
         try {
-            await conn.query("ALTER TABLE sales MODIFY COLUMN payment_method VARCHAR(50) NOT NULL DEFAULT 'cash'");
-            console.log('Columna "payment_method" de la tabla sales modificada a VARCHAR(50).');
+            await conn.query("ALTER TABLE sales MODIFY COLUMN payment_method TEXT NOT NULL");
+            console.log('Columna "payment_method" de la tabla sales modificada a TEXT.');
         }
         catch (err) {
             console.error('Error al modificar columna payment_method:', err.message);
@@ -235,6 +237,22 @@ async function runMigrations() {
       CREATE TABLE IF NOT EXISTS settings (
         settings_key VARCHAR(50) PRIMARY KEY,
         settings_value TEXT NOT NULL
+      ) ENGINE=InnoDB;
+    `);
+        // Crear tabla de gastos si no existe
+        await conn.query(`
+      CREATE TABLE IF NOT EXISTS expenses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        description TEXT NULL,
+        amount DECIMAL(10, 2) NOT NULL,
+        amount_ves DECIMAL(12, 2) NULL,
+        currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+        expense_type VARCHAR(20) NOT NULL DEFAULT 'unexpected',
+        is_active TINYINT NOT NULL DEFAULT 1,
+        start_date DATE NULL,
+        next_due_date DATE NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB;
     `);
         // Insertar configuraciones por defecto si no existen
