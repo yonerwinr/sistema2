@@ -21,10 +21,24 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
 
-  const data = await response.json();
+  const contentType = response.headers.get('content-type') || '';
+  let data: any;
+  if (contentType.includes('application/json')) {
+    data = await response.json();
+  } else {
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: El servidor backend no respondió con JSON. Por favor asegúrate de reiniciar el backend (npm run dev).`);
+    }
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      throw new Error('Respuesta no válida del servidor. Reinicie el servidor backend para aplicar los últimos cambios.');
+    }
+  }
 
   if (!response.ok) {
-    throw new Error(data.message || 'Algo salio mal en la peticion');
+    throw new Error(data?.message || `Error ${response.status} en la petición`);
   }
 
   return data as T;
