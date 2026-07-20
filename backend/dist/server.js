@@ -135,6 +135,14 @@ async function runMigrations() {
         catch (err) {
             console.error('Error al modificar columna payment_method:', err.message);
         }
+        // Modificar columna product_id de la tabla sale_items a NULL (soporte Venta Libre)
+        try {
+            await conn.query('ALTER TABLE sale_items MODIFY COLUMN product_id INT NULL');
+            console.log('Columna "product_id" en sale_items modificada a NULL para Venta Libre.');
+        }
+        catch (err) {
+            console.error('Error al modificar columna product_id en sale_items:', err.message);
+        }
         // Verificar si existen las columnas en la tabla sales
         const [columns] = await conn.query('SHOW COLUMNS FROM sales');
         const columnNames = columns.map((c) => c.Field);

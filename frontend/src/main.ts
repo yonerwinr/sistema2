@@ -54,6 +54,8 @@ let rateEurToVes = 43.50;
 let rateBinanceToVes = 44.50;
 let posApplyCurrencyDiscount = false;
 let posCurrencyDiscount = 0;
+let posConfirmedUnregisteredWarning = false;
+let showFreeSaleModal = false;
 
 // Instancias de Chart.js para destruirlas al cambiar de pestaña
 let revenueChartInstance: Chart | null = null;
@@ -2199,8 +2201,13 @@ async function renderAdminPOS() {
       <div class="pos-layout animate-on-scroll animate-fade-up visible">
         <!-- Columna de Productos -->
         <div class="pos-products-column">
-          <div class="pos-search-bar">
-            <input type="text" class="form-control" id="pos-search-input" placeholder="Buscar por nombre..." value="${posSearchQuery}">
+          <div class="pos-search-bar" style="display:flex; gap:8px;">
+            <input type="text" class="form-control" id="pos-search-input" placeholder="Buscar productos..." value="${posSearchQuery}" style="flex-grow:1;">
+            ${currentUser?.role === 'admin' ? `
+              <button type="button" class="btn btn-secondary" id="open-free-sale-btn" style="background:rgba(245, 158, 11, 0.15); border:1px solid rgba(245, 158, 11, 0.3); color:#f59e0b; font-size:12px; font-weight:700; white-space:nowrap; padding: 8px 12px;" title="Facturar producto o servicio no registrado">
+                ➕ Venta Libre
+              </button>
+            ` : ''}
           </div>
 
           <div class="pos-products-grid stagger-container">
@@ -2459,6 +2466,65 @@ async function renderAdminPOS() {
           </div>
         </div>
       ` : ''}
+
+      ${showFreeSaleModal ? `
+        <div class="modal-overlay open" id="free-sale-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 440px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid var(--border-glass); background: #111827;">
+            <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">➕</div>
+            <h3 style="font-size: 18px; font-weight: 800; text-align: center; margin-bottom: 4px; color: #f59e0b;">Agregar Venta Libre</h3>
+            <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
+              Esta opción permite facturar artículos o servicios no registrados en el catálogo oficial.
+            </p>
+
+            <form id="free-sale-form">
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Nombre / Descripción del Producto</label>
+                <input type="text" class="form-control" id="free-sale-name" placeholder="Ej. Servicio Técnico / Producto Especial" required style="font-size: 13px;">
+              </div>
+
+              <div class="grid-2 gap-2 mb-4">
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Precio USD ($)</label>
+                  <input type="number" step="0.01" min="0.01" class="form-control" id="free-sale-price" placeholder="0.00" required style="font-size: 13px;">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Cantidad</label>
+                  <input type="number" min="1" value="1" class="form-control" id="free-sale-qty" required style="font-size: 13px;">
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-secondary w-50" id="close-free-sale-btn" style="padding: 8px; font-size: 12px;">Cancelar</button>
+                <button type="submit" class="btn btn-primary w-50" style="padding: 8px; font-size: 12px; font-weight: 700; background: #f59e0b; border-color: #f59e0b; color: black;">➕ Agregar al POS</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Modal de Advertencia por Cliente No Registrado -->
+      <div class="modal-overlay" id="unregistered-warning-modal" style="display: none; z-index: 999999; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
+        <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 480px; width: 90%; padding: 28px; border-radius: 16px; border: 1px solid rgba(239, 68, 68, 0.5); background: #111827;">
+          <div style="font-size: 42px; text-align: center; margin-bottom: 6px;">⚠️</div>
+          <h3 style="font-size: 20px; font-weight: 800; text-align: center; color: var(--danger); margin-bottom: 6px;">Advertencia de Cliente No Registrado</h3>
+          <p style="font-size: 12px; color: var(--text-secondary); text-align: center; line-height: 1.5; margin-bottom: 18px;">
+            Ha elegido facturar a <strong>"Consumidor Final"</strong> sin registrar la Cédula ni Nombre del cliente.
+          </p>
+
+          <div style="background: rgba(239, 68, 68, 0.1); padding: 12px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.25); font-size: 12px; color: #f87171; font-weight: 600; margin-bottom: 20px; text-align: center; line-height: 1.4;">
+            🚫 <strong>AVISO DE GARANTÍA:</strong> Las compras a clientes no registrados <u>NO gozan de garantía del sistema</u> ni derecho a reclamos, devoluciones o soporte posterior.
+          </div>
+
+          <div style="display: flex; gap: 10px; flex-direction: column;">
+            <button type="button" class="btn btn-secondary w-100" id="cancel-unregistered-sale-btn" style="padding: 10px; font-weight: 700; font-size: 13px;">
+              ✍️ Cancelar y Registrar Datos del Cliente
+            </button>
+            <button type="button" class="btn btn-danger w-100" id="confirm-unregistered-sale-btn" style="padding: 10px; font-weight: 700; font-size: 13px; background: var(--danger);">
+              ⚠️ Continuar Venta Sin Garantía
+            </button>
+          </div>
+        </div>
+      </div>
     `;
 
     bindPOSEvents();
@@ -2690,6 +2756,64 @@ function bindPOSEvents() {
     }
   });
 
+  // Eventos Venta Libre (Producto No Registrado)
+  document.getElementById('open-free-sale-btn')?.addEventListener('click', async () => {
+    showFreeSaleModal = true;
+    await renderAdminPOS();
+  });
+
+  document.getElementById('close-free-sale-btn')?.addEventListener('click', async () => {
+    showFreeSaleModal = false;
+    await renderAdminPOS();
+  });
+
+  document.getElementById('free-sale-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nameVal = (document.getElementById('free-sale-name') as HTMLInputElement).value;
+    const priceVal = parseFloat((document.getElementById('free-sale-price') as HTMLInputElement).value);
+    const qtyVal = parseInt((document.getElementById('free-sale-qty') as HTMLInputElement).value);
+
+    if (!nameVal || isNaN(priceVal) || priceVal <= 0) {
+      alert('Por favor ingrese un nombre y precio válidos para la venta libre.');
+      return;
+    }
+
+    posCart.push({
+      product: {
+        id: -Date.now(),
+        name: nameVal.trim(),
+        price: priceVal,
+        category: 'Venta Libre',
+        stock: 999,
+        description: 'Producto no registrado en inventario',
+        image_url: ''
+      },
+      quantity: isNaN(qtyVal) || qtyVal <= 0 ? 1 : qtyVal
+    });
+
+    showFreeSaleModal = false;
+    await renderAdminPOS();
+  });
+
+  // Eventos Modal de Advertencia Cliente No Registrado
+  document.getElementById('cancel-unregistered-sale-btn')?.addEventListener('click', () => {
+    const warningModal = document.getElementById('unregistered-warning-modal');
+    if (warningModal) warningModal.style.display = 'none';
+    const nameInput = document.getElementById('pos-client-name') as HTMLInputElement;
+    if (nameInput) {
+      nameInput.focus();
+      nameInput.select();
+    }
+  });
+
+  document.getElementById('confirm-unregistered-sale-btn')?.addEventListener('click', () => {
+    const warningModal = document.getElementById('unregistered-warning-modal');
+    if (warningModal) warningModal.style.display = 'none';
+    posConfirmedUnregisteredWarning = true;
+    const form = document.getElementById('pos-checkout-form') as HTMLFormElement;
+    form?.requestSubmit();
+  });
+
   // Enviar Venta POS
   document.getElementById('pos-checkout-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2705,9 +2829,23 @@ function bindPOSEvents() {
     const isQuotation = (document.getElementById('pos-is-quotation') as HTMLInputElement).checked;
     const isPending = (document.getElementById('pos-is-pending') as HTMLInputElement).checked;
 
+    // Validación de Cliente Registrado & Advertencia Sin Garantía
+    const isCustomerDataProvided = name && name.trim() !== '' && name.toLowerCase() !== 'consumidor final' && ciNum && ciNum.trim() !== '';
+
+    if (!isCustomerDataProvided && !posConfirmedUnregisteredWarning) {
+      const warningModal = document.getElementById('unregistered-warning-modal');
+      if (warningModal) warningModal.style.display = 'flex';
+      return;
+    }
+
+    posConfirmedUnregisteredWarning = false;
+
     const items = posCart.map(item => ({
       productId: item.product.id,
-      quantity: item.quantity
+      quantity: item.quantity,
+      price: item.product.price,
+      name: item.product.name,
+      customName: item.product.id < 0 ? item.product.name : undefined
     }));
 
     const btn = document.getElementById('pos-submit-btn') as HTMLButtonElement;

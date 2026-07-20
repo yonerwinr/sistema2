@@ -194,6 +194,22 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
         const saleItemsToInsert = [];
         // Validar productos y stock
         for (const item of items) {
+            if (item.customName || (typeof item.productId === 'number' && item.productId < 0) || item.name) {
+                // Soporte Venta Libre / Producto no registrado en inventario
+                const isFreeSale = (typeof item.productId === 'number' && item.productId < 0) || item.customName;
+                if (isFreeSale) {
+                    const itemPrice = Number(item.price || 0);
+                    const itemTotal = itemPrice * item.quantity;
+                    total += itemTotal;
+                    saleItemsToInsert.push({
+                        productId: null,
+                        name: item.customName || item.name || 'Venta Libre (No Registrado)',
+                        quantity: item.quantity,
+                        price: itemPrice
+                    });
+                    continue;
+                }
+            }
             const [products] = await conn.query('SELECT * FROM products WHERE id = ? FOR UPDATE', [item.productId]);
             if (products.length === 0) {
                 throw new Error(`Producto con ID ${item.productId} no encontrado`);

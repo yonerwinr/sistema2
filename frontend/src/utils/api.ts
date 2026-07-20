@@ -231,7 +231,7 @@ export const api = {
       customerCi?: string;
       customerUserId?: number;
       paymentMethod: string;
-      items: { productId: number; quantity: number }[];
+      items: { productId: number; quantity: number; price?: number; name?: string; customName?: string }[];
       discount?: number;
       tax?: number;
       isQuotation?: boolean;
