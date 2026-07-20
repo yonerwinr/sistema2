@@ -204,7 +204,7 @@ router.get('/customers', authenticate, async (req: AuthRequest, res: Response) =
 
   try {
     const [customers]: any = await pool.query(
-      'SELECT id, name, email, phone, ci, created_at FROM users WHERE role = "customer" ORDER BY name ASC'
+      'SELECT id, name, email, phone, ci, client_type, representative_name, representative_ci, representative_phone, representative_position, created_at FROM users WHERE role = "customer" ORDER BY name ASC'
     );
     res.json(customers);
   } catch (error) {
@@ -219,24 +219,44 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
     return res.status(403).json({ message: 'No autorizado para registrar clientes' });
   }
 
-  const { name, ci, email, phone } = req.body;
+  const {
+    name,
+    ci,
+    email,
+    phone,
+    client_type,
+    representative_name,
+    representative_ci,
+    representative_phone,
+    representative_position
+  } = req.body;
 
   if (!name || !ci) {
-    return res.status(400).json({ message: 'El nombre y la cédula/RIF son obligatorios' });
+    return res.status(400).json({ message: 'El nombre/razón social y la cédula/RIF son obligatorios' });
   }
 
   const cleanCi = ci.trim();
   const cleanName = name.trim();
   const cleanPhone = phone ? phone.trim() : null;
   let cleanEmail = email ? email.trim() : null;
+  const cleanType = client_type || (cleanCi.toUpperCase().startsWith('J-') ? 'juridico' : cleanCi.toUpperCase().startsWith('G-') ? 'gubernamental' : 'natural');
+
+  const cleanRepName = representative_name ? representative_name.trim() : null;
+  const cleanRepCi = representative_ci ? representative_ci.trim() : null;
+  const cleanRepPhone = representative_phone ? representative_phone.trim() : null;
+  const cleanRepPosition = representative_position ? representative_position.trim() : null;
 
   if (!cleanEmail) {
     cleanEmail = `${cleanCi.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.local`;
   }
 
   try {
-    // Verificar si la cédula ya existe
-    const [existingCI]: any = await pool.query('SELECT id, name, email, phone, ci FROM users WHERE ci = ?', [cleanCi]);
+    // Verificar si la cédula/RIF ya existe
+    const [existingCI]: any = await pool.query(
+      'SELECT id, name, email, phone, ci, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ?',
+      [cleanCi]
+    );
+
     if (existingCI.length > 0) {
       return res.status(200).json({
         message: 'El cliente ya se encuentra registrado en el sistema',
@@ -251,8 +271,10 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
     }
 
     const [result]: any = await pool.query(
-      'INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, NULL, "customer", ?, ?)',
-      [cleanName, cleanEmail, cleanPhone, cleanCi]
+      `INSERT INTO users 
+        (name, email, password, role, phone, ci, client_type, representative_name, representative_ci, representative_phone, representative_position) 
+       VALUES (?, ?, NULL, "customer", ?, ?, ?, ?, ?, ?, ?)`,
+      [cleanName, cleanEmail, cleanPhone, cleanCi, cleanType, cleanRepName, cleanRepCi, cleanRepPhone, cleanRepPosition]
     );
 
     const newCustomerId = result.insertId;
@@ -263,7 +285,7 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
       userRole: req.user?.role,
       actionType: 'user_edit',
       title: `Nuevo Cliente Registrado: ${cleanName}`,
-      details: `Cédula: ${cleanCi}, Teléfono: ${cleanPhone || 'N/D'}, Correo: ${cleanEmail}`
+      details: `Cédula/RIF: ${cleanCi}, Tipo: ${cleanType}, Encargado: ${cleanRepName || 'N/A'}`
     });
 
     res.status(201).json({
@@ -274,7 +296,12 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
         email: cleanEmail,
         phone: cleanPhone,
         ci: cleanCi,
-        role: 'customer'
+        role: 'customer',
+        client_type: cleanType,
+        representative_name: cleanRepName,
+        representative_ci: cleanRepCi,
+        representative_phone: cleanRepPhone,
+        representative_position: cleanRepPosition
       }
     });
   } catch (error: any) {
@@ -287,11 +314,11 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
 router.get('/customer-by-ci', authenticate, async (req: AuthRequest, res: Response) => {
   const { ci } = req.query;
   if (!ci) {
-    return res.status(400).json({ message: 'La cédula es requerida' });
+    return res.status(400).json({ message: 'La cédula o RIF es requerida' });
   }
   try {
     const [users]: any = await pool.query(
-      'SELECT id, name, email, phone, ci, role, permissions FROM users WHERE ci = ? LIMIT 1',
+      'SELECT id, name, email, phone, ci, role, permissions, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ? LIMIT 1',
       [ci]
     );
     if (users.length === 0) {

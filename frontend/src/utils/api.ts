@@ -39,6 +39,11 @@ export interface User {
   phone?: string;
   ci?: string;
   permissions?: string | string[];
+  client_type?: 'natural' | 'juridico' | 'gubernamental';
+  representative_name?: string;
+  representative_ci?: string;
+  representative_phone?: string;
+  representative_position?: string;
 }
 
 export interface Product {
@@ -159,7 +164,17 @@ export const api = {
     }),
     me: () => request<User>('/auth/me'),
     getCustomers: () => request<User[]>('/auth/customers'),
-    registerCustomer: (body: { name: string; ci: string; email?: string; phone?: string }) => request<{ message: string; user: User }>('/auth/register-customer', {
+    registerCustomer: (body: {
+      name: string;
+      ci: string;
+      email?: string;
+      phone?: string;
+      client_type?: string;
+      representative_name?: string;
+      representative_ci?: string;
+      representative_phone?: string;
+      representative_position?: string;
+    }) => request<{ message: string; user: User }>('/auth/register-customer', {
       method: 'POST',
       body: JSON.stringify(body),
     }),

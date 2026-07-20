@@ -2500,40 +2500,75 @@ async function renderAdminPOS() {
 
       ${showRegisterCustomerModal ? `
         <div class="modal-overlay open" id="register-customer-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
-          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 480px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827;">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 520px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827; max-height:90vh; overflow-y:auto;">
             <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">👤</div>
             <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Registrar Nuevo Cliente</h3>
             <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
-              Ingrese los datos del cliente para registrarlo oficialmente en el sistema.
+              Seleccione el tipo de documento e ingrese los datos oficiales del cliente.
             </p>
 
             <form id="register-customer-form">
               <div class="form-group mb-3">
-                <label class="form-label" style="font-size: 11px; font-weight: 700;">Cédula / RIF *</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Tipo de Documento / Persona *</label>
                 <div style="display: flex; gap: 8px;">
-                  <select class="form-control" id="reg-cust-ci-prefix" style="width: 80px; font-weight: 700; flex-shrink: 0; font-size: 14px;">
-                    <option value="V-">V-</option>
-                    <option value="E-">E-</option>
-                    <option value="J-">J-</option>
-                    <option value="G-">G-</option>
+                  <select class="form-control" id="reg-cust-ci-prefix" style="width: 130px; font-weight: 700; flex-shrink: 0; font-size: 13px;">
+                    <option value="V-">V- Natural (Ven)</option>
+                    <option value="E-">E- Natural (Ext)</option>
+                    <option value="J-">J- Jurídico (Empresa)</option>
+                    <option value="G-">G- Gubernamental</option>
+                    <option value="P-">P- Pasaporte</option>
                   </select>
-                  <input type="text" class="form-control" id="reg-cust-ci-num" placeholder="Ej. 12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" required style="flex-grow: 1; font-size: 14px; font-weight: 600;">
+                  <input type="text" class="form-control" id="reg-cust-ci-num" placeholder="Ej. 12345678 o 12345678-9" required style="flex-grow: 1; font-size: 14px; font-weight: 600;">
                 </div>
               </div>
 
               <div class="form-group mb-3">
-                <label class="form-label" style="font-size: 11px; font-weight: 700;">Nombre Completo / Razón Social *</label>
-                <input type="text" class="form-control" id="reg-cust-name" placeholder="Ej. Juan Pérez / Empresa C.A." required style="font-size: 13px;">
+                <label class="form-label" id="reg-cust-name-label" style="font-size: 11px; font-weight: 700;">Nombre Completo / Razón Social *</label>
+                <input type="text" class="form-control" id="reg-cust-name" placeholder="Ej. Juan Pérez / Inversiones C.A." required style="font-size: 13px;">
               </div>
 
-              <div class="grid-2 gap-2 mb-4">
+              <div class="grid-2 gap-2 mb-3">
                 <div class="form-group">
-                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Teléfono (WhatsApp)</label>
+                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Teléfono Principal</label>
                   <input type="text" class="form-control" id="reg-cust-phone" placeholder="Ej. 04141234567" style="font-size: 13px;">
                 </div>
                 <div class="form-group">
                   <label class="form-label" style="font-size: 11px; font-weight: 700;">Correo Electrónico</label>
                   <input type="email" class="form-control" id="reg-cust-email" placeholder="cliente@correo.com" style="font-size: 13px;">
+                </div>
+              </div>
+
+              <!-- Sección Dinámica: Datos del Encargado / Representante (Aparece cuando es J- o G-) -->
+              <div id="reg-cust-rep-box" style="display: none; background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+                <div style="font-size: 12px; font-weight: 800; color: #818cf8; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                  👔 Datos del Encargado / Representante Legal
+                </div>
+                
+                <div class="form-group mb-3">
+                  <label class="form-label" style="font-size: 10px; font-weight: 700;">Nombre y Apellido del Encargado *</label>
+                  <input type="text" class="form-control" id="reg-cust-rep-name" placeholder="Ej. Carlos Mendoza" style="font-size: 12px;">
+                </div>
+
+                <div class="grid-2 gap-2 mb-3">
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 10px; font-weight: 700;">Cédula del Encargado</label>
+                    <div style="display: flex; gap: 4px;">
+                      <select class="form-control" id="reg-cust-rep-ci-prefix" style="width: 65px; font-size: 11px; font-weight: 700;">
+                        <option value="V-">V-</option>
+                        <option value="E-">E-</option>
+                      </select>
+                      <input type="text" class="form-control" id="reg-cust-rep-ci-num" placeholder="Ej. 12345678" style="font-size: 12px;">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 10px; font-weight: 700;">Teléfono Encargado</label>
+                    <input type="text" class="form-control" id="reg-cust-rep-phone" placeholder="Ej. 04129876543" style="font-size: 12px;">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 10px; font-weight: 700;">Cargo / Departamento</label>
+                  <input type="text" class="form-control" id="reg-cust-rep-position" placeholder="Ej. Gerente de Compras / Director" style="font-size: 12px;">
                 </div>
               </div>
 
@@ -2670,6 +2705,25 @@ function bindPOSEvents() {
     await renderAdminPOS();
   });
 
+  // Mostrar / ocultar datos del encargado al cambiar tipo de documento (J- o G-)
+  const ciPrefixSelect = document.getElementById('reg-cust-ci-prefix') as HTMLSelectElement;
+  ciPrefixSelect?.addEventListener('change', () => {
+    const val = ciPrefixSelect.value;
+    const repBox = document.getElementById('reg-cust-rep-box');
+    const nameLabel = document.getElementById('reg-cust-name-label');
+    const nameInput = document.getElementById('reg-cust-name') as HTMLInputElement;
+
+    if (val === 'J-' || val === 'G-') {
+      if (repBox) repBox.style.display = 'block';
+      if (nameLabel) nameLabel.innerText = val === 'J-' ? 'Razón Social / Nombre de la Empresa *' : 'Nombre del Ente / Institución Gubernamental *';
+      if (nameInput) nameInput.placeholder = val === 'J-' ? 'Ej. Inversiones 2020 C.A.' : 'Ej. Alcaldía de Maracaibo / Gobernación';
+    } else {
+      if (repBox) repBox.style.display = 'none';
+      if (nameLabel) nameLabel.innerText = 'Nombre Completo del Cliente *';
+      if (nameInput) nameInput.placeholder = 'Ej. Juan Pérez';
+    }
+  });
+
   // Guardar Nuevo Cliente desde Modal
   document.getElementById('register-customer-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2680,8 +2734,40 @@ function bindPOSEvents() {
     const phone = (document.getElementById('reg-cust-phone') as HTMLInputElement).value.trim();
     const email = (document.getElementById('reg-cust-email') as HTMLInputElement).value.trim();
 
+    const isLegalEntity = (prefix === 'J-' || prefix === 'G-');
+    const client_type = prefix === 'J-' ? 'juridico' : prefix === 'G-' ? 'gubernamental' : 'natural';
+
+    let repName: string | undefined = undefined;
+    let repCi: string | undefined = undefined;
+    let repPhone: string | undefined = undefined;
+    let repPosition: string | undefined = undefined;
+
+    if (isLegalEntity) {
+      const repNameVal = (document.getElementById('reg-cust-rep-name') as HTMLInputElement)?.value.trim();
+      const repCiPrefix = (document.getElementById('reg-cust-rep-ci-prefix') as HTMLSelectElement)?.value || 'V-';
+      const repCiNum = (document.getElementById('reg-cust-rep-ci-num') as HTMLInputElement)?.value.trim();
+      const repPhoneVal = (document.getElementById('reg-cust-rep-phone') as HTMLInputElement)?.value.trim();
+      const repPosVal = (document.getElementById('reg-cust-rep-position') as HTMLInputElement)?.value.trim();
+
+      if (repNameVal) repName = repNameVal;
+      if (repCiNum) repCi = `${repCiPrefix}${repCiNum}`;
+      if (repPhoneVal) repPhone = repPhoneVal;
+      if (repPosVal) repPosition = repPosVal;
+    }
+
     try {
-      const res = await api.auth.registerCustomer({ name, ci, phone: phone || undefined, email: email || undefined });
+      const res = await api.auth.registerCustomer({
+        name,
+        ci,
+        phone: phone || undefined,
+        email: email || undefined,
+        client_type,
+        representative_name: repName,
+        representative_ci: repCi,
+        representative_phone: repPhone,
+        representative_position: repPosition
+      });
+
       posSelectedCustomerId = res.user.id;
       posCustomerName = res.user.name;
       posCustomerCi = res.user.ci || ci;
@@ -5242,9 +5328,16 @@ async function renderAdminCustomers() {
               <tbody>
                 ${filteredCustomers.map(cust => `
                   <tr>
-                    <td><strong>${cust.name}</strong></td>
-                    <td><span class="badge" style="background:rgba(255,255,255,0.05); font-weight:700;">${cust.ci || 'N/D'}</span></td>
-                    <td>${cust.phone || 'N/D'}</td>
+                    <td>
+                      <strong>${cust.name}</strong>
+                      ${cust.representative_name ? `<br><small style="color:#818cf8; font-size:11px;">👔 Encargado: ${cust.representative_name} ${cust.representative_ci ? `(${cust.representative_ci})` : ''} ${cust.representative_position ? `- ${cust.representative_position}` : ''}</small>` : ''}
+                    </td>
+                    <td>
+                      <span class="badge" style="background:${cust.ci?.startsWith('J-') || cust.ci?.startsWith('G-') ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.05)'}; color:${cust.ci?.startsWith('J-') || cust.ci?.startsWith('G-') ? '#818cf8' : 'white'}; font-weight:700;">
+                        ${cust.ci || 'N/D'}
+                      </span>
+                    </td>
+                    <td>${cust.phone || (cust.representative_phone ? `📱 ${cust.representative_phone}` : 'N/D')}</td>
                     <td>${cust.email || 'N/D'}</td>
                     <td class="text-right">
                       <button type="button" class="btn btn-secondary select-customer-pos-btn" style="padding:6px 12px; font-size:12px;" data-ci="${cust.ci || ''}" data-name="${cust.name}">

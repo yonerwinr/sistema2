@@ -70,6 +70,26 @@ async function runMigrations() {
                 await conn.query('ALTER TABLE users ADD COLUMN permissions TEXT NULL');
                 console.log('Columna "permissions" agregada a la tabla users.');
             }
+            if (!userColNames.includes('client_type')) {
+                await conn.query('ALTER TABLE users ADD COLUMN client_type VARCHAR(20) DEFAULT "natural"');
+                console.log('Columna "client_type" agregada a la tabla users.');
+            }
+            if (!userColNames.includes('representative_name')) {
+                await conn.query('ALTER TABLE users ADD COLUMN representative_name VARCHAR(150) NULL');
+                console.log('Columna "representative_name" agregada a la tabla users.');
+            }
+            if (!userColNames.includes('representative_ci')) {
+                await conn.query('ALTER TABLE users ADD COLUMN representative_ci VARCHAR(30) NULL');
+                console.log('Columna "representative_ci" agregada a la tabla users.');
+            }
+            if (!userColNames.includes('representative_phone')) {
+                await conn.query('ALTER TABLE users ADD COLUMN representative_phone VARCHAR(30) NULL');
+                console.log('Columna "representative_phone" agregada a la tabla users.');
+            }
+            if (!userColNames.includes('representative_position')) {
+                await conn.query('ALTER TABLE users ADD COLUMN representative_position VARCHAR(100) NULL');
+                console.log('Columna "representative_position" agregada a la tabla users.');
+            }
         }
         catch (err) {
             console.error('Error al actualizar columnas en la tabla users:', err.message);

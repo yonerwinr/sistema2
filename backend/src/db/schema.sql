@@ -11,6 +11,11 @@ CREATE TABLE IF NOT EXISTS users (
     role ENUM('admin', 'customer', 'seller') DEFAULT 'customer',
     phone VARCHAR(20) NULL,
     ci VARCHAR(30) NULL UNIQUE,
+    client_type VARCHAR(20) DEFAULT 'natural',
+    representative_name VARCHAR(150) NULL,
+    representative_ci VARCHAR(30) NULL,
+    representative_phone VARCHAR(30) NULL,
+    representative_position VARCHAR(100) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
