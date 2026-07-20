@@ -54,45 +54,85 @@ async function runMigrations() {
         catch (err) {
             console.error('Error al modificar columna password en la tabla users:', err.message);
         }
-        // Verificar y agregar columna ci, reset_code y reset_code_expires_at a la tabla users
+        // Verificar y agregar columnas a la tabla users de forma resiliente
         try {
             const [userCols] = await conn.query('SHOW COLUMNS FROM users');
             const userColNames = userCols.map((c) => c.Field);
             if (!userColNames.includes('ci')) {
-                await conn.query('ALTER TABLE users ADD COLUMN ci VARCHAR(30) NULL UNIQUE');
-                console.log('Columna "ci" agregada a la tabla users.');
-            }
-            if (!userColNames.includes('reset_code')) {
-                await conn.query('ALTER TABLE users ADD COLUMN reset_code VARCHAR(10) NULL, ADD COLUMN reset_code_expires_at DATETIME NULL');
-                console.log('Columnas "reset_code" y "reset_code_expires_at" agregadas a la tabla users.');
-            }
-            if (!userColNames.includes('permissions')) {
-                await conn.query('ALTER TABLE users ADD COLUMN permissions TEXT NULL');
-                console.log('Columna "permissions" agregada a la tabla users.');
+                try {
+                    await conn.query('ALTER TABLE users ADD COLUMN ci VARCHAR(30) NULL');
+                    console.log('Columna "ci" agregada a la tabla users.');
+                }
+                catch (err) {
+                    console.error('Error al agregar columna "ci":', err.message);
+                }
             }
             if (!userColNames.includes('client_type')) {
-                await conn.query('ALTER TABLE users ADD COLUMN client_type VARCHAR(20) DEFAULT "natural"');
-                console.log('Columna "client_type" agregada a la tabla users.');
+                try {
+                    await conn.query('ALTER TABLE users ADD COLUMN client_type VARCHAR(20) DEFAULT "natural"');
+                    console.log('Columna "client_type" agregada a la tabla users.');
+                }
+                catch (err) {
+                    console.error('Error al agregar columna "client_type":', err.message);
+                }
             }
             if (!userColNames.includes('representative_name')) {
-                await conn.query('ALTER TABLE users ADD COLUMN representative_name VARCHAR(150) NULL');
-                console.log('Columna "representative_name" agregada a la tabla users.');
+                try {
+                    await conn.query('ALTER TABLE users ADD COLUMN representative_name VARCHAR(150) NULL');
+                    console.log('Columna "representative_name" agregada a la tabla users.');
+                }
+                catch (err) {
+                    console.error('Error al agregar columna "representative_name":', err.message);
+                }
             }
             if (!userColNames.includes('representative_ci')) {
-                await conn.query('ALTER TABLE users ADD COLUMN representative_ci VARCHAR(30) NULL');
-                console.log('Columna "representative_ci" agregada a la tabla users.');
+                try {
+                    await conn.query('ALTER TABLE users ADD COLUMN representative_ci VARCHAR(30) NULL');
+                    console.log('Columna "representative_ci" agregada a la tabla users.');
+                }
+                catch (err) {
+                    console.error('Error al agregar columna "representative_ci":', err.message);
+                }
             }
             if (!userColNames.includes('representative_phone')) {
-                await conn.query('ALTER TABLE users ADD COLUMN representative_phone VARCHAR(30) NULL');
-                console.log('Columna "representative_phone" agregada a la tabla users.');
+                try {
+                    await conn.query('ALTER TABLE users ADD COLUMN representative_phone VARCHAR(30) NULL');
+                    console.log('Columna "representative_phone" agregada a la tabla users.');
+                }
+                catch (err) {
+                    console.error('Error al agregar columna "representative_phone":', err.message);
+                }
             }
             if (!userColNames.includes('representative_position')) {
-                await conn.query('ALTER TABLE users ADD COLUMN representative_position VARCHAR(100) NULL');
-                console.log('Columna "representative_position" agregada a la tabla users.');
+                try {
+                    await conn.query('ALTER TABLE users ADD COLUMN representative_position VARCHAR(100) NULL');
+                    console.log('Columna "representative_position" agregada a la tabla users.');
+                }
+                catch (err) {
+                    console.error('Error al agregar columna "representative_position":', err.message);
+                }
+            }
+            if (!userColNames.includes('reset_code')) {
+                try {
+                    await conn.query('ALTER TABLE users ADD COLUMN reset_code VARCHAR(10) NULL, ADD COLUMN reset_code_expires_at DATETIME NULL');
+                    console.log('Columnas "reset_code" y "reset_code_expires_at" agregadas a la tabla users.');
+                }
+                catch (err) {
+                    console.error('Error al agregar columnas "reset_code":', err.message);
+                }
+            }
+            if (!userColNames.includes('permissions')) {
+                try {
+                    await conn.query('ALTER TABLE users ADD COLUMN permissions TEXT NULL');
+                    console.log('Columna "permissions" agregada a la tabla users.');
+                }
+                catch (err) {
+                    console.error('Error al agregar columna "permissions":', err.message);
+                }
             }
         }
         catch (err) {
-            console.error('Error al actualizar columnas en la tabla users:', err.message);
+            console.error('Error al inspeccionar columnas de la tabla users:', err.message);
         }
         // Verificar y agregar columna customer_ci a la tabla sales
         try {
