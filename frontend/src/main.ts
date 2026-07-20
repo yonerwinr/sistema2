@@ -106,8 +106,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.error('Error al cargar tasas de cambio en el arranque:', e);
   }
 
-  // Renderizar e iniciar animaciones
-  navigate('store');
+  // Si hay un usuario logueado que sea administrador o vendedor, ir directamente al panel de control
+  if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller')) {
+    activeAdminView = 'stats';
+    navigate('admin');
+  } else {
+    navigate('store');
+  }
 });
 
 async function loadProducts() {
@@ -2108,11 +2113,24 @@ async function renderAdminPOS() {
 
   try {
     // Cargar lista de clientes para el POS si está vacía
-    if (posCustomersList.length === 0) {
-      posCustomersList = await api.auth.getCustomers();
+    if (!Array.isArray(posCustomersList) || posCustomersList.length === 0) {
+      try {
+        const custs = await api.auth.getCustomers();
+        posCustomersList = Array.isArray(custs) ? custs : [];
+      } catch (err) {
+        console.error('Error al cargar lista de clientes para POS:', err);
+        posCustomersList = [];
+      }
     }
     
-    const posProducts = await api.products.getAll(undefined, posSearchQuery || undefined);
+    let posProducts: Product[] = [];
+    try {
+      const prods = await api.products.getAll(undefined, posSearchQuery || undefined);
+      posProducts = Array.isArray(prods) ? prods : [];
+    } catch (err) {
+      console.error('Error al cargar lista de productos para POS:', err);
+      posProducts = [];
+    }
     
     // Cálculos de totales
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
@@ -2192,7 +2210,7 @@ async function renderAdminPOS() {
                   <option value="J-">J-</option>
                   <option value="G-">G-</option>
                 </select>
-                <input type="text" class="form-control" id="pos-client-ci-num" style="padding: 8px 12px; font-size:13px; flex-grow: 1;" placeholder="12345678" pattern="\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos">
+                <input type="text" class="form-control" id="pos-client-ci-num" style="padding: 8px 12px; font-size:13px; flex-grow: 1;" placeholder="12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos">
               </div>
             </div>
             <div class="form-group mb-2">
@@ -2303,9 +2321,14 @@ async function renderAdminPOS() {
 
     bindPOSEvents();
 
-  } catch (error) {
-    console.error(error);
-    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar POS.</div>`;
+  } catch (error: any) {
+    console.error('Error al cargar POS:', error);
+    panel.innerHTML = `
+      <div class="card text-center" style="color:var(--danger); padding:40px;">
+        <h3 style="font-weight:700;">No se pudo cargar el punto de venta (POS)</h3>
+        <p style="font-size:13px; margin-top:8px; opacity:0.8;">${error?.message || 'Error al comunicarse con el servidor'}</p>
+      </div>
+    `;
   }
 }
 
