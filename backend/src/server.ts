@@ -126,6 +126,25 @@ async function runMigrations() {
       console.error('Error al crear tabla audit_logs:', err.message);
     }
 
+    // Verificar y crear tabla coupons si no existe
+    try {
+      await conn.query(`
+        CREATE TABLE IF NOT EXISTS coupons (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          code VARCHAR(50) NOT NULL UNIQUE,
+          discount_percent DECIMAL(5, 2) NOT NULL,
+          user_id INT NULL,
+          active TINYINT DEFAULT 1,
+          is_used TINYINT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
+      console.log('Tabla "coupons" lista para cupones de descuento.');
+    } catch (err: any) {
+      console.error('Error al crear tabla coupons:', err.message);
+    }
+
     // Verificar y agregar columna code a la tabla products
     try {
       const [prodCols]: any = await conn.query('SHOW COLUMNS FROM products');

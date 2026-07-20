@@ -372,4 +372,82 @@ router.post('/reset-password', async (req, res) => {
         res.status(500).json({ message: 'Error interno al restablecer la contraseña' });
     }
 });
+// GET /auth/staff: Obtener personal y vendedores
+router.get('/staff', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado. Solo administradores' });
+    }
+    try {
+        const [staff] = await db_1.default.query('SELECT id, name, email, role, phone, ci, permissions FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC');
+        res.json(staff);
+    }
+    catch (error) {
+        console.error('Error al obtener personal:', error);
+        res.status(500).json({ message: 'Error al obtener personal' });
+    }
+});
+// POST /auth/staff: Crear personal/vendedor
+router.post('/staff', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado. Solo administradores' });
+    }
+    const { name, email, password, role, phone, ci, permissions } = req.body;
+    if (!name || !email || !password || !role) {
+        return res.status(400).json({ message: 'Nombre, correo, contraseña y rol son obligatorios' });
+    }
+    try {
+        const [existing] = await db_1.default.query('SELECT id FROM users WHERE email = ?', [email]);
+        if (existing.length > 0) {
+            return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
+        }
+        const salt = await bcryptjs_1.default.genSalt(10);
+        const hashedPassword = await bcryptjs_1.default.hash(password, salt);
+        const permsStr = Array.isArray(permissions) ? JSON.stringify(permissions) : (permissions || null);
+        await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci, permissions) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, email, hashedPassword, role, phone || null, ci || null, permsStr]);
+        res.status(201).json({ message: 'Personal registrado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al registrar personal:', error);
+        res.status(500).json({ message: 'Error al registrar personal' });
+    }
+});
+// PUT /auth/staff/:id: Actualizar personal/vendedor
+router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado. Solo administradores' });
+    }
+    const id = req.params.id;
+    const { name, email, password, role, phone, ci, permissions } = req.body;
+    try {
+        const permsStr = Array.isArray(permissions) ? JSON.stringify(permissions) : (permissions || null);
+        if (password && password.trim() !== '') {
+            const salt = await bcryptjs_1.default.genSalt(10);
+            const hashedPassword = await bcryptjs_1.default.hash(password, salt);
+            await db_1.default.query('UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ?, ci = ?, permissions = ? WHERE id = ?', [name, email, hashedPassword, role, phone || null, ci || null, permsStr, id]);
+        }
+        else {
+            await db_1.default.query('UPDATE users SET name = ?, email = ?, role = ?, phone = ?, ci = ?, permissions = ? WHERE id = ?', [name, email, role, phone || null, ci || null, permsStr, id]);
+        }
+        res.json({ message: 'Personal actualizado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al actualizar personal:', error);
+        res.status(500).json({ message: 'Error al actualizar personal' });
+    }
+});
+// DELETE /auth/staff/:id: Eliminar personal/vendedor
+router.delete('/staff/:id', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado. Solo administradores' });
+    }
+    const id = req.params.id;
+    try {
+        await db_1.default.query('DELETE FROM users WHERE id = ?', [id]);
+        res.json({ message: 'Usuario eliminado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al eliminar personal:', error);
+        res.status(500).json({ message: 'Error al eliminar personal' });
+    }
+});
 exports.default = router;

@@ -1082,4 +1082,82 @@ router.post('/settings/rates/sync', authenticate, async (req: AuthRequest, res: 
   }
 });
 
+// GET /sales/coupons/all: Obtener lista de cupones
+router.get('/coupons/all', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const [coupons]: any = await pool.query(
+      `SELECT c.*, u.name AS user_name 
+       FROM coupons c 
+       LEFT JOIN users u ON c.user_id = u.id 
+       ORDER BY c.created_at DESC`
+    );
+    res.json(coupons);
+  } catch (error: any) {
+    console.error('Error al obtener cupones:', error);
+    res.status(500).json({ message: 'Error al obtener cupones' });
+  }
+});
+
+// POST /sales/coupons: Crear un nuevo cupón
+router.post('/coupons', authenticate, async (req: AuthRequest, res: Response) => {
+  const { code, discountPercent, userId } = req.body;
+  if (!code || !discountPercent) {
+    return res.status(400).json({ message: 'Código y porcentaje de descuento son obligatorios' });
+  }
+
+  try {
+    const cleanCode = code.toUpperCase().trim();
+    await pool.query(
+      'INSERT INTO coupons (code, discount_percent, user_id, active, is_used) VALUES (?, ?, ?, 1, 0)',
+      [cleanCode, discountPercent, userId || null]
+    );
+
+    logAuditEvent({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      userRole: req.user?.role,
+      actionType: 'coupon_crud',
+      title: `Nuevo Cupón Creado: ${cleanCode}`,
+      details: `Descuento: ${discountPercent}%, Destinatario ID: ${userId || 'General / Todos'}`
+    });
+
+    res.status(201).json({ message: 'Cupón creado con éxito' });
+  } catch (error: any) {
+    console.error('Error al crear cupón:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'Ya existe un cupón con ese código' });
+    }
+    res.status(500).json({ message: 'Error al crear cupón en la base de datos' });
+  }
+});
+
+// PUT /sales/coupons/:id: Actualizar cupón
+router.put('/coupons/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  const id = req.params.id;
+  const { discount_percent, active, is_used } = req.body;
+
+  try {
+    await pool.query(
+      'UPDATE coupons SET discount_percent = COALESCE(?, discount_percent), active = COALESCE(?, active), is_used = COALESCE(?, is_used) WHERE id = ?',
+      [discount_percent, active, is_used, id]
+    );
+    res.json({ message: 'Cupón actualizado con éxito' });
+  } catch (error: any) {
+    console.error('Error al actualizar cupón:', error);
+    res.status(500).json({ message: 'Error al actualizar cupón' });
+  }
+});
+
+// DELETE /sales/coupons/:id: Eliminar cupón
+router.delete('/coupons/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  const id = req.params.id;
+  try {
+    await pool.query('DELETE FROM coupons WHERE id = ?', [id]);
+    res.json({ message: 'Cupón eliminado con éxito' });
+  } catch (error: any) {
+    console.error('Error al eliminar cupón:', error);
+    res.status(500).json({ message: 'Error al eliminar cupón' });
+  }
+});
+
 export default router;

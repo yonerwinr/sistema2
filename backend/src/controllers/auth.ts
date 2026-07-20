@@ -472,4 +472,99 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// GET /auth/staff: Obtener personal y vendedores
+router.get('/staff', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado. Solo administradores' });
+  }
+  try {
+    const [staff]: any = await pool.query(
+      'SELECT id, name, email, role, phone, ci, permissions FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC'
+    );
+    res.json(staff);
+  } catch (error) {
+    console.error('Error al obtener personal:', error);
+    res.status(500).json({ message: 'Error al obtener personal' });
+  }
+});
+
+// POST /auth/staff: Crear personal/vendedor
+router.post('/staff', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado. Solo administradores' });
+  }
+  const { name, email, password, role, phone, ci, permissions } = req.body;
+  if (!name || !email || !password || !role) {
+    return res.status(400).json({ message: 'Nombre, correo, contraseña y rol son obligatorios' });
+  }
+
+  try {
+    const [existing]: any = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const permsStr = Array.isArray(permissions) ? JSON.stringify(permissions) : (permissions || null);
+
+    await pool.query(
+      'INSERT INTO users (name, email, password, role, phone, ci, permissions) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, role, phone || null, ci || null, permsStr]
+    );
+
+    res.status(201).json({ message: 'Personal registrado con éxito' });
+  } catch (error: any) {
+    console.error('Error al registrar personal:', error);
+    res.status(500).json({ message: 'Error al registrar personal' });
+  }
+});
+
+// PUT /auth/staff/:id: Actualizar personal/vendedor
+router.put('/staff/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado. Solo administradores' });
+  }
+  const id = req.params.id;
+  const { name, email, password, role, phone, ci, permissions } = req.body;
+
+  try {
+    const permsStr = Array.isArray(permissions) ? JSON.stringify(permissions) : (permissions || null);
+
+    if (password && password.trim() !== '') {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      await pool.query(
+        'UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ?, ci = ?, permissions = ? WHERE id = ?',
+        [name, email, hashedPassword, role, phone || null, ci || null, permsStr, id]
+      );
+    } else {
+      await pool.query(
+        'UPDATE users SET name = ?, email = ?, role = ?, phone = ?, ci = ?, permissions = ? WHERE id = ?',
+        [name, email, role, phone || null, ci || null, permsStr, id]
+      );
+    }
+
+    res.json({ message: 'Personal actualizado con éxito' });
+  } catch (error: any) {
+    console.error('Error al actualizar personal:', error);
+    res.status(500).json({ message: 'Error al actualizar personal' });
+  }
+});
+
+// DELETE /auth/staff/:id: Eliminar personal/vendedor
+router.delete('/staff/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado. Solo administradores' });
+  }
+  const id = req.params.id;
+  try {
+    await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    res.json({ message: 'Usuario eliminado con éxito' });
+  } catch (error: any) {
+    console.error('Error al eliminar personal:', error);
+    res.status(500).json({ message: 'Error al eliminar personal' });
+  }
+});
+
 export default router;

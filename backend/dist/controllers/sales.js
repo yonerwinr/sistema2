@@ -9,6 +9,7 @@ const auth_1 = require("../middleware/auth");
 const email_1 = require("../services/email");
 const sheets_1 = require("../services/sheets");
 const rates_1 = require("../services/rates");
+const audit_1 = require("../services/audit");
 const router = (0, express_1.Router)();
 // Middleware de autenticación opcional para compras (permite compras de invitados y POS sin iniciar sesión si es necesario, o POS por Admin)
 // Para POS requerimos Admin, para Online podemos requerir usuario autenticado o permitir invitados.
@@ -899,6 +900,72 @@ router.post('/settings/rates/sync', auth_1.authenticate, async (req, res) => {
     catch (error) {
         console.error('Error al sincronizar tasas manualmente:', error);
         res.status(500).json({ message: 'Error al sincronizar tasas de cambio con el BCV', error: error.message });
+    }
+});
+// GET /sales/coupons/all: Obtener lista de cupones
+router.get('/coupons/all', auth_1.authenticate, async (req, res) => {
+    try {
+        const [coupons] = await db_1.default.query(`SELECT c.*, u.name AS user_name 
+       FROM coupons c 
+       LEFT JOIN users u ON c.user_id = u.id 
+       ORDER BY c.created_at DESC`);
+        res.json(coupons);
+    }
+    catch (error) {
+        console.error('Error al obtener cupones:', error);
+        res.status(500).json({ message: 'Error al obtener cupones' });
+    }
+});
+// POST /sales/coupons: Crear un nuevo cupón
+router.post('/coupons', auth_1.authenticate, async (req, res) => {
+    const { code, discountPercent, userId } = req.body;
+    if (!code || !discountPercent) {
+        return res.status(400).json({ message: 'Código y porcentaje de descuento son obligatorios' });
+    }
+    try {
+        const cleanCode = code.toUpperCase().trim();
+        await db_1.default.query('INSERT INTO coupons (code, discount_percent, user_id, active, is_used) VALUES (?, ?, ?, 1, 0)', [cleanCode, discountPercent, userId || null]);
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'coupon_crud',
+            title: `Nuevo Cupón Creado: ${cleanCode}`,
+            details: `Descuento: ${discountPercent}%, Destinatario ID: ${userId || 'General / Todos'}`
+        });
+        res.status(201).json({ message: 'Cupón creado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al crear cupón:', error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ message: 'Ya existe un cupón con ese código' });
+        }
+        res.status(500).json({ message: 'Error al crear cupón en la base de datos' });
+    }
+});
+// PUT /sales/coupons/:id: Actualizar cupón
+router.put('/coupons/:id', auth_1.authenticate, async (req, res) => {
+    const id = req.params.id;
+    const { discount_percent, active, is_used } = req.body;
+    try {
+        await db_1.default.query('UPDATE coupons SET discount_percent = COALESCE(?, discount_percent), active = COALESCE(?, active), is_used = COALESCE(?, is_used) WHERE id = ?', [discount_percent, active, is_used, id]);
+        res.json({ message: 'Cupón actualizado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al actualizar cupón:', error);
+        res.status(500).json({ message: 'Error al actualizar cupón' });
+    }
+});
+// DELETE /sales/coupons/:id: Eliminar cupón
+router.delete('/coupons/:id', auth_1.authenticate, async (req, res) => {
+    const id = req.params.id;
+    try {
+        await db_1.default.query('DELETE FROM coupons WHERE id = ?', [id]);
+        res.json({ message: 'Cupón eliminado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al eliminar cupón:', error);
+        res.status(500).json({ message: 'Error al eliminar cupón' });
     }
 });
 exports.default = router;
