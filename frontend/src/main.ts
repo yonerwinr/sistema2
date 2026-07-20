@@ -3310,6 +3310,29 @@ function bindProductCRUDEvents() {
     }
   }
 
+  // Escuchar cambios de fecha para actualizar automáticamente las tasas de esa fecha
+  document.getElementById('calc-purchase-date')?.addEventListener('change', async (e) => {
+    const selectedDate = (e.target as HTMLInputElement).value;
+    if (selectedDate) {
+      try {
+        const rates = await api.sales.getHistoricalExchangeRates(selectedDate);
+        const bcvInput = document.getElementById('calc-bcv-rate') as HTMLInputElement;
+        const binanceInput = document.getElementById('calc-binance-rate') as HTMLInputElement;
+
+        if (bcvInput && rates.usdToVes > 0) {
+          bcvInput.value = rates.usdToVes.toFixed(2);
+        }
+        if (binanceInput && rates.binanceUsdToVes > 0) {
+          binanceInput.value = rates.binanceUsdToVes.toFixed(2);
+        }
+
+        updateProductPriceCalc();
+      } catch (err) {
+        console.error('Error al obtener tasas de la fecha seleccionada:', err);
+      }
+    }
+  });
+
   ['calc-purchase-date', 'calc-bcv-rate', 'calc-binance-rate', 'calc-black-cost', 'calc-profit-margin'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', updateProductPriceCalc);
     document.getElementById(id)?.addEventListener('change', updateProductPriceCalc);

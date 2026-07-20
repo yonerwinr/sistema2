@@ -794,6 +794,52 @@ router.post('/:id/remind', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ message: 'Error al enviar recordatorio por correo' });
     }
 });
+// Obtener tasas históricas por fecha (Público / Admin)
+router.get('/settings/rates/historical', async (req, res) => {
+    const dateStr = req.query.date;
+    try {
+        let usdRate = 0;
+        let binanceRate = 0;
+        if (dateStr) {
+            try {
+                const resH = await fetch(`https://ve.dolarapi.com/v1/historico/usd`);
+                if (resH.ok) {
+                    const data = await resH.json();
+                    if (Array.isArray(data)) {
+                        const entry = data.find((item) => item.fecha && item.fecha.startsWith(dateStr));
+                        if (entry) {
+                            if (entry.promedio)
+                                usdRate = parseFloat(entry.promedio);
+                            if (entry.paralelo)
+                                binanceRate = parseFloat(entry.paralelo);
+                        }
+                    }
+                }
+            }
+            catch (e) {
+                console.warn('[RATES] Error al consultar historial en DolarApi:', e.message);
+            }
+        }
+        // Fallback a las tasas actuales guardadas en DB
+        if (!usdRate || usdRate <= 0) {
+            const [rows] = await db_1.default.query("SELECT settings_value FROM settings WHERE settings_key = 'usd_to_ves_rate'");
+            usdRate = rows.length > 0 ? parseFloat(rows[0].settings_value) : 40.00;
+        }
+        if (!binanceRate || binanceRate <= 0) {
+            const [rows] = await db_1.default.query("SELECT settings_value FROM settings WHERE settings_key = 'binance_usd_to_ves_rate'");
+            binanceRate = rows.length > 0 ? parseFloat(rows[0].settings_value) : usdRate * 1.08;
+        }
+        res.json({
+            date: dateStr,
+            usdToVes: usdRate,
+            binanceUsdToVes: binanceRate
+        });
+    }
+    catch (error) {
+        console.error('Error al obtener tasas históricas:', error);
+        res.status(500).json({ message: 'Error al obtener tasas históricas', error: error.message });
+    }
+});
 // Obtener tasas de cambio (Público)
 router.get('/settings/rates', async (req, res) => {
     try {

@@ -284,6 +284,7 @@ export const api = {
       method: 'POST',
     }),
     getExchangeRates: () => request<{ usdToVes: number; eurToVes: number; binanceUsdToVes: number }>('/sales/settings/rates'),
+    getHistoricalExchangeRates: (date: string) => request<{ date: string; usdToVes: number; binanceUsdToVes: number }>(`/sales/settings/rates/historical?date=${date}`),
     updateExchangeRates: (body: { usdToVes: number; eurToVes: number; binanceUsdToVes?: number }) => request<{ message: string }>('/sales/settings/rates', {
       method: 'PUT',
       body: JSON.stringify(body),
