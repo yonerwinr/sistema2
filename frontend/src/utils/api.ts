@@ -38,6 +38,7 @@ export interface User {
   role: 'admin' | 'customer' | 'seller';
   phone?: string;
   ci?: string;
+  permissions?: string | string[];
 }
 
 export interface Product {
@@ -144,6 +145,7 @@ export const api = {
     }),
     me: () => request<User>('/auth/me'),
     getCustomers: () => request<User[]>('/auth/customers'),
+    getCustomerByCi: (ci: string) => request<User>(`/auth/customer-by-ci?ci=${encodeURIComponent(ci)}`),
     getStaff: () => request<User[]>('/auth/staff'),
     createStaff: (body: any) => request<{ message: string }>('/auth/staff', {
       method: 'POST',

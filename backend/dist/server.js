@@ -64,6 +64,10 @@ async function runMigrations() {
                 await conn.query('ALTER TABLE users ADD COLUMN reset_code VARCHAR(10) NULL, ADD COLUMN reset_code_expires_at DATETIME NULL');
                 console.log('Columnas "reset_code" y "reset_code_expires_at" agregadas a la tabla users.');
             }
+            if (!userColNames.includes('permissions')) {
+                await conn.query('ALTER TABLE users ADD COLUMN permissions TEXT NULL');
+                console.log('Columna "permissions" agregada a la tabla users.');
+            }
         }
         catch (err) {
             console.error('Error al actualizar columnas en la tabla users:', err.message);

@@ -44,6 +44,11 @@ let posCouponDiscountPercent = 0;
 let posIsPending = false;
 let posInitialPayment = 0;
 let posLoadedQuotationId: number | null = null;
+let posClientIdentified = false;
+let posCustomerName = 'Consumidor Final';
+let posCustomerCi = '';
+let posCustomerEmail = '';
+let posCustomerPhone = '';
 let rateUsdToVes = 40.00;
 let rateEurToVes = 43.50;
 
@@ -160,7 +165,7 @@ function renderApp() {
     <main id="main-content" style="flex-grow: 1;">
       ${currentView === 'store' ? renderStoreView() : ''}
       ${currentView === 'auth' ? renderAuthView() : ''}
-      ${currentView === 'admin' ? renderAdminView() : ''}
+      ${currentView === 'admin' ? renderAdminDashboard() : ''}
     </main>
     ${renderFooter()}
     ${renderCartSidebar()}
@@ -1662,23 +1667,40 @@ function bindAuthEvents() {
   initGoogleBtn();
 }
 
+
 // ==========================================================================
 // VISTA: PANEL DE ADMINISTRACION (DASHBOARD)
 // ==========================================================================
-function renderAdminView(): string {
+function hasPermission(perm: string): boolean {
+  if (!currentUser) return false;
+  if (currentUser.role === 'admin') return true;
+  if (!currentUser.permissions) return perm === 'pos';
+  try {
+    const perms = typeof currentUser.permissions === 'string'
+      ? JSON.parse(currentUser.permissions)
+      : currentUser.permissions;
+    return Array.isArray(perms) && perms.includes(perm);
+  } catch (e) {
+    return perm === 'pos';
+  }
+}
+
+function renderAdminDashboard(): string {
   if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller')) {
     return `
-      <div class="container text-center" style="padding: 100px 0;">
-        <h2 style="color:var(--danger)">Acceso Restringido</h2>
-        <p class="mb-4">Debes ser administrador o vendedor para ingresar a esta seccion.</p>
-        <button class="btn btn-primary" onclick="navigate('store')">Volver a la Tienda</button>
+      <div class="card text-center animate-on-scroll animate-fade-up visible" style="max-width: 400px; margin: 40px auto; padding: 40px;">
+        <h2 class="mb-4">Acceso Denegado</h2>
+        <p class="mb-4" style="color:var(--text-secondary);">Debes ser un administrador o vendedor autenticado para acceder al panel de control.</p>
+        <button class="btn btn-primary" id="go-store-btn">Volver a la Tienda</button>
       </div>
     `;
   }
 
-  // Si es un vendedor, forzar vista POS
-  if (currentUser.role === 'seller') {
-    activeAdminView = 'pos';
+  // Ajustar subvista activa por defecto según permisos
+  if (!hasPermission(activeAdminView)) {
+    if (hasPermission('pos')) activeAdminView = 'pos';
+    else if (hasPermission('stats')) activeAdminView = 'stats';
+    else if (hasPermission('products')) activeAdminView = 'products';
   }
 
   return `
@@ -1691,25 +1713,37 @@ function renderAdminView(): string {
               ${icons.dashboard} Estadisticas
             </button>
           ` : ''}
-          <button class="sidebar-nav-btn ${activeAdminView === 'pos' ? 'active' : ''}" id="admin-tab-pos">
-            ${icons.pos} Punto de Venta (POS)
-          </button>
-          ${currentUser.role === 'admin' ? `
+          ${hasPermission('pos') ? `
+            <button class="sidebar-nav-btn ${activeAdminView === 'pos' ? 'active' : ''}" id="admin-tab-pos">
+              ${icons.pos} Punto de Venta (POS)
+            </button>
+          ` : ''}
+          ${hasPermission('products') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'products' ? 'active' : ''}" id="admin-tab-products">
               ${icons.products} Catalogo Productos
             </button>
+          ` : ''}
+          ${hasPermission('sales') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'sales' ? 'active' : ''}" id="admin-tab-sales">
-              ${icons.sales} Historico Ventas
+              ${icons.sales} Historico del Sistema
             </button>
+          ` : ''}
+          ${hasPermission('debtors') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'debtors' ? 'active' : ''}" id="admin-tab-debtors">
               💸 Deudores
             </button>
+          ` : ''}
+          ${hasPermission('quotations') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'quotations' ? 'active' : ''}" id="admin-tab-quotations">
               📝 Cotizaciones
             </button>
+          ` : ''}
+          ${hasPermission('coupons') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'coupons' ? 'active' : ''}" id="admin-tab-coupons">
               🎟️ Cupones
             </button>
+          ` : ''}
+          ${hasPermission('staff') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'staff' ? 'active' : ''}" id="admin-tab-staff">
               👥 Vendedores
             </button>
@@ -2163,6 +2197,19 @@ async function renderAdminPOS() {
 
         <!-- Columna de Carrito POS -->
         <div class="pos-cart-column">
+          <!-- Card de Cliente Identificado -->
+          <div class="card mb-3" style="padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cliente Asignado:</div>
+              <div style="font-size:13px; font-weight:700; color:var(--primary);">
+                👤 ${posCustomerName || 'Consumidor Final'} ${posCustomerCi ? `(${posCustomerCi})` : ''}
+              </div>
+            </div>
+            <button type="button" class="btn btn-secondary" id="change-pos-client-btn" style="padding:4px 8px; font-size:11px;">
+              🆔 Cambiar Cliente
+            </button>
+          </div>
+
           <h3 style="font-size:18px; font-weight:700;">Venta POS Actual</h3>
           
           <div class="pos-cart-items">
@@ -2199,27 +2246,27 @@ async function renderAdminPOS() {
             
             <div class="form-group mb-2">
               <label class="form-label" style="font-size:10px;">Nombre Cliente</label>
-              <input type="text" class="form-control" id="pos-client-name" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. Consumidor Final" value="${posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.name || '') : 'Consumidor Final'}">
+              <input type="text" class="form-control" id="pos-client-name" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. Consumidor Final" value="${posCustomerName || (posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.name || '') : 'Consumidor Final')}">
             </div>
             <div class="form-group mb-2">
               <label class="form-label" style="font-size:10px;">Cédula de Identidad / RIF</label>
               <div style="display: flex; gap: 6px;">
                 <select class="form-control" id="pos-client-ci-prefix" style="width: 70px; padding: 8px 6px; font-size:12px; font-weight:700; flex-shrink: 0;">
-                  <option value="V-">V-</option>
-                  <option value="E-">E-</option>
-                  <option value="J-">J-</option>
-                  <option value="G-">G-</option>
+                  <option value="V-" ${posCustomerCi.startsWith('V-') ? 'selected' : ''}>V-</option>
+                  <option value="E-" ${posCustomerCi.startsWith('E-') ? 'selected' : ''}>E-</option>
+                  <option value="J-" ${posCustomerCi.startsWith('J-') ? 'selected' : ''}>J-</option>
+                  <option value="G-" ${posCustomerCi.startsWith('G-') ? 'selected' : ''}>G-</option>
                 </select>
-                <input type="text" class="form-control" id="pos-client-ci-num" style="padding: 8px 12px; font-size:13px; flex-grow: 1;" placeholder="12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos">
+                <input type="text" class="form-control" id="pos-client-ci-num" style="padding: 8px 12px; font-size:13px; flex-grow: 1;" placeholder="12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" value="${posCustomerCi ? posCustomerCi.replace(/^[VEJG]-/, '') : ''}">
               </div>
             </div>
             <div class="form-group mb-2">
               <label class="form-label" style="font-size:10px;">Correo (Opcional para Factura)</label>
-              <input type="email" class="form-control" id="pos-client-email" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. cliente@correo.com" value="${posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.email || '') : ''}">
+              <input type="email" class="form-control" id="pos-client-email" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. cliente@correo.com" value="${posCustomerEmail || (posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.email || '') : '')}">
             </div>
             <div class="form-group mb-2">
               <label class="form-label" style="font-size:10px;">WhatsApp/Telefono (Opcional)</label>
-              <input type="tel" class="form-control" id="pos-client-phone" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. +5491122334455" value="${posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.phone || '') : ''}">
+              <input type="tel" class="form-control" id="pos-client-phone" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. +584120000000" value="${posCustomerPhone || (posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.phone || '') : '')}">
             </div>
             <div class="form-group mb-2">
               <label class="form-label" style="font-size:10px;">Método de Pago</label>
@@ -2317,6 +2364,47 @@ async function renderAdminPOS() {
           </form>
         </div>
       </div>
+
+      ${!posClientIdentified && !posLoadedQuotationId ? `
+        <div class="modal-overlay open" id="pos-id-modal" style="z-index: 9999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 460px; width: 90%; padding: 28px; border-radius: 16px; border: 1px solid var(--border-glass); background: #111827;">
+            <div style="font-size: 38px; text-align: center; margin-bottom: 6px;">🆔</div>
+            <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px;">Identificación del Cliente</h3>
+            <p style="font-size: 12px; color: var(--text-secondary); text-align: center; margin-bottom: 20px;">
+              Ingrese la Cédula o RIF para buscar y cargar los datos del cliente en el POS.
+            </p>
+
+            <form id="pos-id-search-form" class="mb-4">
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; text-transform: uppercase; font-weight: 700;">Cédula de Identidad / RIF</label>
+                <div style="display: flex; gap: 8px;">
+                  <select class="form-control" id="pos-id-prefix" style="width: 80px; font-weight: 700; flex-shrink: 0; font-size: 14px;">
+                    <option value="V-">V-</option>
+                    <option value="E-">E-</option>
+                    <option value="J-">J-</option>
+                    <option value="G-">G-</option>
+                  </select>
+                  <input type="text" class="form-control" id="pos-id-num" placeholder="Ej. 12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" required style="flex-grow: 1; font-size: 15px; font-weight: 600;">
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary w-100" id="pos-id-submit-btn" style="padding: 10px; font-size: 13px; font-weight: 700;">
+                🔍 Buscar Cliente en Base de Datos
+              </button>
+            </form>
+
+            <div style="position: relative; text-align: center; margin: 18px 0;">
+              <hr style="border: 0; border-top: 1px solid var(--border-glass);">
+              <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #111827; padding: 0 10px; font-size: 10px; color: var(--text-muted); text-transform: uppercase;">
+                O continuar sin registrar
+              </span>
+            </div>
+
+            <button type="button" class="btn btn-secondary w-100" id="pos-id-skip-btn" style="padding: 10px; font-size: 12px; font-weight: 600;">
+              👤 Consumidor Final (Usuario No Registrado)
+            </button>
+          </div>
+        </div>
+      ` : ''}
     `;
 
     bindPOSEvents();
@@ -2333,6 +2421,56 @@ async function renderAdminPOS() {
 }
 
 function bindPOSEvents() {
+  // Eventos Modal de Identificación del Cliente (POS Step 1)
+  document.getElementById('pos-id-search-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const prefix = (document.getElementById('pos-id-prefix') as HTMLSelectElement).value;
+    const num = (document.getElementById('pos-id-num') as HTMLInputElement).value.trim();
+    const fullCi = `${prefix}${num}`;
+    const btn = document.getElementById('pos-id-submit-btn') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.innerText = 'Buscando...';
+
+    try {
+      const customer = await api.auth.getCustomerByCi(fullCi);
+      posSelectedCustomerId = customer.id;
+      posCustomerName = customer.name;
+      posCustomerEmail = customer.email || '';
+      posCustomerPhone = customer.phone || '';
+      posCustomerCi = customer.ci || fullCi;
+      posClientIdentified = true;
+
+      alert(`¡Cliente Identificado Con Éxito!\n\nNombre: ${customer.name}\nCédula: ${customer.ci}\nCorreo: ${customer.email || 'N/D'}`);
+      await renderAdminPOS();
+    } catch (err: any) {
+      const customName = prompt(`No se encontró ningún cliente registrado con la Cédula/RIF "${fullCi}".\n\nSi deseas asignarle un nombre para esta factura, ingrésalo a continuación (o presiona Aceptar para continuar como Consumidor Final):`);
+      if (customName && customName.trim() !== '') {
+        posCustomerName = customName.trim();
+      } else {
+        posCustomerName = 'Consumidor Final';
+      }
+      posCustomerCi = fullCi;
+      posSelectedCustomerId = null;
+      posClientIdentified = true;
+      await renderAdminPOS();
+    }
+  });
+
+  document.getElementById('pos-id-skip-btn')?.addEventListener('click', async () => {
+    posSelectedCustomerId = null;
+    posCustomerName = 'Consumidor Final';
+    posCustomerCi = '';
+    posCustomerEmail = '';
+    posCustomerPhone = '';
+    posClientIdentified = true;
+    await renderAdminPOS();
+  });
+
+  document.getElementById('change-pos-client-btn')?.addEventListener('click', async () => {
+    posClientIdentified = false;
+    await renderAdminPOS();
+  });
+
   // Buscador de productos POS
   let posSearchTimeout: any;
   const searchInput = document.getElementById('pos-search-input') as HTMLInputElement;
@@ -2544,6 +2682,11 @@ function bindPOSEvents() {
       posIsPending = false;
       posInitialPayment = 0;
       posLoadedQuotationId = null;
+      posClientIdentified = false;
+      posCustomerName = 'Consumidor Final';
+      posCustomerCi = '';
+      posCustomerEmail = '';
+      posCustomerPhone = '';
       
       await loadProducts(); // recargar
       
@@ -3850,14 +3993,45 @@ async function renderAdminStaff() {
                 </div>
               </div>
             </div>
-            <div class="form-group">
-              <label class="form-label" for="staff-role">Privilegios / Rol</label>
+            <div class="form-group mb-3">
+              <label class="form-label" for="staff-role">Privilegios / Rol Principal</label>
               <select class="form-control" id="staff-role" required>
-                <option value="seller">Vendedor (Acceso exclusivo a POS)</option>
-                <option value="admin">Administrador (Acceso total al sistema)</option>
+                <option value="seller">Vendedor / Cajero (Permisos Seleccionados)</option>
+                <option value="admin">Administrador (Acceso Total)</option>
               </select>
             </div>
-            <div class="form-group">
+
+            <!-- Granular Permissions Checkboxes -->
+            <div class="form-group mb-4">
+              <label class="form-label" style="font-size:13px; font-weight:700;">Permisos Específicos Asignados</label>
+              <p style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">Marque los módulos a los cuales este usuario tendrá acceso dentro del sistema:</p>
+              
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px; background:rgba(255,255,255,0.02); padding:14px; border-radius:8px; border:1px solid var(--border-glass);">
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="staff-perm-checkbox" value="pos" checked> 🛒 Punto de Venta (POS)
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="staff-perm-checkbox" value="products"> 📦 Catálogo e Inventario
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="staff-perm-checkbox" value="sales"> 📋 Histórico & Auditoría
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="staff-perm-checkbox" value="debtors"> 💸 Control de Deudores
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="staff-perm-checkbox" value="quotations"> 📝 Cotizaciones al Mayor
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="staff-perm-checkbox" value="coupons"> 🎟️ Cupones de Descuento
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="staff-perm-checkbox" value="staff"> 👥 Gestión de Personal
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group mb-4">
               <label class="form-label" for="staff-password" id="staff-pass-label">Contraseña</label>
               <input type="password" class="form-control" id="staff-password" required placeholder="Min. 6 caracteres">
               <small class="form-text text-muted" id="staff-pass-help" style="display:none; color:var(--text-secondary); margin-top:4px;">Dejar en blanco para mantener la contraseña actual.</small>
@@ -3945,6 +4119,18 @@ function bindStaffEvents() {
     if (formCard) formCard.style.display = 'none';
   });
 
+  // Auto-seleccionar permisos según el rol
+  document.getElementById('staff-role')?.addEventListener('change', (e) => {
+    const roleVal = (e.target as HTMLSelectElement).value;
+    document.querySelectorAll('.staff-perm-checkbox').forEach((cb: any) => {
+      if (roleVal === 'admin') {
+        cb.checked = true;
+      } else {
+        cb.checked = (cb.value === 'pos');
+      }
+    });
+  });
+
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = (document.getElementById('staff-name') as HTMLInputElement).value;
@@ -3956,7 +4142,9 @@ function bindStaffEvents() {
     const role = (document.getElementById('staff-role') as HTMLSelectElement).value;
     const password = passInput.value;
 
-    const payload: any = { name, email, role, phone, ci };
+    const checkedPerms = Array.from(document.querySelectorAll('.staff-perm-checkbox:checked')).map((c: any) => c.value);
+
+    const payload: any = { name, email, role, phone, ci, permissions: checkedPerms };
     if (password || !editingStaffId) {
       payload.password = password;
     }
@@ -3990,27 +4178,37 @@ function bindStaffEvents() {
         (document.getElementById('staff-email') as HTMLInputElement).value = member.email;
         (document.getElementById('staff-phone') as HTMLInputElement).value = member.phone || '';
         (document.getElementById('staff-role') as HTMLSelectElement).value = member.role;
-        
-        const ciPrefixIn = document.getElementById('staff-ci-prefix') as HTMLSelectElement;
-        const ciNumIn = document.getElementById('staff-ci-num') as HTMLInputElement;
+
         if (member.ci) {
           const parts = member.ci.split('-');
           if (parts.length === 2) {
-            if (ciPrefixIn) ciPrefixIn.value = `${parts[0]}-`;
-            if (ciNumIn) ciNumIn.value = parts[1];
-          } else if (ciNumIn) {
-            ciNumIn.value = member.ci;
+            (document.getElementById('staff-ci-prefix') as HTMLSelectElement).value = `${parts[0]}-`;
+            (document.getElementById('staff-ci-num') as HTMLInputElement).value = parts[1];
+          } else {
+            (document.getElementById('staff-ci-num') as HTMLInputElement).value = member.ci;
           }
-        } else if (ciNumIn) {
-          ciNumIn.value = '';
+        } else {
+          (document.getElementById('staff-ci-num') as HTMLInputElement).value = '';
         }
-        
-        if (passInput) {
-          passInput.value = '';
-          passInput.required = false;
-        }
-        if (passHelp) passHelp.style.display = 'block';
 
+        // Cargar checkboxes de permisos
+        let perms: string[] = [];
+        if (member.permissions) {
+          try {
+            perms = typeof member.permissions === 'string' ? JSON.parse(member.permissions) : member.permissions;
+          } catch (err) {
+            perms = [];
+          }
+        } else {
+          perms = member.role === 'admin' ? ['pos', 'products', 'sales', 'debtors', 'quotations', 'coupons', 'staff'] : ['pos'];
+        }
+
+        document.querySelectorAll('.staff-perm-checkbox').forEach((cb: any) => {
+          cb.checked = Array.isArray(perms) && perms.includes(cb.value);
+        });
+
+        if (passInput) passInput.required = false;
+        if (passHelp) passHelp.style.display = 'block';
         if (formCard) formCard.style.display = 'block';
         formCard?.scrollIntoView({ behavior: 'smooth' });
       }

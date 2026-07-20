@@ -146,7 +146,7 @@ router.get('/me', auth_1.authenticate, async (req, res) => {
     try {
         if (!req.user)
             return res.status(401).json({ message: 'No autenticado' });
-        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, created_at FROM users WHERE id = ?', [req.user.id]);
+        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, ci, permissions, created_at FROM users WHERE id = ?', [req.user.id]);
         if (users.length === 0) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
@@ -170,13 +170,31 @@ router.get('/customers', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ message: 'Error al obtener lista de clientes' });
     }
 });
-// Obtener todos los administradores y vendedores (Solo Admin)
+// Buscar cliente por cédula (POS Step-1)
+router.get('/customer-by-ci', auth_1.authenticate, async (req, res) => {
+    const { ci } = req.query;
+    if (!ci) {
+        return res.status(400).json({ message: 'La cédula es requerida' });
+    }
+    try {
+        const [users] = await db_1.default.query('SELECT id, name, email, phone, ci, role, permissions FROM users WHERE ci = ? LIMIT 1', [ci]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Cliente no encontrado' });
+        }
+        res.json(users[0]);
+    }
+    catch (error) {
+        console.error('Error buscando cliente por cédula:', error);
+        res.status(500).json({ message: 'Error interno al buscar cliente' });
+    }
+});
+// Obtener todos los administradores y vendedores (Solo Admin o Personal con permiso)
 router.get('/staff', auth_1.authenticate, async (req, res) => {
-    if (req.user?.role !== 'admin') {
+    if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
         return res.status(403).json({ message: 'No autorizado' });
     }
     try {
-        const [staff] = await db_1.default.query('SELECT id, name, email, role, phone, ci FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC');
+        const [staff] = await db_1.default.query('SELECT id, name, email, role, phone, ci, permissions FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC');
         res.json(staff);
     }
     catch (error) {
@@ -189,7 +207,7 @@ router.post('/staff', auth_1.authenticate, async (req, res) => {
     if (req.user?.role !== 'admin') {
         return res.status(403).json({ message: 'No autorizado' });
     }
-    const { name, email, password, role, phone, ci } = req.body;
+    const { name, email, password, role, phone, ci, permissions } = req.body;
     if (!name || !email || !password || !role) {
         return res.status(400).json({ message: 'Nombre, correo, contraseña y rol son obligatorios' });
     }
@@ -204,14 +222,15 @@ router.post('/staff', auth_1.authenticate, async (req, res) => {
         }
         const salt = await bcryptjs_1.default.genSalt(10);
         const hashedPassword = await bcryptjs_1.default.hash(password, salt);
-        await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, ?, ?, ?, ?)', [name, email, hashedPassword, role, phone || null, ci || null]);
+        const permissionsStr = Array.isArray(permissions) ? JSON.stringify(permissions) : (permissions || null);
+        await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci, permissions) VALUES (?, ?, ?, ?, ?, ?, ?)', [name, email, hashedPassword, role, phone || null, ci || null, permissionsStr]);
         (0, audit_1.logAuditEvent)({
             userId: req.user?.id,
             userName: req.user?.name,
             userRole: req.user?.role,
             actionType: 'staff_crud',
             title: `Nuevo Vendedor / Personal Creado: ${name}`,
-            details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}`
+            details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}, Permisos: ${permissionsStr || 'Por defecto'}`
         });
         res.status(201).json({ message: 'Usuario de personal creado con éxito' });
     }
@@ -226,7 +245,7 @@ router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado' });
     }
     const { id } = req.params;
-    const { name, email, password, role, phone, ci } = req.body;
+    const { name, email, password, role, phone, ci, permissions } = req.body;
     if (!name || !email || !role) {
         return res.status(400).json({ message: 'Nombre, correo y rol son obligatorios' });
     }
@@ -239,13 +258,14 @@ router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
         if (existing.length > 0) {
             return res.status(400).json({ message: 'El correo electrónico ya está en uso por otro usuario' });
         }
+        const permissionsStr = Array.isArray(permissions) ? JSON.stringify(permissions) : (permissions || null);
         if (password) {
             const salt = await bcryptjs_1.default.genSalt(10);
             const hashedPassword = await bcryptjs_1.default.hash(password, salt);
-            await db_1.default.query('UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ?, ci = ? WHERE id = ?', [name, email, hashedPassword, role, phone || null, ci || null, id]);
+            await db_1.default.query('UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ?, ci = ?, permissions = ? WHERE id = ?', [name, email, hashedPassword, role, phone || null, ci || null, permissionsStr, id]);
         }
         else {
-            await db_1.default.query('UPDATE users SET name = ?, email = ?, role = ?, phone = ?, ci = ? WHERE id = ?', [name, email, role, phone || null, ci || null, id]);
+            await db_1.default.query('UPDATE users SET name = ?, email = ?, role = ?, phone = ?, ci = ?, permissions = ? WHERE id = ?', [name, email, role, phone || null, ci || null, permissionsStr, id]);
         }
         (0, audit_1.logAuditEvent)({
             userId: req.user?.id,
@@ -253,7 +273,7 @@ router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
             userRole: req.user?.role,
             actionType: 'staff_crud',
             title: `Personal Actualizado (ID #${id}): ${name}`,
-            details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}`
+            details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}, Permisos: ${permissionsStr || 'Por defecto'}`
         });
         res.json({ message: 'Usuario de personal actualizado con éxito' });
     }

@@ -185,7 +185,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'No autenticado' });
 
-    const [users]: any = await pool.query('SELECT id, name, email, role, phone, created_at FROM users WHERE id = ?', [req.user.id]);
+    const [users]: any = await pool.query('SELECT id, name, email, role, phone, ci, permissions, created_at FROM users WHERE id = ?', [req.user.id]);
     if (users.length === 0) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
@@ -213,15 +213,36 @@ router.get('/customers', authenticate, async (req: AuthRequest, res: Response) =
   }
 });
 
-// Obtener todos los administradores y vendedores (Solo Admin)
+// Buscar cliente por cédula (POS Step-1)
+router.get('/customer-by-ci', authenticate, async (req: AuthRequest, res: Response) => {
+  const { ci } = req.query;
+  if (!ci) {
+    return res.status(400).json({ message: 'La cédula es requerida' });
+  }
+  try {
+    const [users]: any = await pool.query(
+      'SELECT id, name, email, phone, ci, role, permissions FROM users WHERE ci = ? LIMIT 1',
+      [ci]
+    );
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'Cliente no encontrado' });
+    }
+    res.json(users[0]);
+  } catch (error) {
+    console.error('Error buscando cliente por cédula:', error);
+    res.status(500).json({ message: 'Error interno al buscar cliente' });
+  }
+});
+
+// Obtener todos los administradores y vendedores (Solo Admin o Personal con permiso)
 router.get('/staff', authenticate, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== 'admin') {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
     return res.status(403).json({ message: 'No autorizado' });
   }
 
   try {
     const [staff]: any = await pool.query(
-      'SELECT id, name, email, role, phone, ci FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC'
+      'SELECT id, name, email, role, phone, ci, permissions FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC'
     );
     res.json(staff);
   } catch (error) {
@@ -236,7 +257,7 @@ router.post('/staff', authenticate, async (req: AuthRequest, res: Response) => {
     return res.status(403).json({ message: 'No autorizado' });
   }
 
-  const { name, email, password, role, phone, ci } = req.body;
+  const { name, email, password, role, phone, ci, permissions } = req.body;
 
   if (!name || !email || !password || !role) {
     return res.status(400).json({ message: 'Nombre, correo, contraseña y rol son obligatorios' });
@@ -255,10 +276,11 @@ router.post('/staff', authenticate, async (req: AuthRequest, res: Response) => {
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+    const permissionsStr = Array.isArray(permissions) ? JSON.stringify(permissions) : (permissions || null);
 
     await pool.query(
-      'INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, role, phone || null, ci || null]
+      'INSERT INTO users (name, email, password, role, phone, ci, permissions) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, role, phone || null, ci || null, permissionsStr]
     );
 
     logAuditEvent({
@@ -267,7 +289,7 @@ router.post('/staff', authenticate, async (req: AuthRequest, res: Response) => {
       userRole: req.user?.role,
       actionType: 'staff_crud',
       title: `Nuevo Vendedor / Personal Creado: ${name}`,
-      details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}`
+      details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}, Permisos: ${permissionsStr || 'Por defecto'}`
     });
 
     res.status(201).json({ message: 'Usuario de personal creado con éxito' });
@@ -284,7 +306,7 @@ router.put('/staff/:id', authenticate, async (req: AuthRequest, res: Response) =
   }
 
   const { id } = req.params;
-  const { name, email, password, role, phone, ci } = req.body;
+  const { name, email, password, role, phone, ci, permissions } = req.body;
 
   if (!name || !email || !role) {
     return res.status(400).json({ message: 'Nombre, correo y rol son obligatorios' });
@@ -301,17 +323,19 @@ router.put('/staff/:id', authenticate, async (req: AuthRequest, res: Response) =
       return res.status(400).json({ message: 'El correo electrónico ya está en uso por otro usuario' });
     }
 
+    const permissionsStr = Array.isArray(permissions) ? JSON.stringify(permissions) : (permissions || null);
+
     if (password) {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
       await pool.query(
-        'UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ?, ci = ? WHERE id = ?',
-        [name, email, hashedPassword, role, phone || null, ci || null, id]
+        'UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ?, ci = ?, permissions = ? WHERE id = ?',
+        [name, email, hashedPassword, role, phone || null, ci || null, permissionsStr, id]
       );
     } else {
       await pool.query(
-        'UPDATE users SET name = ?, email = ?, role = ?, phone = ?, ci = ? WHERE id = ?',
-        [name, email, role, phone || null, ci || null, id]
+        'UPDATE users SET name = ?, email = ?, role = ?, phone = ?, ci = ?, permissions = ? WHERE id = ?',
+        [name, email, role, phone || null, ci || null, permissionsStr, id]
       );
     }
 
@@ -321,7 +345,7 @@ router.put('/staff/:id', authenticate, async (req: AuthRequest, res: Response) =
       userRole: req.user?.role,
       actionType: 'staff_crud',
       title: `Personal Actualizado (ID #${id}): ${name}`,
-      details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}`
+      details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}, Permisos: ${permissionsStr || 'Por defecto'}`
     });
 
     res.json({ message: 'Usuario de personal actualizado con éxito' });
