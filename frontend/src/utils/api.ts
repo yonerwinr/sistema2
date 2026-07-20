@@ -281,12 +281,12 @@ export const api = {
     sendManualReminder: (id: number) => request<{ message: string }>(`/sales/${id}/remind`, {
       method: 'POST',
     }),
-    getExchangeRates: () => request<{ usdToVes: number; eurToVes: number }>('/sales/settings/rates'),
-    updateExchangeRates: (body: { usdToVes: number; eurToVes: number }) => request<{ message: string }>('/sales/settings/rates', {
+    getExchangeRates: () => request<{ usdToVes: number; eurToVes: number; binanceUsdToVes: number }>('/sales/settings/rates'),
+    updateExchangeRates: (body: { usdToVes: number; eurToVes: number; binanceUsdToVes?: number }) => request<{ message: string }>('/sales/settings/rates', {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
-    syncExchangeRates: () => request<{ message: string; rates: { usdToVes: number; eurToVes: number } }>('/sales/settings/rates/sync', {
+    syncExchangeRates: () => request<{ message: string; rates: { usdToVes: number; eurToVes: number; binanceUsdToVes: number } }>('/sales/settings/rates/sync', {
       method: 'POST',
     }),
   },

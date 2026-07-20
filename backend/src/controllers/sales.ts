@@ -938,17 +938,20 @@ router.post('/:id/remind', authenticate, async (req: AuthRequest, res: Response)
 // Obtener tasas de cambio (Público)
 router.get('/settings/rates', async (req, res) => {
   try {
-    const [rows]: any = await pool.query('SELECT * FROM settings WHERE settings_key IN (?, ?)', [
+    const [rows]: any = await pool.query('SELECT * FROM settings WHERE settings_key IN (?, ?, ?)', [
       'usd_to_ves_rate',
-      'eur_to_ves_rate'
+      'eur_to_ves_rate',
+      'binance_usd_to_ves_rate'
     ]);
 
     const usdRate = rows.find((r: any) => r.settings_key === 'usd_to_ves_rate')?.settings_value || '40.00';
     const eurRate = rows.find((r: any) => r.settings_key === 'eur_to_ves_rate')?.settings_value || '43.50';
+    const binanceRate = rows.find((r: any) => r.settings_key === 'binance_usd_to_ves_rate')?.settings_value || '44.50';
 
     res.json({
       usdToVes: parseFloat(usdRate),
-      eurToVes: parseFloat(eurRate)
+      eurToVes: parseFloat(eurRate),
+      binanceUsdToVes: parseFloat(binanceRate)
     });
   } catch (error) {
     console.error('Error al obtener tasas de cambio:', error);
@@ -962,7 +965,7 @@ router.put('/settings/rates', authenticate, async (req: AuthRequest, res: Respon
     return res.status(403).json({ message: 'No autorizado' });
   }
 
-  const { usdToVes, eurToVes } = req.body;
+  const { usdToVes, eurToVes, binanceUsdToVes } = req.body;
 
   if (usdToVes === undefined || eurToVes === undefined) {
     return res.status(400).json({ message: 'Por favor complete todos los datos' });
@@ -977,6 +980,12 @@ router.put('/settings/rates', authenticate, async (req: AuthRequest, res: Respon
       'INSERT INTO settings (settings_key, settings_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE settings_value = ?',
       ['eur_to_ves_rate', eurToVes.toString(), eurToVes.toString()]
     );
+    if (binanceUsdToVes !== undefined) {
+      await pool.query(
+        'INSERT INTO settings (settings_key, settings_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE settings_value = ?',
+        ['binance_usd_to_ves_rate', binanceUsdToVes.toString(), binanceUsdToVes.toString()]
+      );
+    }
 
     res.json({ message: 'Tasas de cambio actualizadas con éxito' });
   } catch (error) {

@@ -51,6 +51,9 @@ let posCustomerEmail = '';
 let posCustomerPhone = '';
 let rateUsdToVes = 40.00;
 let rateEurToVes = 43.50;
+let rateBinanceToVes = 44.50;
+let posApplyCurrencyDiscount = false;
+let posCurrencyDiscount = 0;
 
 // Instancias de Chart.js para destruirlas al cambiar de pestaña
 let revenueChartInstance: Chart | null = null;
@@ -107,6 +110,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const rates = await api.sales.getExchangeRates();
     rateUsdToVes = rates.usdToVes;
     rateEurToVes = rates.eurToVes;
+    rateBinanceToVes = rates.binanceUsdToVes || (rates.usdToVes * 1.08);
   } catch (e) {
     console.error('Error al cargar tasas de cambio en el arranque:', e);
   }
@@ -1754,20 +1758,24 @@ function renderAdminDashboard(): string {
           <!-- Tasas de Cambio Widget -->
           <div class="card" style="margin-top: 20px; padding: 12px; font-size:11px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
             <div style="font-weight:700; margin-bottom: 8px; display:flex; align-items:center; gap:4px; color:var(--primary);">
-              💵 Tasas del Día (BCV)
+              💵 Tasas BCV & Binance
             </div>
             <div style="display:flex; flex-direction:column; gap:6px;">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                <span>$ a Bs:</span>
+                <span>$ BCV:</span>
                 <input type="number" step="0.01" id="rate-usd-input" value="${rateUsdToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                <span>€ a Bs:</span>
+                <span>€ BCV:</span>
                 <input type="number" step="0.01" id="rate-eur-input" value="${rateEurToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
               </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; color:#f59e0b;">
+                <span>🟡 Binance:</span>
+                <input type="number" step="0.01" id="rate-binance-input" value="${rateBinanceToVes}" style="width:70px; padding:2px 6px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:4px; color:#f59e0b; text-align:right; font-size:11px; font-weight:700;">
+              </div>
               <div style="display:flex; gap:4px;">
-                <button type="button" class="btn btn-secondary" id="sync-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:45%; background:rgba(255,255,255,0.05); color:white; border-color:var(--border-glass);" title="Sincronizar automáticamente con el BCV">
-                  🔄 BCV
+                <button type="button" class="btn btn-secondary" id="sync-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:45%; background:rgba(255,255,255,0.05); color:white; border-color:var(--border-glass);" title="Sincronizar automáticamente con el BCV y Binance P2P">
+                  🔄 Auto
                 </button>
                 <button type="button" class="btn btn-primary" id="save-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:55%;">
                   Guardar
@@ -1893,12 +1901,13 @@ async function bindAdminEvents() {
     await renderAdminStaff();
   }
 
-  // Guardar Tasas de Cambio Manuales
+  // Guardar Tasas de Cambio Manuales (BCV & Binance)
   document.getElementById('save-rates-btn')?.addEventListener('click', async () => {
     const usdVal = parseFloat((document.getElementById('rate-usd-input') as HTMLInputElement).value);
     const eurVal = parseFloat((document.getElementById('rate-eur-input') as HTMLInputElement).value);
+    const binanceVal = parseFloat((document.getElementById('rate-binance-input') as HTMLInputElement).value);
 
-    if (isNaN(usdVal) || usdVal <= 0 || isNaN(eurVal) || eurVal <= 0) {
+    if (isNaN(usdVal) || usdVal <= 0 || isNaN(eurVal) || eurVal <= 0 || isNaN(binanceVal) || binanceVal <= 0) {
       alert('Por favor ingrese tasas válidas mayores a 0.');
       return;
     }
@@ -1908,10 +1917,11 @@ async function bindAdminEvents() {
     btn.innerText = '...';
 
     try {
-      await api.sales.updateExchangeRates({ usdToVes: usdVal, eurToVes: eurVal });
+      await api.sales.updateExchangeRates({ usdToVes: usdVal, eurToVes: eurVal, binanceUsdToVes: binanceVal });
       rateUsdToVes = usdVal;
       rateEurToVes = eurVal;
-      alert('Tasas de cambio oficiales guardadas con éxito.');
+      rateBinanceToVes = binanceVal;
+      alert('Tasas de cambio oficiales (BCV & Binance) guardadas con éxito.');
       navigate('admin'); // Recargar vista admin para refrescar todo
     } catch (err: any) {
       alert(err.message || 'Error al actualizar tasas de cambio.');
@@ -1920,7 +1930,7 @@ async function bindAdminEvents() {
     }
   });
 
-  // Sincronizar Tasas de Cambio Automáticamente desde el BCV
+  // Sincronizar Tasas de Cambio Automáticamente desde el BCV y Binance
   document.getElementById('sync-rates-btn')?.addEventListener('click', async () => {
     const btn = document.getElementById('sync-rates-btn') as HTMLButtonElement;
     const saveBtn = document.getElementById('save-rates-btn') as HTMLButtonElement;
@@ -1933,21 +1943,24 @@ async function bindAdminEvents() {
       const res = await api.sales.syncExchangeRates();
       rateUsdToVes = res.rates.usdToVes;
       rateEurToVes = res.rates.eurToVes;
+      rateBinanceToVes = res.rates.binanceUsdToVes;
       
       // Actualizar inputs si existen en pantalla
       const usdInput = document.getElementById('rate-usd-input') as HTMLInputElement;
       const eurInput = document.getElementById('rate-eur-input') as HTMLInputElement;
+      const binanceInput = document.getElementById('rate-binance-input') as HTMLInputElement;
       if (usdInput) usdInput.value = rateUsdToVes.toString();
       if (eurInput) eurInput.value = rateEurToVes.toString();
+      if (binanceInput) binanceInput.value = rateBinanceToVes.toString();
 
-      alert(`Tasas oficiales sincronizadas con el BCV con éxito!\n\nDólar: Bs. ${rateUsdToVes.toFixed(2)}\nEuro: Bs. ${rateEurToVes.toFixed(2)}`);
+      alert(`¡Tasas sincronizadas con éxito desde el BCV y Binance P2P!\n\nBCV Dólar: Bs. ${rateUsdToVes.toFixed(2)}\nBCV Euro: Bs. ${rateEurToVes.toFixed(2)}\nBinance USDT: Bs. ${rateBinanceToVes.toFixed(2)}`);
       navigate('admin');
     } catch (err: any) {
-      alert(err.message || 'Error al conectar con el servidor para sincronizar tasas BCV.');
+      alert(err.message || 'Error al conectar con el servidor para sincronizar tasas.');
     } finally {
       btn.disabled = false;
       saveBtn.disabled = false;
-      btn.innerText = '🔄 BCV';
+      btn.innerText = '🔄 Auto';
     }
   });
 }
@@ -2168,8 +2181,16 @@ async function renderAdminPOS() {
     
     // Cálculos de totales
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const currencyDiffRatio = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
+      ? (1 - (rateUsdToVes / rateBinanceToVes))
+      : 0;
+    const autoCurrencyDiscountAmount = posSubtotal * currencyDiffRatio;
+    const effectiveCurrencyDiscount = posApplyCurrencyDiscount
+      ? (posCurrencyDiscount > 0 ? posCurrencyDiscount : autoCurrencyDiscountAmount)
+      : 0;
+
     const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
-    const totalDiscount = couponDiscountAmount + posDiscount;
+    const totalDiscount = couponDiscountAmount + posDiscount + effectiveCurrencyDiscount;
     const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
     const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
     const posTotal = taxableSubtotal + taxAmount;
@@ -2283,6 +2304,33 @@ async function renderAdminPOS() {
               </select>
             </div>
 
+            <!-- Descuento de Divisas (Tasa Paralela / Binance P2P) -->
+            <div class="card mb-3" style="padding: 10px 12px; background: rgba(245, 158, 11, 0.04); border: 1px solid rgba(245, 158, 11, 0.25);">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="checkbox" id="pos-apply-currency-discount" ${posApplyCurrencyDiscount ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #f59e0b; cursor: pointer;">
+                  <div>
+                    <label for="pos-apply-currency-discount" style="font-size: 11px; font-weight: 700; color: #f59e0b; margin: 0; cursor: pointer;">
+                      💵 Descuento de Divisas (Tasa Binance)
+                    </label>
+                    <div style="font-size: 10px; color: var(--text-muted);">
+                      BCV: Bs. ${rateUsdToVes.toFixed(2)} vs Binance: Bs. ${rateBinanceToVes.toFixed(2)} (${(currencyDiffRatio * 100).toFixed(1)}% dif.)
+                    </div>
+                  </div>
+                </div>
+                <div style="font-weight: 700; font-size: 12px; color: #f59e0b; white-space: nowrap;">
+                  -$${autoCurrencyDiscountAmount.toFixed(2)}
+                </div>
+              </div>
+
+              ${posApplyCurrencyDiscount ? `
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 6px; border-top: 1px dashed rgba(245, 158, 11, 0.2); padding-top: 6px;">
+                  <span style="font-size: 10px; color: var(--text-secondary);">Monto Manual Descuento ($):</span>
+                  <input type="number" step="0.01" min="0" class="form-control" id="pos-currency-discount-input" style="padding: 4px 8px; font-size: 11px; width: 100px; text-align: right;" placeholder="${autoCurrencyDiscountAmount.toFixed(2)}" value="${posCurrencyDiscount > 0 ? posCurrencyDiscount : ''}">
+                </div>
+              ` : ''}
+            </div>
+
             <!-- Descuento y Cupón -->
             <div class="grid-2 gap-2 mb-2">
               <div class="form-group">
@@ -2328,9 +2376,15 @@ async function renderAdminPOS() {
                 <span>Subtotal</span>
                 <span>$${posSubtotal.toFixed(2)}</span>
               </div>
+              ${effectiveCurrencyDiscount > 0 ? `
+              <div class="flex justify-between mb-1" style="color: #f59e0b; font-weight: 600;">
+                <span>Descuento Divisas (Binance)</span>
+                <span>-$${effectiveCurrencyDiscount.toFixed(2)}</span>
+              </div>
+              ` : ''}
               ${totalDiscount > 0 ? `
               <div class="flex justify-between mb-1" style="color: var(--danger);">
-                <span>Descuento</span>
+                <span>Descuento Total</span>
                 <span>-$${totalDiscount.toFixed(2)}</span>
               </div>
               ` : ''}
@@ -2561,6 +2615,20 @@ function bindPOSEvents() {
     }
   });
 
+  // Descuento de Divisas (Tasa Paralela / Binance P2P)
+  const applyCurrencyDiscountCb = document.getElementById('pos-apply-currency-discount') as HTMLInputElement;
+  applyCurrencyDiscountCb?.addEventListener('change', async (e) => {
+    posApplyCurrencyDiscount = (e.target as HTMLInputElement).checked;
+    await renderAdminPOS();
+  });
+
+  const currencyDiscountInput = document.getElementById('pos-currency-discount-input') as HTMLInputElement;
+  currencyDiscountInput?.addEventListener('change', async (e) => {
+    const val = parseFloat((e.target as HTMLInputElement).value);
+    posCurrencyDiscount = isNaN(val) ? 0 : val;
+    await renderAdminPOS();
+  });
+
   // Descuento Fijo
   const discountInput = document.getElementById('pos-discount-input') as HTMLInputElement;
   discountInput?.addEventListener('change', async (e) => {
@@ -2648,8 +2716,16 @@ function bindPOSEvents() {
 
     // Totales finales a pasar
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const currencyDiffRatio = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
+      ? (1 - (rateUsdToVes / rateBinanceToVes))
+      : 0;
+    const autoCurrencyDiscountAmount = posSubtotal * currencyDiffRatio;
+    const effectiveCurrencyDiscount = posApplyCurrencyDiscount
+      ? (posCurrencyDiscount > 0 ? posCurrencyDiscount : autoCurrencyDiscountAmount)
+      : 0;
+
     const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
-    const totalDiscount = couponDiscountAmount + posDiscount;
+    const totalDiscount = couponDiscountAmount + posDiscount + effectiveCurrencyDiscount;
     const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
     const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
 
@@ -2676,6 +2752,8 @@ function bindPOSEvents() {
       posSearchQuery = '';
       posSelectedCustomerId = null;
       posDiscount = 0;
+      posApplyCurrencyDiscount = false;
+      posCurrencyDiscount = 0;
       posApplyTax = true;
       posCouponCode = '';
       posCouponDiscountPercent = 0;
