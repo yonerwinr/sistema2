@@ -11,6 +11,27 @@ const sheets_1 = require("../services/sheets");
 const rates_1 = require("../services/rates");
 const audit_1 = require("../services/audit");
 const router = (0, express_1.Router)();
+// GET /sales/audit-logs: Obtener audit_logs y ventas para el histórico global
+router.get('/audit-logs', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
+        return res.status(403).json({ message: 'No autorizado' });
+    }
+    try {
+        const [logs] = await db_1.default.query('SELECT * FROM audit_logs ORDER BY created_at DESC');
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name AS seller_name 
+       FROM sales s 
+       LEFT JOIN users u ON s.seller_id = u.id 
+       ORDER BY s.created_at DESC`);
+        res.json({
+            logs: logs || [],
+            sales: sales || []
+        });
+    }
+    catch (error) {
+        console.error('Error al obtener histórico y auditoría:', error);
+        res.status(500).json({ message: 'Error al obtener histórico del sistema', error: error.message });
+    }
+});
 // Middleware de autenticación opcional para compras (permite compras de invitados y POS sin iniciar sesión si es necesario, o POS por Admin)
 // Para POS requerimos Admin, para Online podemos requerir usuario autenticado o permitir invitados.
 // Hagamos una ruta limpia:
