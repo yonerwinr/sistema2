@@ -3319,15 +3319,15 @@ function bindProductCRUDEvents() {
     }
   }
 
-  // Escuchar cambios de fecha para actualizar automáticamente las tasas de esa fecha
-  document.getElementById('calc-purchase-date')?.addEventListener('change', async (e) => {
+  // Escuchar cambios de fecha para actualizar automáticamente las tasas de esa fecha sin recargar la página
+  const handlePurchaseDateChange = async (e: Event) => {
     const selectedDate = (e.target as HTMLInputElement).value;
     if (selectedDate) {
+      const bcvInput = document.getElementById('calc-bcv-rate') as HTMLInputElement;
+      const binanceInput = document.getElementById('calc-binance-rate') as HTMLInputElement;
+
       try {
         const rates = await api.sales.getHistoricalExchangeRates(selectedDate);
-        const bcvInput = document.getElementById('calc-bcv-rate') as HTMLInputElement;
-        const binanceInput = document.getElementById('calc-binance-rate') as HTMLInputElement;
-
         if (bcvInput && rates.usdToVes > 0) {
           bcvInput.value = rates.usdToVes.toFixed(2);
         }
@@ -3340,7 +3340,11 @@ function bindProductCRUDEvents() {
         console.error('Error al obtener tasas de la fecha seleccionada:', err);
       }
     }
-  });
+  };
+
+  const purchaseDateElem = document.getElementById('calc-purchase-date');
+  purchaseDateElem?.addEventListener('change', handlePurchaseDateChange);
+  purchaseDateElem?.addEventListener('input', handlePurchaseDateChange);
 
   // Toggle para caja de texto de nueva categoría
   const categorySelect = document.getElementById('prod-category-select') as HTMLSelectElement;

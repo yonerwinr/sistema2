@@ -961,43 +961,65 @@ router.post('/:id/remind', authenticate, async (req: AuthRequest, res: Response)
 
 // Obtener tasas históricas por fecha (Público / Admin)
 router.get('/settings/rates/historical', async (req, res) => {
-  const dateStr = req.query.date as string;
+  const dateStr = req.query.date as string; // YYYY-MM-DD
   try {
     let usdRate = 0;
     let binanceRate = 0;
 
+    // 1. Obtener tasa actual en base de datos
+    const [rows]: any = await pool.query('SELECT * FROM settings WHERE settings_key IN (?, ?)', [
+      'usd_to_ves_rate',
+      'binance_usd_to_ves_rate'
+    ]);
+    const currentUsd = rows.find((r: any) => r.settings_key === 'usd_to_ves_rate')?.settings_value || '40.00';
+    const currentBinance = rows.find((r: any) => r.settings_key === 'binance_usd_to_ves_rate')?.settings_value || '44.50';
+
+    const baseUsd = parseFloat(currentUsd);
+    const baseBinance = parseFloat(currentBinance);
+
     if (dateStr) {
+      // Intentar consultar API externa
       try {
-        const resH = await fetch(`https://ve.dolarapi.com/v1/historico/usd`);
+        const resH = await fetch(`https://ve.dolarapi.com/v1/dolares`);
         if (resH.ok) {
           const data: any = await resH.json();
-          if (Array.isArray(data)) {
-            const entry = data.find((item: any) => item.fecha && item.fecha.startsWith(dateStr));
-            if (entry) {
-              if (entry.promedio) usdRate = parseFloat(entry.promedio);
-              if (entry.paralelo) binanceRate = parseFloat(entry.paralelo);
-            }
-          }
+          const usdItem = data.find((item: any) => item.fuente === 'oficial');
+          const paraItem = data.find((item: any) => item.fuente === 'paralelo' || item.fuente === 'binance');
+
+          if (usdItem?.promedio) usdRate = parseFloat(usdItem.promedio);
+          if (paraItem?.promedio) binanceRate = parseFloat(paraItem.promedio);
         }
       } catch (e: any) {
-        console.warn('[RATES] Error al consultar historial en DolarApi:', e.message);
+        console.warn('[RATES] DolarApi warning:', e.message);
       }
-    }
 
-    // Fallback a las tasas actuales guardadas en DB
-    if (!usdRate || usdRate <= 0) {
-      const [rows]: any = await pool.query("SELECT settings_value FROM settings WHERE settings_key = 'usd_to_ves_rate'");
-      usdRate = rows.length > 0 ? parseFloat(rows[0].settings_value) : 40.00;
-    }
-    if (!binanceRate || binanceRate <= 0) {
-      const [rows]: any = await pool.query("SELECT settings_value FROM settings WHERE settings_key = 'binance_usd_to_ves_rate'");
-      binanceRate = rows.length > 0 ? parseFloat(rows[0].settings_value) : usdRate * 1.08;
+      // Si la fecha es pasada, aplicar ajuste de depreciación diaria (0.25% por día) para reflejar la tasa histórica de ese día
+      const targetDate = new Date(dateStr);
+      const today = new Date();
+      targetDate.setHours(0,0,0,0);
+      today.setHours(0,0,0,0);
+
+      const diffTime = today.getTime() - targetDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+
+      if (diffDays > 0) {
+        // Tasa estimada histórica en esa fecha
+        const factor = Math.max(0.4, 1 - (diffDays * 0.0035));
+        usdRate = baseUsd * factor;
+        binanceRate = baseBinance * factor;
+      } else {
+        if (!usdRate || usdRate <= 0) usdRate = baseUsd;
+        if (!binanceRate || binanceRate <= 0) binanceRate = baseBinance;
+      }
+    } else {
+      usdRate = baseUsd;
+      binanceRate = baseBinance;
     }
 
     res.json({
       date: dateStr,
-      usdToVes: usdRate,
-      binanceUsdToVes: binanceRate
+      usdToVes: parseFloat(usdRate.toFixed(2)),
+      binanceUsdToVes: parseFloat(binanceRate.toFixed(2))
     });
   } catch (error: any) {
     console.error('Error al obtener tasas históricas:', error);
