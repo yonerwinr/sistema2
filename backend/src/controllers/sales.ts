@@ -185,7 +185,7 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
     return res.status(403).json({ message: 'No autorizado. Solo administradores y vendedores pueden registrar ventas POS' });
   }
 
-  const { customerName, customerEmail, customerPhone, customerCi, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId } = req.body;
+  const { customerName, customerEmail, customerPhone, customerCi, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId, concept, note } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'Debe agregar al menos un producto' });
@@ -313,7 +313,9 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
           is_quotation = ?, 
           amount_paid = ?,
           coupon_code = ?,
-          seller_id = ?
+          seller_id = ?,
+          concept = ?,
+          note = ?
          WHERE id = ?`,
         [
           customerUserId || null,
@@ -330,13 +332,15 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
           finalAmountPaid,
           couponCode ? couponCode.toUpperCase().trim() : null,
           req.user?.id || null,
+          concept || null,
+          note || null,
           saleId
         ]
       );
     } else {
       // Registrar la venta nueva
       const [saleResult]: any = await conn.query(
-        'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, customer_ci, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code, seller_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, customer_ci, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code, seller_id, concept, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           customerUserId || null,
           customerName || 'Consumidor Final',
@@ -352,7 +356,9 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
           isQuotation ? 1 : 0,
           finalAmountPaid,
           couponCode ? couponCode.toUpperCase().trim() : null,
-          req.user?.id || null
+          req.user?.id || null,
+          concept || null,
+          note || null
         ]
       );
       saleId = saleResult.insertId;

@@ -239,6 +239,8 @@ export const api = {
       amountPaid?: number;
       couponCode?: string;
       loadedQuotationId?: number;
+      concept?: string;
+      note?: string;
     }) => request<SaleResult>('/sales/pos', {
       method: 'POST',
       body: JSON.stringify(body),

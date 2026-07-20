@@ -154,7 +154,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
     if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
         return res.status(403).json({ message: 'No autorizado. Solo administradores y vendedores pueden registrar ventas POS' });
     }
-    const { customerName, customerEmail, customerPhone, customerCi, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId } = req.body;
+    const { customerName, customerEmail, customerPhone, customerCi, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId, concept, note } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: 'Debe agregar al menos un producto' });
     }
@@ -262,7 +262,9 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
           is_quotation = ?, 
           amount_paid = ?,
           coupon_code = ?,
-          seller_id = ?
+          seller_id = ?,
+          concept = ?,
+          note = ?
          WHERE id = ?`, [
                 customerUserId || null,
                 customerName || 'Consumidor Final',
@@ -278,12 +280,14 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
                 finalAmountPaid,
                 couponCode ? couponCode.toUpperCase().trim() : null,
                 req.user?.id || null,
+                concept || null,
+                note || null,
                 saleId
             ]);
         }
         else {
             // Registrar la venta nueva
-            const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, customer_ci, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code, seller_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+            const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, customer_ci, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code, seller_id, concept, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
                 customerUserId || null,
                 customerName || 'Consumidor Final',
                 customerEmail || null,
@@ -298,7 +302,9 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
                 isQuotation ? 1 : 0,
                 finalAmountPaid,
                 couponCode ? couponCode.toUpperCase().trim() : null,
-                req.user?.id || null
+                req.user?.id || null,
+                concept || null,
+                note || null
             ]);
             saleId = saleResult.insertId;
         }

@@ -80,6 +80,14 @@ async function runMigrations() {
                 await conn.query('ALTER TABLE sales ADD COLUMN customer_ci VARCHAR(30) NULL');
                 console.log('Columna "customer_ci" agregada a la tabla sales.');
             }
+            if (!salesColNames.includes('concept')) {
+                await conn.query('ALTER TABLE sales ADD COLUMN concept VARCHAR(255) NULL');
+                console.log('Columna "concept" agregada a la tabla sales.');
+            }
+            if (!salesColNames.includes('note')) {
+                await conn.query('ALTER TABLE sales ADD COLUMN note TEXT NULL');
+                console.log('Columna "note" agregada a la tabla sales.');
+            }
         }
         catch (err) {
             console.error('Error al agregar columna customer_ci a la tabla sales:', err.message);

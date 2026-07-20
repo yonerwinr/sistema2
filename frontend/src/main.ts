@@ -56,6 +56,7 @@ let posApplyCurrencyDiscount = false;
 let posCurrencyDiscount = 0;
 let posConfirmedUnregisteredWarning = false;
 let showFreeSaleModal = false;
+let showExpenseModal = false;
 
 // Instancias de Chart.js para destruirlas al cambiar de pestaña
 let revenueChartInstance: Chart | null = null;
@@ -2198,230 +2199,216 @@ async function renderAdminPOS() {
     const posTotal = taxableSubtotal + taxAmount;
 
     panel.innerHTML = `
-      <div class="pos-layout animate-on-scroll animate-fade-up visible">
-        <!-- Columna de Productos -->
+      <!-- Barra Superior de Acciones POS -->
+      <div class="flex justify-between align-center mb-3">
+        <div class="flex gap-2">
+          ${currentUser?.role === 'admin' ? `
+            <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:12px; font-weight:700; padding:8px 14px; border-radius:8px;">
+              ➕ Nueva Venta Libre
+            </button>
+          ` : ''}
+          <button type="button" class="btn btn-danger" id="open-expense-btn" style="background:#ef4444; border:none; color:white; font-size:12px; font-weight:700; padding:8px 14px; border-radius:8px;">
+            🔴 Nuevo Gasto
+          </button>
+        </div>
+
+        <div style="font-size:12px; color:var(--text-secondary);">
+          Vendedor: <strong>${currentUser?.name || 'Admin'}</strong>
+        </div>
+      </div>
+
+      <div class="pos-layout animate-on-scroll animate-fade-up visible" style="display:grid; grid-template-columns: 1fr 420px; gap:20px;">
+        <!-- Columna de Productos (Izquierda) -->
         <div class="pos-products-column">
-          <div class="pos-search-bar" style="display:flex; gap:8px;">
-            <input type="text" class="form-control" id="pos-search-input" placeholder="Buscar productos..." value="${posSearchQuery}" style="flex-grow:1;">
-            ${currentUser?.role === 'admin' ? `
-              <button type="button" class="btn btn-secondary" id="open-free-sale-btn" style="background:rgba(245, 158, 11, 0.15); border:1px solid rgba(245, 158, 11, 0.3); color:#f59e0b; font-size:12px; font-weight:700; white-space:nowrap; padding: 8px 12px;" title="Facturar producto o servicio no registrado">
-                ➕ Venta Libre
-              </button>
-            ` : ''}
+          <div class="pos-search-bar mb-3">
+            <input type="text" class="form-control" id="pos-search-input" placeholder="🔍 Buscar por nombre o código de producto..." value="${posSearchQuery}" style="font-size:14px; padding:10px 14px;">
           </div>
 
-          <div class="pos-products-grid stagger-container">
+          <div class="pos-products-grid stagger-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:12px;">
             ${posProducts.map(prod => `
-              <div class="card pos-product-card add-to-pos-cart" data-id="${prod.id}">
-                <img src="${prod.image_url}" alt="${prod.name}">
-                <div class="pos-product-name">${prod.name}</div>
-                <div style="font-weight:700; color:var(--primary);">$${Number(prod.price).toFixed(2)}</div>
-                <div style="font-size:11px; color:var(--text-muted);">Stock: ${prod.stock}</div>
+              <div class="card pos-product-card add-to-pos-cart" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease;">
+                <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:90px; object-fit:cover; border-radius:8px; margin-bottom:6px;">
+                <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.name}</div>
+                <div style="font-weight:800; color:var(--primary); font-size:13px; margin-top:2px;">$${Number(prod.price).toFixed(2)}</div>
+                <div style="font-size:10px; color:var(--text-muted);">Stock: ${prod.stock}</div>
               </div>
             `).join('')}
             ${posProducts.length === 0 ? '<p style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-secondary);">No se encontraron productos.</p>' : ''}
           </div>
         </div>
 
-        <!-- Columna de Carrito POS -->
-        <div class="pos-cart-column">
-          <!-- Card de Cliente Identificado -->
-          <div class="card mb-3" style="padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cliente Asignado:</div>
-              <div style="font-size:13px; font-weight:700; color:var(--primary);">
-                👤 ${posCustomerName || 'Consumidor Final'} ${posCustomerCi ? `(${posCustomerCi})` : ''}
-              </div>
-            </div>
-            <button type="button" class="btn btn-secondary" id="change-pos-client-btn" style="padding:4px 8px; font-size:11px;">
-              🆔 Cambiar Cliente
-            </button>
+        <!-- Columna de Carrito & Datos de Pago (Derecha) -->
+        <div class="pos-cart-column" style="background:#111827; border:1px solid var(--border-glass); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:14px;">
+          
+          <!-- Encabezado de Productos & Vaciar Canasta -->
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:8px;">
+            <span style="font-size:15px; font-weight:800; color:white;">Productos (${posCart.reduce((sum, i) => sum + i.quantity, 0)})</span>
+            ${posCart.length > 0 ? `
+              <button type="button" id="clear-pos-cart-btn" style="background:none; border:none; color:#f87171; font-size:12px; text-decoration:underline; cursor:pointer; font-weight:600;">
+                Vaciar canasta
+              </button>
+            ` : ''}
           </div>
 
-          <h3 style="font-size:18px; font-weight:700;">Venta POS Actual</h3>
-          
-          <div class="pos-cart-items">
+          <!-- Items en Canasta -->
+          <div class="pos-cart-items" style="max-height:260px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
             ${posCart.map(item => `
-              <div class="pos-cart-item">
-                <div style="flex-grow:1; max-width: 60%;">
-                  <div style="font-size:13px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; overflow:hidden;">${item.product.name}</div>
-                  <div style="font-size:11px; color:var(--text-secondary);">$${Number(item.product.price).toFixed(2)} c/u</div>
+              <div class="pos-cart-item" style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:10px; border-radius:10px; display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <img src="${item.product.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" style="width:36px; height:36px; object-fit:cover; border-radius:6px;">
+                    <div style="font-size:12px; font-weight:700; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.product.name}</div>
+                  </div>
+                  <button type="button" class="btn btn-danger remove-pos-item" data-id="${item.product.id}" style="padding:2px 6px; font-size:10px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;" title="Eliminar del carrito">
+                    🗑️
+                  </button>
                 </div>
-                <div class="flex align-center gap-2">
-                  <button class="qty-btn dec-pos-qty" data-id="${item.product.id}">${icons.minus}</button>
-                  <span style="font-size:13px; font-weight:600;">${item.quantity}</span>
-                  <button class="qty-btn inc-pos-qty" data-id="${item.product.id}">${icons.plus}</button>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:4px;">
+                  <div class="flex align-center gap-1" style="border:1px solid var(--border-glass); border-radius:6px; padding:2px 4px;">
+                    <button type="button" class="qty-btn dec-pos-qty" data-id="${item.product.id}" style="width:24px; height:24px; font-weight:800; border:none; background:none; color:white; cursor:pointer;">-</button>
+                    <span style="font-size:12px; font-weight:700; min-width:20px; text-align:center;">${item.quantity}</span>
+                    <button type="button" class="qty-btn inc-pos-qty" data-id="${item.product.id}" style="width:24px; height:24px; font-weight:800; border:none; background:none; color:white; cursor:pointer;">+</button>
+                  </div>
+
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="font-size:11px; color:var(--text-muted);">$</span>
+                    <input type="number" step="0.01" min="0.01" class="form-control change-pos-price" data-id="${item.product.id}" value="${Number(item.product.price).toFixed(2)}" style="width:70px; padding:2px 6px; font-size:12px; text-align:right; font-weight:700;">
+                  </div>
                 </div>
-                <div style="font-weight:700; font-size:13px; min-width:60px; text-align:right;">
-                  $${(item.product.price * item.quantity).toFixed(2)}
+
+                <div style="font-size:10px; color:var(--text-muted); text-align:left;">
+                  Precio por ${item.quantity} unidades: <strong>$${(item.product.price * item.quantity).toFixed(2)}</strong>
                 </div>
               </div>
             `).join('')}
-            ${posCart.length === 0 ? `<div style="text-align:center; padding:60px 0; color:var(--text-secondary);">El POS esta vacio. Selecciona productos.</div>` : ''}
+            ${posCart.length === 0 ? `<div style="text-align:center; padding:30px 0; color:var(--text-secondary); font-size:13px;">La canasta está vacía. Selecciona productos.</div>` : ''}
           </div>
 
           <!-- Checkout POS Form -->
-          <form id="pos-checkout-form">
-            <div class="form-group mb-2">
-              <label class="form-label" style="font-size:10px;">Seleccionar Cliente Registrado</label>
-              <select class="form-control" id="pos-client-select" style="padding: 8px 12px; font-size:13px;">
-                <option value="">-- Consumidor Final / Invitado --</option>
-                ${posCustomersList.map(c => `
-                  <option value="${c.id}" ${posSelectedCustomerId === c.id ? 'selected' : ''}>${c.name} (${c.email})</option>
-                `).join('')}
-              </select>
-            </div>
+          <form id="pos-checkout-form" style="display:flex; flex-direction:column; gap:12px;">
             
-            <div class="form-group mb-2">
-              <label class="form-label" style="font-size:10px;">Nombre Cliente</label>
-              <input type="text" class="form-control" id="pos-client-name" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. Consumidor Final" value="${posCustomerName || (posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.name || '') : 'Consumidor Final')}">
-            </div>
-            <div class="form-group mb-2">
-              <label class="form-label" style="font-size:10px;">Cédula de Identidad / RIF</label>
-              <div style="display: flex; gap: 6px;">
-                <select class="form-control" id="pos-client-ci-prefix" style="width: 70px; padding: 8px 6px; font-size:12px; font-weight:700; flex-shrink: 0;">
-                  <option value="V-" ${posCustomerCi.startsWith('V-') ? 'selected' : ''}>V-</option>
-                  <option value="E-" ${posCustomerCi.startsWith('E-') ? 'selected' : ''}>E-</option>
-                  <option value="J-" ${posCustomerCi.startsWith('J-') ? 'selected' : ''}>J-</option>
-                  <option value="G-" ${posCustomerCi.startsWith('G-') ? 'selected' : ''}>G-</option>
-                </select>
-                <input type="text" class="form-control" id="pos-client-ci-num" style="padding: 8px 12px; font-size:13px; flex-grow: 1;" placeholder="12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" value="${posCustomerCi ? posCustomerCi.replace(/^[VEJG]-/, '') : ''}">
-              </div>
-            </div>
-            <div class="form-group mb-2">
-              <label class="form-label" style="font-size:10px;">Correo (Opcional para Factura)</label>
-              <input type="email" class="form-control" id="pos-client-email" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. cliente@correo.com" value="${posCustomerEmail || (posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.email || '') : '')}">
-            </div>
-            <div class="form-group mb-2">
-              <label class="form-label" style="font-size:10px;">WhatsApp/Telefono (Opcional)</label>
-              <input type="tel" class="form-control" id="pos-client-phone" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. +584120000000" value="${posCustomerPhone || (posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.phone || '') : '')}">
-            </div>
-            <div class="form-group mb-2">
-              <label class="form-label" style="font-size:10px;">Método de Pago</label>
-              <select class="form-control" id="pos-client-payment" style="padding: 8px 12px; font-size:13px;">
-                <option value="efectivo_usd">💵 Efectivo USD ($)</option>
-                <option value="efectivo_ves">💵 Efectivo Bs. (VES)</option>
-                <option value="efectivo_eur">💶 Efectivo EUR (€)</option>
-                <option value="pago_movil">📱 Pago Móvil</option>
-                <option value="zelle">💸 Zelle ($)</option>
-                <option value="punto_de_venta">💳 Punto de Venta (Bs.)</option>
-                <option value="transferencia_ves">🏢 Transferencia Bancaria (Bs.)</option>
-                <option value="paypal">🅿️ PayPal ($)</option>
-                <option value="binance">🔶 Binance Pay</option>
-              </select>
+            <!-- Segmented Toggle: Pagada vs A crédito -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; background:rgba(255,255,255,0.03); padding:4px; border-radius:10px; border:1px solid var(--border-glass);">
+              <button type="button" id="pos-type-paid-btn" class="btn" style="padding:8px; font-size:12px; font-weight:700; border-radius:8px; ${!posIsPending ? 'background:#10b981; color:white;' : 'background:transparent; color:var(--text-muted);'}">
+                Pagada
+              </button>
+              <button type="button" id="pos-type-credit-btn" class="btn" style="padding:8px; font-size:12px; font-weight:700; border-radius:8px; ${posIsPending ? 'background:#ef4444; color:white;' : 'background:transparent; color:var(--text-muted);'}">
+                A crédito
+              </button>
             </div>
 
-            <!-- Descuento de Divisas (Tasa Paralela / Binance P2P) -->
-            <div class="card mb-3" style="padding: 10px 12px; background: rgba(245, 158, 11, 0.04); border: 1px solid rgba(245, 158, 11, 0.25);">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <input type="checkbox" id="pos-apply-currency-discount" ${posApplyCurrencyDiscount ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: #f59e0b; cursor: pointer;">
-                  <div>
-                    <label for="pos-apply-currency-discount" style="font-size: 11px; font-weight: 700; color: #f59e0b; margin: 0; cursor: pointer;">
-                      💵 Descuento de Divisas (Tasa Binance)
-                    </label>
-                    <div style="font-size: 10px; color: var(--text-muted);">
-                      BCV: Bs. ${rateUsdToVes.toFixed(2)} vs Binance: Bs. ${rateBinanceToVes.toFixed(2)} (${(currencyDiffRatio * 100).toFixed(1)}% dif.)
-                    </div>
-                  </div>
-                </div>
-                <div style="font-weight: 700; font-size: 12px; color: #f59e0b; white-space: nowrap;">
-                  -$${autoCurrencyDiscountAmount.toFixed(2)}
-                </div>
+            <!-- Card Multi-moneda & Tasa -->
+            <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.25); border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-size:11px; font-weight:700; color:#10b981;">Activar multi-moneda</div>
+                <input type="checkbox" id="pos-multicurrency-toggle" checked style="width:16px; height:16px; accent-color:#10b981;">
               </div>
 
-              ${posApplyCurrencyDiscount ? `
-                <div style="margin-top: 8px; display: flex; align-items: center; gap: 6px; border-top: 1px dashed rgba(245, 158, 11, 0.2); padding-top: 6px;">
-                  <span style="font-size: 10px; color: var(--text-secondary);">Monto Manual Descuento ($):</span>
-                  <input type="number" step="0.01" min="0" class="form-control" id="pos-currency-discount-input" style="padding: 4px 8px; font-size: 11px; width: 100px; text-align: right;" placeholder="${autoCurrencyDiscountAmount.toFixed(2)}" value="${posCurrencyDiscount > 0 ? posCurrencyDiscount : ''}">
-                </div>
-              ` : ''}
-            </div>
-
-            <!-- Descuento y Cupón -->
-            <div class="grid-2 gap-2 mb-2">
-              <div class="form-group">
-                <label class="form-label" style="font-size:10px;">Descuento Fijo ($)</label>
-                <input type="number" step="0.01" min="0" class="form-control" id="pos-discount-input" style="padding: 8px 12px; font-size:13px;" placeholder="0.00" value="${posDiscount > 0 ? posDiscount : ''}">
-              </div>
-              <div class="form-group">
-                <label class="form-label" style="font-size:10px;">Cupón de Descuento</label>
-                <div style="display: flex; gap: 4px;">
-                  <input type="text" class="form-control" id="pos-coupon-input" style="padding: 8px 12px; font-size:13px; text-transform: uppercase;" placeholder="CÓDIGO" value="${posCouponCode}">
-                  <button type="button" class="btn btn-secondary" id="pos-apply-coupon-btn" style="padding: 0 8px; font-size: 11px;">OK</button>
-                </div>
-              </div>
-            </div>
-            ${posCouponDiscountPercent > 0 ? `<div style="color:var(--success); font-size:10px; margin-bottom:10px;">Cupón aplicado: ${posCouponDiscountPercent}% de descuento</div>` : ''}
-
-            <!-- Opciones Avanzadas (IVA y Cotización) -->
-            <div class="mb-4">
-              <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
-                <input type="checkbox" id="pos-apply-tax" ${posApplyTax ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--primary);">
-                <label for="pos-apply-tax" class="form-label" style="font-size:11px; margin: 0; cursor: pointer;">Aplicar IVA (16%)</label>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                <input type="checkbox" id="pos-is-pending" ${posIsPending ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--danger);">
-                <label for="pos-is-pending" class="form-label" style="font-size:11px; margin: 0; cursor: pointer; color: var(--danger);">Marcar como Deuda / Pago Pendiente</label>
-              </div>
-
-              <div id="pos-initial-payment-box" style="display: ${posIsPending ? 'block' : 'none'}; margin-top: 10px; margin-left: 24px;">
-                <label class="form-label" style="font-size:10px; color: var(--text-secondary);">Abono Inicial / Pago Parcial ($)</label>
-                <input type="number" step="0.01" min="0" class="form-control" id="pos-initial-payment-input" style="padding: 6px 12px; font-size:12px;" placeholder="0.00" value="${posInitialPayment > 0 ? posInitialPayment : ''}">
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                <input type="checkbox" id="pos-is-quotation" style="width: 16px; height: 16px; accent-color: var(--secondary);">
-                <label for="pos-is-quotation" class="form-label" style="font-size:11px; margin: 0; cursor: pointer; color: var(--secondary); font-weight:600;">Registrar como Cotización al Mayor</label>
-              </div>
-            </div>
-
-            <!-- Resumen de Totales -->
-            <div style="border-top:1px solid var(--border-glass); padding-top:16px; margin-bottom:16px; font-size: 13px;">
-              <div class="flex justify-between mb-1" style="color: var(--text-secondary);">
-                <span>Subtotal</span>
-                <span>$${posSubtotal.toFixed(2)}</span>
-              </div>
-              ${effectiveCurrencyDiscount > 0 ? `
-              <div class="flex justify-between mb-1" style="color: #f59e0b; font-weight: 600;">
-                <span>Descuento Divisas (Binance)</span>
-                <span>-$${effectiveCurrencyDiscount.toFixed(2)}</span>
-              </div>
-              ` : ''}
-              ${totalDiscount > 0 ? `
-              <div class="flex justify-between mb-1" style="color: var(--danger);">
-                <span>Descuento Total</span>
-                <span>-$${totalDiscount.toFixed(2)}</span>
-              </div>
-              ` : ''}
-              ${taxAmount > 0 ? `
-              <div class="flex justify-between mb-1" style="color: var(--text-secondary);">
-                <span>IVA (16%)</span>
-                <span>$${taxAmount.toFixed(2)}</span>
-              </div>
-              ` : ''}
-              
-              <!-- Desglose Multimoneda (Venezuela) -->
-              <div style="background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; margin-top: 8px; border: 1px dashed var(--border-glass);">
-                <div class="flex justify-between" style="font-size:16px; font-weight:700;">
-                  <span>Total USD ($)</span>
-                  <span style="color:var(--primary);">$${posTotal.toFixed(2)}</span>
-                </div>
-                <div class="flex justify-between mt-1" style="font-size:14px; font-weight:600; color: #f59e0b;">
-                  <span>Total VES (Bs.)</span>
-                  <span>Bs. ${(posTotal * rateUsdToVes).toFixed(2)}</span>
-                </div>
-                <div class="flex justify-between mt-1" style="font-size:12px; color: var(--text-muted);">
-                  <span>Equivalente EUR (€)</span>
-                  <span>€ ${((posTotal * rateUsdToVes) / rateEurToVes).toFixed(2)}</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <span style="font-size:10px; color:var(--text-muted);">Tasa del día:</span>
+                <div style="display:flex; align-items:center; gap:4px;">
+                  <span style="font-size:11px; font-weight:700;">Bs.</span>
+                  <input type="number" step="0.01" id="pos-inline-bcv-rate" value="${rateUsdToVes}" style="width:65px; padding:2px 4px; font-size:11px; text-align:right; font-weight:700; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); border-radius:4px; color:white;">
+                  <span style="font-size:10px; color:var(--text-muted);">= $1 USD</span>
+                  <button type="button" id="refresh-inline-rate-btn" style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:12px;" title="Sincronizar BCV">🔄</button>
                 </div>
               </div>
             </div>
 
-            <button type="submit" class="btn btn-primary w-100" id="pos-submit-btn" ${posCart.length === 0 ? 'disabled' : ''}>
-              Registrar Venta POS
-            </button>
+            <!-- Cliente Seleccionado -->
+            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:10px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cliente Factura:</div>
+                <div style="font-size:12px; font-weight:700; color:var(--primary);">
+                  👑 ${posCustomerName || 'Consumidor Final'} ${posCustomerCi ? `(${posCustomerCi})` : ''}
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary" id="change-pos-client-btn" style="padding:4px 8px; font-size:10px;">
+                🆔 Cambiar
+              </button>
+            </div>
+
+            <!-- Datos Ocultos para Formulario -->
+            <input type="hidden" id="pos-client-name" value="${posCustomerName}">
+            <input type="hidden" id="pos-client-ci-num" value="${posCustomerCi}">
+            <input type="hidden" id="pos-client-email" value="${posCustomerEmail}">
+            <input type="hidden" id="pos-client-phone" value="${posCustomerPhone}">
+            <input type="hidden" id="pos-is-pending" value="${posIsPending ? '1' : '0'}">
+
+            <!-- Cuadrícula de Métodos de Pago (Cards Seleccionables) -->
+            <div>
+              <label class="form-label" style="font-size:10px; text-transform:uppercase; font-weight:700;">Método de Pago *</label>
+              <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">
+                <div class="pay-card active" data-method="efectivo_usd" style="border:1px solid var(--primary); background:rgba(99,102,241,0.1); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:700;">
+                  💵<br>Efectivo
+                </div>
+                <div class="pay-card" data-method="punto_de_venta" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
+                  💳<br>Tarjeta
+                </div>
+                <div class="pay-card" data-method="transferencia_ves" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
+                  🏛️<br>Transferencia
+                </div>
+                <div class="pay-card" data-method="binance" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
+                  🟡<br>Binance
+                </div>
+                <div class="pay-card" data-method="pago_movil" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
+                  📱<br>Pago Móvil
+                </div>
+                <div class="pay-card" data-method="zelle" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
+                  💸<br>Zelle
+                </div>
+              </div>
+              <input type="hidden" id="pos-client-payment" value="efectivo_usd">
+            </div>
+
+            <!-- Descuento Dual (% y $) -->
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <label class="form-label" style="font-size:10px; font-weight:700;">Descuento</label>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <input type="number" step="0.1" min="0" max="100" class="form-control" id="pos-discount-percent" placeholder="0%" style="font-size:12px; padding:6px; text-align:right;">
+                <span>=</span>
+                <input type="number" step="0.01" min="0" class="form-control" id="pos-discount-input" placeholder="$ 0.00" value="${posDiscount > 0 ? posDiscount : ''}" style="font-size:12px; padding:6px; text-align:right;">
+              </div>
+            </div>
+
+            <!-- Sección Desplegable: Detalles del Comprobante -->
+            <div style="border:1px solid var(--border-glass); border-radius:10px; padding:8px 12px; background:rgba(255,255,255,0.01);">
+              <div id="toggle-receipt-details-btn" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:11px; font-weight:700; color:var(--text-secondary);">
+                <span>Detalles del comprobante</span>
+                <span id="receipt-details-arrow">▼</span>
+              </div>
+
+              <div id="receipt-details-body" style="display:none; margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                <div class="form-group">
+                  <label class="form-label" style="font-size:10px;">Concepto del comprobante (Opcional)</label>
+                  <input type="text" class="form-control" id="pos-concept-input" placeholder="Ej. Venta de productos / Servicios" style="font-size:12px; padding:6px 10px;">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size:10px;">Nota del comprobante (Opcional)</label>
+                  <textarea class="form-control" id="pos-note-input" rows="2" placeholder="Ej. Entregado en tienda..." style="font-size:12px; padding:6px 10px;"></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Resumen de Pago -->
+            <div style="border-top:1px solid var(--border-glass); padding-top:10px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
+              <div style="display:flex; justify-content:space-between; color:var(--text-muted);">
+                <span>Equivalente en bolívares</span>
+                <strong style="color:#f59e0b;">Bs. ${(posTotal * rateUsdToVes).toFixed(2)}</strong>
+              </div>
+            </div>
+
+            <!-- Botón Principal de Cobro (Crear Venta) -->
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button type="button" class="btn btn-secondary" id="pos-print-preview-btn" style="padding:10px 12px; font-size:14px; background:rgba(255,255,255,0.05);" title="Imprimir / Vista Previa">
+                🖨️
+              </button>
+              <button type="submit" class="btn btn-primary" id="pos-submit-btn" ${posCart.length === 0 ? 'disabled' : ''} style="flex-grow:1; padding:12px; font-size:14px; font-weight:800; background:#111827; border:1px solid var(--primary); display:flex; justify-content:space-between; align-items:center;">
+                <span>🛒 Crear venta</span>
+                <span style="color:var(--primary); font-size:15px;">$${posTotal.toFixed(2)} ›</span>
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -2525,6 +2512,40 @@ async function renderAdminPOS() {
           </div>
         </div>
       </div>
+
+      ${showExpenseModal ? `
+        <div class="modal-overlay open" id="expense-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 440px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid rgba(239, 68, 68, 0.4); background: #111827;">
+            <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">🔴</div>
+            <h3 style="font-size: 18px; font-weight: 800; text-align: center; margin-bottom: 4px; color: #f87171;">Registrar Nuevo Gasto de Caja</h3>
+            <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
+              Registra egresos de dinero o gastos operativos en el sistema POS.
+            </p>
+
+            <form id="expense-form">
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Concepto del Gasto</label>
+                <input type="text" class="form-control" id="expense-title" placeholder="Ej. Pago de Transporte / Compra de Insumos" required style="font-size: 13px;">
+              </div>
+
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Monto del Gasto ($)</label>
+                <input type="number" step="0.01" min="0.01" class="form-control" id="expense-amount" placeholder="0.00" required style="font-size: 13px;">
+              </div>
+
+              <div class="form-group mb-4">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Detalle / Observaciones (Opcional)</label>
+                <textarea class="form-control" id="expense-details" rows="2" placeholder="Observaciones adicionales..." style="font-size: 12px;"></textarea>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-secondary w-50" id="close-expense-btn" style="padding: 8px; font-size: 12px;">Cancelar</button>
+                <button type="submit" class="btn btn-danger w-50" style="padding: 8px; font-size: 12px; font-weight: 700; background: #ef4444;">🔴 Guardar Gasto</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ` : ''}
     `;
 
     bindPOSEvents();
@@ -2756,6 +2777,33 @@ function bindPOSEvents() {
     }
   });
 
+  // Eventos Modal de Gasto
+  document.getElementById('open-expense-btn')?.addEventListener('click', async () => {
+    showExpenseModal = true;
+    await renderAdminPOS();
+  });
+
+  document.getElementById('close-expense-btn')?.addEventListener('click', async () => {
+    showExpenseModal = false;
+    await renderAdminPOS();
+  });
+
+  document.getElementById('expense-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = (document.getElementById('expense-title') as HTMLInputElement).value;
+    const amount = parseFloat((document.getElementById('expense-amount') as HTMLInputElement).value);
+    const details = (document.getElementById('expense-details') as HTMLTextAreaElement).value;
+
+    if (!title || isNaN(amount) || amount <= 0) {
+      alert('Por favor ingrese un concepto y monto válidos.');
+      return;
+    }
+
+    alert(`🔴 Gasto de Caja Registrado con Éxito:\n\nConcepto: ${title}\nMonto: $${amount.toFixed(2)}\nDetalle: ${details || 'Sin observaciones'}`);
+    showExpenseModal = false;
+    await renderAdminPOS();
+  });
+
   // Eventos Venta Libre (Producto No Registrado)
   document.getElementById('open-free-sale-btn')?.addEventListener('click', async () => {
     showFreeSaleModal = true;
@@ -2814,6 +2862,97 @@ function bindPOSEvents() {
     form?.requestSubmit();
   });
 
+  // Vaciar Canasta
+  document.getElementById('clear-pos-cart-btn')?.addEventListener('click', async () => {
+    posCart = [];
+    await renderAdminPOS();
+  });
+
+  // Eliminar Item de Canasta
+  document.querySelectorAll('.remove-pos-item').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      posCart = posCart.filter(item => item.product.id !== id);
+      await renderAdminPOS();
+    });
+  });
+
+  // Cambiar Precio Unitario de Item en Canasta
+  document.querySelectorAll('.change-pos-price').forEach(input => {
+    input.addEventListener('change', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLInputElement).dataset.id || '0');
+      const val = parseFloat((e.currentTarget as HTMLInputElement).value);
+      const item = posCart.find(i => i.product.id === id);
+      if (item && !isNaN(val) && val >= 0) {
+        item.product.price = val;
+        await renderAdminPOS();
+      }
+    });
+  });
+
+  // Toggle Pagada vs A Crédito
+  document.getElementById('pos-type-paid-btn')?.addEventListener('click', async () => {
+    posIsPending = false;
+    await renderAdminPOS();
+  });
+  document.getElementById('pos-type-credit-btn')?.addEventListener('click', async () => {
+    posIsPending = true;
+    await renderAdminPOS();
+  });
+
+  // Selección Visual de Método de Pago (Cards)
+  document.querySelectorAll('.pay-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      document.querySelectorAll('.pay-card').forEach(c => {
+        c.classList.remove('active');
+        (c as HTMLElement).style.border = '1px solid var(--border-glass)';
+        (c as HTMLElement).style.background = 'rgba(255,255,255,0.02)';
+      });
+      const target = e.currentTarget as HTMLElement;
+      target.classList.add('active');
+      target.style.border = '1px solid var(--primary)';
+      target.style.background = 'rgba(99,102,241,0.1)';
+      const method = target.dataset.method || 'efectivo_usd';
+      (document.getElementById('pos-client-payment') as HTMLInputElement).value = method;
+    });
+  });
+
+  // Descuento por Porcentaje %
+  document.getElementById('pos-discount-percent')?.addEventListener('input', async (e) => {
+    const pct = parseFloat((e.target as HTMLInputElement).value);
+    const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    if (!isNaN(pct) && pct >= 0 && posSubtotal > 0) {
+      posDiscount = posSubtotal * (pct / 100);
+    } else if (isNaN(pct)) {
+      posDiscount = 0;
+    }
+    const fixedInput = document.getElementById('pos-discount-input') as HTMLInputElement;
+    if (fixedInput) fixedInput.value = posDiscount > 0 ? posDiscount.toFixed(2) : '';
+  });
+
+  // Desplegable Detalles del Comprobante (Concepto y Nota)
+  document.getElementById('toggle-receipt-details-btn')?.addEventListener('click', () => {
+    const body = document.getElementById('receipt-details-body');
+    const arrow = document.getElementById('receipt-details-arrow');
+    if (body) {
+      const isHidden = body.style.display === 'none' || body.style.display === '';
+      body.style.display = isHidden ? 'flex' : 'none';
+      if (arrow) arrow.innerText = isHidden ? '▲' : '▼';
+    }
+  });
+
+  // Refrescar Tasa Inline
+  document.getElementById('refresh-inline-rate-btn')?.addEventListener('click', async () => {
+    try {
+      const res = await api.sales.syncExchangeRates();
+      rateUsdToVes = res.rates.usdToVes;
+      await renderAdminPOS();
+      alert(`Tasa BCV sincronizada: Bs. ${rateUsdToVes.toFixed(2)}`);
+    } catch (e: any) {
+      alert('Error al sincronizar tasa BCV');
+    }
+  });
+
   // Enviar Venta POS
   document.getElementById('pos-checkout-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2824,10 +2963,13 @@ function bindPOSEvents() {
     const ciPrefix = (document.getElementById('pos-client-ci-prefix') as HTMLSelectElement)?.value || 'V-';
     const ciNum = (document.getElementById('pos-client-ci-num') as HTMLInputElement)?.value.trim() || '';
     const customerCi = ciNum ? `${ciPrefix}${ciNum}` : undefined;
-    const payment = (document.getElementById('pos-client-payment') as HTMLSelectElement).value;
+    const payment = (document.getElementById('pos-client-payment') as HTMLInputElement).value;
 
-    const isQuotation = (document.getElementById('pos-is-quotation') as HTMLInputElement).checked;
-    const isPending = (document.getElementById('pos-is-pending') as HTMLInputElement).checked;
+    const concept = (document.getElementById('pos-concept-input') as HTMLInputElement)?.value.trim() || undefined;
+    const note = (document.getElementById('pos-note-input') as HTMLTextAreaElement)?.value.trim() || undefined;
+
+    const isQuotation = (document.getElementById('pos-is-quotation') as HTMLInputElement)?.checked || false;
+    const isPending = (document.getElementById('pos-is-pending') as HTMLInputElement)?.value === '1';
 
     // Validación de Cliente Registrado & Advertencia Sin Garantía
     const isCustomerDataProvided = name && name.trim() !== '' && name.toLowerCase() !== 'consumidor final' && ciNum && ciNum.trim() !== '';
@@ -2882,7 +3024,9 @@ function bindPOSEvents() {
         status: isPending ? 'pending' : 'completed',
         amountPaid: posIsPending ? posInitialPayment : undefined,
         couponCode: posCouponCode || undefined,
-        loadedQuotationId: posLoadedQuotationId || undefined
+        loadedQuotationId: posLoadedQuotationId || undefined,
+        concept,
+        note
       });
 
       // Venta exitosa, limpiar estados
