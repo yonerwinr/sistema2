@@ -3150,6 +3150,7 @@ function addToPOSCart(product: Product) {
 // ==========================================================================
 let editingProductId: number | null = null;
 let editingStaffId: number | null = null;
+let adminProductsSearchQuery = '';
 
 async function renderAdminProducts() {
   const panel = document.getElementById('dashboard-content-panel');
@@ -3157,6 +3158,19 @@ async function renderAdminProducts() {
 
   const existingCategories = Array.from(new Set(productsList.map(p => p.category).filter(Boolean)));
   if (!existingCategories.includes('General')) existingCategories.push('General');
+
+  const normalizedQuery = adminProductsSearchQuery.trim().toLowerCase();
+  const filteredProducts = productsList.filter(prod => {
+    if (!normalizedQuery) return true;
+    const haystack = [
+      prod.name,
+      prod.description,
+      prod.category,
+      prod.code,
+      prod.id?.toString()
+    ].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(normalizedQuery);
+  });
 
   panel.innerHTML = `
     <div class="animate-on-scroll animate-fade-up visible">
@@ -3278,6 +3292,13 @@ async function renderAdminProducts() {
         </form>
       </div>
 
+      <div class="card mb-3" style="padding: 12px 14px;">
+        <div class="flex align-center gap-2" style="flex-wrap: wrap;">
+          <input type="text" class="form-control" id="admin-products-search" placeholder="Buscar por nombre, código, categoría..." value="${adminProductsSearchQuery}" style="max-width: 360px;">
+          <button type="button" class="btn btn-secondary" id="admin-products-clear-search" style="padding: 8px 12px;">Limpiar</button>
+        </div>
+      </div>
+
       <!-- Tabla de Productos -->
       <div class="card">
         <div class="table-responsive">
@@ -3293,7 +3314,7 @@ async function renderAdminProducts() {
               </tr>
             </thead>
             <tbody>
-              ${productsList.map(prod => `
+              ${filteredProducts.map(prod => `
                 <tr>
                   <td>
                     <img src="${prod.image_url}" style="width:48px; height:48px; object-fit:cover; border-radius:8px;" alt="${prod.name}">
@@ -3330,6 +3351,8 @@ function bindProductCRUDEvents() {
   const formCard = document.getElementById('product-form-card');
   const addBtn = document.getElementById('add-product-btn');
   const cancelBtn = document.getElementById('prod-form-cancel');
+  const searchInput = document.getElementById('admin-products-search') as HTMLInputElement | null;
+  const clearSearchBtn = document.getElementById('admin-products-clear-search') as HTMLButtonElement | null;
   const form = document.getElementById('product-form') as HTMLFormElement;
   const formTitle = document.getElementById('product-form-title');
 
@@ -3423,6 +3446,22 @@ function bindProductCRUDEvents() {
     updateProductPriceCalc();
     const prodPriceInput = document.getElementById('prod-price') as HTMLInputElement;
     if (prodPriceInput) prodPriceInput.focus();
+  });
+
+  const applyProductsSearch = () => {
+    if (searchInput) {
+      adminProductsSearchQuery = searchInput.value;
+      renderAdminProducts();
+    }
+  };
+
+  searchInput?.addEventListener('input', applyProductsSearch);
+  clearSearchBtn?.addEventListener('click', () => {
+    if (searchInput) {
+      searchInput.value = '';
+      adminProductsSearchQuery = '';
+      renderAdminProducts();
+    }
   });
 
   addBtn?.addEventListener('click', () => {
