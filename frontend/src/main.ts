@@ -31,7 +31,7 @@ let posCart: POSCartItem[] = [];
 let posSearchQuery: string = '';
 
 // Vista activa dentro de Administración
-type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses';
+type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers';
 let activeAdminView: AdminSubView = 'stats';
 
 // Nuevas variables de estado para el control en POS
@@ -52,11 +52,11 @@ let posCustomerPhone = '';
 let rateUsdToVes = 40.00;
 let rateEurToVes = 43.50;
 let rateBinanceToVes = 44.50;
-let posApplyCurrencyDiscount = false;
-let posCurrencyDiscount = 0;
 let posConfirmedUnregisteredWarning = false;
 let showFreeSaleModal = false;
 let showExpenseModal = false;
+let showRegisterCustomerModal = false;
+let adminCustomerSearchQuery = '';
 
 interface POSPaymentLine {
   id: number;
@@ -1761,6 +1761,9 @@ function renderAdminDashboard(): string {
               🎟️ Cupones
             </button>
           ` : ''}
+          <button class="sidebar-nav-btn ${activeAdminView === 'customers' ? 'active' : ''}" id="admin-tab-customers">
+            👤 Clientes Registrados
+          </button>
           ${currentUser.role === 'admin' ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'expenses' ? 'active' : ''}" id="admin-tab-expenses">
               💼 Gastos
@@ -1824,6 +1827,7 @@ async function bindAdminEvents() {
   const tabDebtors = document.getElementById('admin-tab-debtors');
   const tabQuotations = document.getElementById('admin-tab-quotations');
   const tabCoupons = document.getElementById('admin-tab-coupons');
+  const tabCustomers = document.getElementById('admin-tab-customers');
   const tabExpenses = document.getElementById('admin-tab-expenses');
   const tabStaff = document.getElementById('admin-tab-staff');
 
@@ -1835,6 +1839,7 @@ async function bindAdminEvents() {
     tabDebtors?.classList.remove('active');
     tabQuotations?.classList.remove('active');
     tabCoupons?.classList.remove('active');
+    tabCustomers?.classList.remove('active');
     tabExpenses?.classList.remove('active');
     tabStaff?.classList.remove('active');
   };
@@ -1895,6 +1900,14 @@ async function bindAdminEvents() {
     await renderAdminCoupons();
   });
 
+  tabCustomers?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabCustomers?.classList.add('active');
+    activeAdminView = 'customers';
+    destroyCharts();
+    await renderAdminCustomers();
+  });
+
   tabExpenses?.addEventListener('click', async () => {
     clearActiveTabs();
     tabExpenses?.classList.add('active');
@@ -1926,6 +1939,8 @@ async function bindAdminEvents() {
     await renderAdminQuotations();
   } else if (activeAdminView === 'coupons') {
     await renderAdminCoupons();
+  } else if (activeAdminView === 'customers') {
+    await renderAdminCustomers();
   } else if (activeAdminView === 'expenses') {
     await renderAdminExpenses();
   } else if (activeAdminView === 'staff') {
@@ -2210,26 +2225,10 @@ async function renderAdminPOS() {
       posProducts = [];
     }
     
-    // Cálculos de totales y descuento de divisas asignado SOLAMENTE a la parte pagada en dólares / Binance
+    // Cálculos de totales del POS
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-
-    const usdMethodsList = ['efectivo_usd', 'binance', 'zelle', 'efectivo_eur', 'paypal'];
-    const totalUsdPaidInUsdMethods = posPaymentLines
-      .filter(l => usdMethodsList.includes(l.method))
-      .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
-
-    const currencyDiffRatio = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
-      ? (1 - (rateUsdToVes / rateBinanceToVes))
-      : 0;
-
-    // El descuento de divisas (Binance) aplica EXCLUSIVAMENTE a los pagos en dólares físicos / Binance
-    const autoCurrencyDiscountAmount = totalUsdPaidInUsdMethods * currencyDiffRatio;
-    const effectiveCurrencyDiscount = posApplyCurrencyDiscount
-      ? (posCurrencyDiscount > 0 ? posCurrencyDiscount : autoCurrencyDiscountAmount)
-      : 0;
-
     const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
-    const totalDiscount = couponDiscountAmount + posDiscount + effectiveCurrencyDiscount;
+    const totalDiscount = couponDiscountAmount + posDiscount;
     const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
     const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
     const posTotal = taxableSubtotal + taxAmount;
@@ -2238,6 +2237,9 @@ async function renderAdminPOS() {
       <!-- Barra Superior de Acciones POS -->
       <div class="flex justify-between align-center mb-3">
         <div class="flex gap-2">
+          <button type="button" class="btn btn-secondary" id="open-register-customer-btn" style="background:#6366f1; border:none; color:white; font-size:12px; font-weight:700; padding:8px 14px; border-radius:8px;">
+            👤 Registrar Cliente
+          </button>
           ${currentUser?.role === 'admin' ? `
             <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:12px; font-weight:700; padding:8px 14px; border-radius:8px;">
               ➕ Nueva Venta Libre
@@ -2334,21 +2336,12 @@ async function renderAdminPOS() {
               </button>
             </div>
 
-            <!-- Card Multi-moneda & Tasa -->
-            <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.25); border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:8px;">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-size:11px; font-weight:700; color:#10b981;">Activar multi-moneda</div>
-                <input type="checkbox" id="pos-multicurrency-toggle" checked style="width:16px; height:16px; accent-color:#10b981;">
-              </div>
-
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                <span style="font-size:10px; color:var(--text-muted);">Tasa del día:</span>
-                <div style="display:flex; align-items:center; gap:4px;">
-                  <span style="font-size:11px; font-weight:700;">Bs.</span>
-                  <input type="number" step="0.01" id="pos-inline-bcv-rate" value="${rateUsdToVes}" style="width:65px; padding:2px 4px; font-size:11px; text-align:right; font-weight:700; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); border-radius:4px; color:white;">
-                  <span style="font-size:10px; color:var(--text-muted);">= $1 USD</span>
-                  <button type="button" id="refresh-inline-rate-btn" style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:12px;" title="Sincronizar BCV">🔄</button>
-                </div>
+            <!-- Tasa Oficial del Día -->
+            <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:8px 12px; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; font-weight:700; color:#10b981;">Tasa Oficial BCV:</span>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="font-size:11px; font-weight:700; color:white;">Bs. ${rateUsdToVes.toFixed(2)}</span>
+                <span style="font-size:10px; color:var(--text-muted);">= $1 USD</span>
               </div>
             </div>
 
@@ -2372,10 +2365,10 @@ async function renderAdminPOS() {
             <input type="hidden" id="pos-client-phone" value="${posCustomerPhone}">
             <input type="hidden" id="pos-is-pending" value="${posIsPending ? '1' : '0'}">
 
-            <!-- Módulo de Métodos de Pago Combinados / Mixtos Ilimitados -->
+            <!-- Módulo de Métodos de Pago Combinados / Mixtos -->
             <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <label class="form-label" style="font-size:10px; text-transform:uppercase; font-weight:700; margin:0;">💳 Métodos de Pago Divididos / Mixtos *</label>
+                <label class="form-label" style="font-size:10px; text-transform:uppercase; font-weight:700; margin:0;">💳 Métodos de Pago *</label>
                 <button type="button" class="btn btn-secondary" id="add-pos-payment-line-btn" style="padding:3px 8px; font-size:10px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-weight:700;">
                   ➕ Añadir Otro Método
                 </button>
@@ -2392,44 +2385,19 @@ async function renderAdminPOS() {
                       <option value="zelle" ${line.method === 'zelle' ? 'selected' : ''}>💸 Zelle ($)</option>
                       <option value="binance" ${line.method === 'binance' ? 'selected' : ''}>🟡 Binance Pay ($)</option>
                       <option value="efectivo_ves" ${line.method === 'efectivo_ves' ? 'selected' : ''}>💵 Efectivo Bs. (VES)</option>
-                      <option value="efectivo_eur" ${line.method === 'efectivo_eur' ? 'selected' : ''}>💶 Efectivo EUR (€)</option>
                       <option value="paypal" ${line.method === 'paypal' ? 'selected' : ''}>🅿️ PayPal ($)</option>
                     </select>
 
-                    ${['pago_movil', 'punto_de_venta', 'transferencia_ves', 'efectivo_ves'].includes(line.method) ? `
-                      <div style="display:flex; align-items:center; gap:3px;">
-                        <span style="font-size:10px; color:#f59e0b; font-weight:700;">Bs.</span>
-                        <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-ves" data-index="${idx}" value="${line.amountVes !== undefined && line.amountVes > 0 ? line.amountVes : ''}" placeholder="0.00" style="width:75px; padding:4px; font-size:11px; text-align:right; font-weight:700;">
-                      </div>
-                    ` : `
-                      <div style="display:flex; align-items:center; gap:3px;">
-                        <span style="font-size:10px; color:var(--primary); font-weight:700;">$</span>
-                        <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-usd" data-index="${idx}" value="${line.amountUsd !== undefined && line.amountUsd > 0 ? line.amountUsd : ''}" placeholder="0.00" style="width:75px; padding:4px; font-size:11px; text-align:right; font-weight:700;">
-                      </div>
-                    `}
+                    <div style="display:flex; align-items:center; gap:3px;">
+                      <span style="font-size:10px; color:var(--primary); font-weight:700;">$</span>
+                      <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-usd" data-index="${idx}" value="${line.amountUsd !== undefined && line.amountUsd > 0 ? line.amountUsd : ''}" placeholder="0.00" style="width:75px; padding:4px; font-size:11px; text-align:right; font-weight:700;">
+                    </div>
 
                     ${posPaymentLines.length > 1 ? `
                       <button type="button" class="btn btn-danger remove-pos-payment-line" data-index="${idx}" style="padding:2px 6px; font-size:10px; background:rgba(239,68,68,0.2); color:#f87171; border:none;" title="Quitar método">✕</button>
                     ` : '<div style="width:16px;"></div>'}
                   </div>
                 `).join('')}
-              </div>
-            </div>
-
-            <!-- Descuento de Divisas (Aplica EXCLUSIVAMENTE a la parte en Dólares / Binance) -->
-            <div style="padding: 8px 10px; background: rgba(245, 158, 11, 0.04); border: 1px solid rgba(245, 158, 11, 0.25); border-radius:10px;">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                <div style="display: flex; align-items: center; gap: 6px;">
-                  <input type="checkbox" id="pos-apply-currency-discount" ${posApplyCurrencyDiscount ? 'checked' : ''} style="width: 15px; height: 15px; accent-color: #f59e0b; cursor: pointer;">
-                  <div>
-                    <label for="pos-apply-currency-discount" style="font-size: 10px; font-weight: 700; color: #f59e0b; margin: 0; cursor: pointer;">
-                      💵 Descuento Divisas (Aplicado a $${totalUsdPaidInUsdMethods.toFixed(2)} en USD/Binance)
-                    </label>
-                  </div>
-                </div>
-                <div style="font-weight: 700; font-size: 11px; color: #f59e0b; white-space: nowrap;">
-                  -$${autoCurrencyDiscountAmount.toFixed(2)}
-                </div>
               </div>
             </div>
 
@@ -2506,9 +2474,14 @@ async function renderAdminPOS() {
                   <input type="text" class="form-control" id="pos-id-num" placeholder="Ej. 12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" required style="flex-grow: 1; font-size: 15px; font-weight: 600;">
                 </div>
               </div>
-              <button type="submit" class="btn btn-primary w-100" id="pos-id-submit-btn" style="padding: 10px; font-size: 13px; font-weight: 700;">
-                🔍 Buscar Cliente en Base de Datos
-              </button>
+              <div style="display:flex; gap:8px;">
+                <button type="submit" class="btn btn-primary" id="pos-id-submit-btn" style="padding: 10px; font-size: 13px; font-weight: 700; flex:1;">
+                  🔍 Buscar Cliente
+                </button>
+                <button type="button" class="btn btn-success" id="pos-id-register-btn" style="padding: 10px; font-size: 13px; font-weight: 700; background:#6366f1; border-color:#6366f1; flex:1;">
+                  ➕ Registrar Nuevo
+                </button>
+              </div>
             </form>
 
             <div style="position: relative; text-align: center; margin: 18px 0;">
@@ -2521,6 +2494,54 @@ async function renderAdminPOS() {
             <button type="button" class="btn btn-secondary w-100" id="pos-id-skip-btn" style="padding: 10px; font-size: 12px; font-weight: 600;">
               👤 Consumidor Final (Usuario No Registrado)
             </button>
+          </div>
+        </div>
+      ` : ''}
+
+      ${showRegisterCustomerModal ? `
+        <div class="modal-overlay open" id="register-customer-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 480px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827;">
+            <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">👤</div>
+            <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Registrar Nuevo Cliente</h3>
+            <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
+              Ingrese los datos del cliente para registrarlo oficialmente en el sistema.
+            </p>
+
+            <form id="register-customer-form">
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Cédula / RIF *</label>
+                <div style="display: flex; gap: 8px;">
+                  <select class="form-control" id="reg-cust-ci-prefix" style="width: 80px; font-weight: 700; flex-shrink: 0; font-size: 14px;">
+                    <option value="V-">V-</option>
+                    <option value="E-">E-</option>
+                    <option value="J-">J-</option>
+                    <option value="G-">G-</option>
+                  </select>
+                  <input type="text" class="form-control" id="reg-cust-ci-num" placeholder="Ej. 12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" required style="flex-grow: 1; font-size: 14px; font-weight: 600;">
+                </div>
+              </div>
+
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Nombre Completo / Razón Social *</label>
+                <input type="text" class="form-control" id="reg-cust-name" placeholder="Ej. Juan Pérez / Empresa C.A." required style="font-size: 13px;">
+              </div>
+
+              <div class="grid-2 gap-2 mb-4">
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Teléfono (WhatsApp)</label>
+                  <input type="text" class="form-control" id="reg-cust-phone" placeholder="Ej. 04141234567" style="font-size: 13px;">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Correo Electrónico</label>
+                  <input type="email" class="form-control" id="reg-cust-email" placeholder="cliente@correo.com" style="font-size: 13px;">
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-secondary w-50" id="close-register-customer-btn" style="padding: 10px; font-size: 12px;">Cancelar</button>
+                <button type="submit" class="btn btn-primary w-50" style="padding: 10px; font-size: 12px; font-weight: 700;">💾 Guardar Cliente</button>
+              </div>
+            </form>
           </div>
         </div>
       ` : ''}
@@ -2633,6 +2654,49 @@ async function renderAdminPOS() {
 }
 
 function bindPOSEvents() {
+  // Abrir Modal de Registro de Cliente desde Header o POS ID
+  document.getElementById('open-register-customer-btn')?.addEventListener('click', async () => {
+    showRegisterCustomerModal = true;
+    await renderAdminPOS();
+  });
+
+  document.getElementById('pos-id-register-btn')?.addEventListener('click', async () => {
+    showRegisterCustomerModal = true;
+    await renderAdminPOS();
+  });
+
+  document.getElementById('close-register-customer-btn')?.addEventListener('click', async () => {
+    showRegisterCustomerModal = false;
+    await renderAdminPOS();
+  });
+
+  // Guardar Nuevo Cliente desde Modal
+  document.getElementById('register-customer-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const prefix = (document.getElementById('reg-cust-ci-prefix') as HTMLSelectElement).value;
+    const num = (document.getElementById('reg-cust-ci-num') as HTMLInputElement).value.trim();
+    const ci = `${prefix}${num}`;
+    const name = (document.getElementById('reg-cust-name') as HTMLInputElement).value.trim();
+    const phone = (document.getElementById('reg-cust-phone') as HTMLInputElement).value.trim();
+    const email = (document.getElementById('reg-cust-email') as HTMLInputElement).value.trim();
+
+    try {
+      const res = await api.auth.registerCustomer({ name, ci, phone: phone || undefined, email: email || undefined });
+      posSelectedCustomerId = res.user.id;
+      posCustomerName = res.user.name;
+      posCustomerCi = res.user.ci || ci;
+      posCustomerPhone = res.user.phone || phone || '';
+      posCustomerEmail = res.user.email || email || '';
+      posClientIdentified = true;
+      showRegisterCustomerModal = false;
+
+      alert(`¡Cliente "${res.user.name}" registrado y seleccionado con éxito!`);
+      await renderAdminPOS();
+    } catch (err: any) {
+      alert(err.message || 'Error al registrar cliente');
+    }
+  });
+
   // Eventos Modal de Identificación del Cliente (POS Step 1)
   document.getElementById('pos-id-search-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2655,16 +2719,22 @@ function bindPOSEvents() {
       alert(`¡Cliente Identificado Con Éxito!\n\nNombre: ${customer.name}\nCédula: ${customer.ci}\nCorreo: ${customer.email || 'N/D'}`);
       await renderAdminPOS();
     } catch (err: any) {
-      const customName = prompt(`No se encontró ningún cliente registrado con la Cédula/RIF "${fullCi}".\n\nSi deseas asignarle un nombre para esta factura, ingrésalo a continuación (o presiona Aceptar para continuar como Consumidor Final):`);
-      if (customName && customName.trim() !== '') {
-        posCustomerName = customName.trim();
+      if (confirm(`No se encontró ningún cliente registrado con la Cédula/RIF "${fullCi}".\n\n¿Desea registrarlo como nuevo cliente ahora?`)) {
+        showRegisterCustomerModal = true;
+        await renderAdminPOS();
+        setTimeout(() => {
+          const ciPrefixIn = document.getElementById('reg-cust-ci-prefix') as HTMLSelectElement;
+          const ciNumIn = document.getElementById('reg-cust-ci-num') as HTMLInputElement;
+          if (ciPrefixIn) ciPrefixIn.value = prefix;
+          if (ciNumIn) ciNumIn.value = num;
+        }, 100);
       } else {
         posCustomerName = 'Consumidor Final';
+        posCustomerCi = fullCi;
+        posSelectedCustomerId = null;
+        posClientIdentified = true;
+        await renderAdminPOS();
       }
-      posCustomerCi = fullCi;
-      posSelectedCustomerId = null;
-      posClientIdentified = true;
-      await renderAdminPOS();
     }
   });
 
@@ -2771,20 +2841,6 @@ function bindPOSEvents() {
       (document.getElementById('pos-client-phone') as HTMLInputElement).value = '';
       if (ciNumInput) ciNumInput.value = '';
     }
-  });
-
-  // Descuento de Divisas (Tasa Paralela / Binance P2P)
-  const applyCurrencyDiscountCb = document.getElementById('pos-apply-currency-discount') as HTMLInputElement;
-  applyCurrencyDiscountCb?.addEventListener('change', async (e) => {
-    posApplyCurrencyDiscount = (e.target as HTMLInputElement).checked;
-    await renderAdminPOS();
-  });
-
-  const currencyDiscountInput = document.getElementById('pos-currency-discount-input') as HTMLInputElement;
-  currencyDiscountInput?.addEventListener('change', async (e) => {
-    const val = parseFloat((e.target as HTMLInputElement).value);
-    posCurrencyDiscount = isNaN(val) ? 0 : val;
-    await renderAdminPOS();
   });
 
   // Descuento Fijo
@@ -3067,16 +3123,8 @@ function bindPOSEvents() {
 
     // Totales finales a pasar
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    const currencyDiffRatio = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
-      ? (1 - (rateUsdToVes / rateBinanceToVes))
-      : 0;
-    const autoCurrencyDiscountAmount = posSubtotal * currencyDiffRatio;
-    const effectiveCurrencyDiscount = posApplyCurrencyDiscount
-      ? (posCurrencyDiscount > 0 ? posCurrencyDiscount : autoCurrencyDiscountAmount)
-      : 0;
-
     const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
-    const totalDiscount = couponDiscountAmount + posDiscount + effectiveCurrencyDiscount;
+    const totalDiscount = couponDiscountAmount + posDiscount;
     const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
     const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
 
@@ -3105,8 +3153,6 @@ function bindPOSEvents() {
       posSearchQuery = '';
       posSelectedCustomerId = null;
       posDiscount = 0;
-      posApplyCurrencyDiscount = false;
-      posCurrencyDiscount = 0;
       posApplyTax = true;
       posCouponCode = '';
       posCouponDiscountPercent = 0;
@@ -5144,6 +5190,107 @@ function bindStaffEvents() {
           alert(err.message || 'Error al eliminar.');
         }
       }
+    });
+  });
+}
+
+// ==========================================================================
+// SUB-VISTA: GESTIÓN DE CLIENTES REGISTRADOS
+// ==========================================================================
+async function renderAdminCustomers() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  try {
+    const customers = await api.auth.getCustomers();
+    const query = (adminCustomerSearchQuery || '').toLowerCase().trim();
+    const filteredCustomers = query ? customers.filter(c => 
+      (c.name && c.name.toLowerCase().includes(query)) ||
+      (c.ci && c.ci.toLowerCase().includes(query)) ||
+      (c.phone && c.phone.toLowerCase().includes(query)) ||
+      (c.email && c.email.toLowerCase().includes(query))
+    ) : customers;
+
+    panel.innerHTML = `
+      <div class="animate-on-scroll animate-fade-up visible">
+        <div class="flex justify-between align-center mb-4">
+          <div>
+            <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Gestión de Clientes Registrados</h2>
+            <p style="font-size:12px; color:var(--text-secondary);">Directorio de clientes registrados en el sistema</p>
+          </div>
+          <button type="button" class="btn btn-primary" id="admin-add-customer-btn" style="padding:10px 16px; font-weight:700;">
+            ➕ Registrar Nuevo Cliente
+          </button>
+        </div>
+
+        <div class="card mb-4" style="padding:14px;">
+          <input type="text" class="form-control" id="admin-customer-search-input" placeholder="🔍 Buscar por nombre, cédula, teléfono o correo..." value="${adminCustomerSearchQuery}" style="font-size:13px; padding:10px 14px;">
+        </div>
+
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table-custom">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Cédula / RIF</th>
+                  <th>Teléfono</th>
+                  <th>Correo</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredCustomers.map(cust => `
+                  <tr>
+                    <td><strong>${cust.name}</strong></td>
+                    <td><span class="badge" style="background:rgba(255,255,255,0.05); font-weight:700;">${cust.ci || 'N/D'}</span></td>
+                    <td>${cust.phone || 'N/D'}</td>
+                    <td>${cust.email || 'N/D'}</td>
+                    <td class="text-right">
+                      <button type="button" class="btn btn-secondary select-customer-pos-btn" style="padding:6px 12px; font-size:12px;" data-ci="${cust.ci || ''}" data-name="${cust.name}">
+                        🛒 Asignar al POS
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+                ${filteredCustomers.length === 0 ? '<tr><td colspan="5" class="text-center">No se encontraron clientes registrados.</td></tr>' : ''}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    bindCustomersEvents();
+  } catch (error) {
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar la lista de clientes del servidor.</div>`;
+  }
+}
+
+function bindCustomersEvents() {
+  let customerSearchTimeout: any;
+  document.getElementById('admin-customer-search-input')?.addEventListener('input', (e) => {
+    adminCustomerSearchQuery = (e.target as HTMLInputElement).value;
+    clearTimeout(customerSearchTimeout);
+    customerSearchTimeout = setTimeout(async () => {
+      await renderAdminCustomers();
+    }, 350);
+  });
+
+  document.getElementById('admin-add-customer-btn')?.addEventListener('click', async () => {
+    showRegisterCustomerModal = true;
+    activeAdminView = 'pos';
+    await renderAdminPOS();
+  });
+
+  document.querySelectorAll('.select-customer-pos-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const target = e.currentTarget as HTMLButtonElement;
+      posCustomerName = target.dataset.name || 'Consumidor Final';
+      posCustomerCi = target.dataset.ci || '';
+      posClientIdentified = true;
+      activeAdminView = 'pos';
+      await renderAdminPOS();
     });
   });
 }

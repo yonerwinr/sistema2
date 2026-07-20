@@ -162,12 +162,69 @@ router.get('/customers', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado. Solo administradores y vendedores pueden ver la lista de clientes' });
     }
     try {
-        const [customers] = await db_1.default.query('SELECT id, name, email, phone, ci FROM users WHERE role = "customer" ORDER BY name ASC');
+        const [customers] = await db_1.default.query('SELECT id, name, email, phone, ci, created_at FROM users WHERE role = "customer" ORDER BY name ASC');
         res.json(customers);
     }
     catch (error) {
         console.error('Error al obtener clientes:', error);
         res.status(500).json({ message: 'Error al obtener lista de clientes' });
+    }
+});
+// Registrar nuevo cliente desde POS o Panel Admin
+router.post('/register-customer', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
+        return res.status(403).json({ message: 'No autorizado para registrar clientes' });
+    }
+    const { name, ci, email, phone } = req.body;
+    if (!name || !ci) {
+        return res.status(400).json({ message: 'El nombre y la cédula/RIF son obligatorios' });
+    }
+    const cleanCi = ci.trim();
+    const cleanName = name.trim();
+    const cleanPhone = phone ? phone.trim() : null;
+    let cleanEmail = email ? email.trim() : null;
+    if (!cleanEmail) {
+        cleanEmail = `${cleanCi.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.local`;
+    }
+    try {
+        // Verificar si la cédula ya existe
+        const [existingCI] = await db_1.default.query('SELECT id, name, email, phone, ci FROM users WHERE ci = ?', [cleanCi]);
+        if (existingCI.length > 0) {
+            return res.status(200).json({
+                message: 'El cliente ya se encuentra registrado en el sistema',
+                user: existingCI[0]
+            });
+        }
+        // Verificar si el correo ya existe
+        const [existingEmail] = await db_1.default.query('SELECT id FROM users WHERE email = ?', [cleanEmail]);
+        if (existingEmail.length > 0) {
+            cleanEmail = `${cleanCi.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now()}@cliente.local`;
+        }
+        const [result] = await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, NULL, "customer", ?, ?)', [cleanName, cleanEmail, cleanPhone, cleanCi]);
+        const newCustomerId = result.insertId;
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'user_edit',
+            title: `Nuevo Cliente Registrado: ${cleanName}`,
+            details: `Cédula: ${cleanCi}, Teléfono: ${cleanPhone || 'N/D'}, Correo: ${cleanEmail}`
+        });
+        res.status(201).json({
+            message: 'Cliente registrado con éxito',
+            user: {
+                id: newCustomerId,
+                name: cleanName,
+                email: cleanEmail,
+                phone: cleanPhone,
+                ci: cleanCi,
+                role: 'customer'
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error al registrar cliente:', error);
+        res.status(500).json({ message: error.message || 'Error al registrar cliente en la base de datos' });
     }
 });
 // Buscar cliente por cédula (POS Step-1)

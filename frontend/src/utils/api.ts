@@ -159,6 +159,10 @@ export const api = {
     }),
     me: () => request<User>('/auth/me'),
     getCustomers: () => request<User[]>('/auth/customers'),
+    registerCustomer: (body: { name: string; ci: string; email?: string; phone?: string }) => request<{ message: string; user: User }>('/auth/register-customer', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
     getCustomerByCi: (ci: string) => request<User>(`/auth/customer-by-ci?ci=${encodeURIComponent(ci)}`),
     getStaff: () => request<User[]>('/auth/staff'),
     createStaff: (body: any) => request<{ message: string }>('/auth/staff', {
