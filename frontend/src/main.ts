@@ -3168,17 +3168,13 @@ function addToPOSCart(product: Product) {
 let editingProductId: number | null = null;
 let editingStaffId: number | null = null;
 let adminProductsSearchQuery = '';
+let adminProductsSearchDebounceTimer: number | undefined;
 
-async function renderAdminProducts() {
-  const panel = document.getElementById('dashboard-content-panel');
-  if (!panel) return;
-
-  const existingCategories = Array.from(new Set(productsList.map(p => p.category).filter(Boolean)));
-  if (!existingCategories.includes('General')) existingCategories.push('General');
-
+function getAdminFilteredProducts(): Product[] {
   const normalizedQuery = adminProductsSearchQuery.trim().toLowerCase();
-  const filteredProducts = productsList.filter(prod => {
-    if (!normalizedQuery) return true;
+  if (!normalizedQuery) return productsList;
+
+  return productsList.filter(prod => {
     const haystack = [
       prod.name,
       prod.description,
@@ -3188,6 +3184,100 @@ async function renderAdminProducts() {
     ].filter(Boolean).join(' ').toLowerCase();
     return haystack.includes(normalizedQuery);
   });
+}
+
+function renderAdminProductsRows(products: Product[]): string {
+  return products.map(prod => `
+    <tr>
+      <td>
+        <img src="${prod.image_url}" style="width:48px; height:48px; object-fit:cover; border-radius:8px;" alt="${prod.name}">
+      </td>
+      <td>
+        <strong>${prod.name}</strong>
+        ${prod.code ? `<br><small style="color:var(--primary); font-weight:600; font-size:11px;">🏷️ ${prod.code}</small>` : ''}
+        <br><small style="color:var(--text-secondary); max-width:200px; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.description || ''}</small>
+      </td>
+      <td>${prod.category || 'General'}</td>
+      <td><strong>$${Number(prod.price).toFixed(2)}</strong></td>
+      <td class="text-center" style="font-weight:600; ${prod.stock < 5 ? 'color:var(--danger)' : ''}">${prod.stock}</td>
+      <td class="text-right">
+        <button class="btn btn-secondary btn-icon edit-prod-btn" style="padding:6px;" data-id="${prod.id}">
+          📝
+        </button>
+        <button class="btn btn-danger btn-icon delete-prod-btn" style="padding:6px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.2); color:var(--danger);" data-id="${prod.id}">
+          ${icons.trash}
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function bindProductTableActions() {
+  document.querySelectorAll('.edit-prod-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const prod = productsList.find(p => p.id === id);
+      if (prod) {
+        editingProductId = prod.id;
+        const formTitle = document.getElementById('product-form-title');
+        if (formTitle) formTitle.innerText = `Editar Producto: ${prod.name}`;
+
+        const categorySelect = document.getElementById('prod-category-select') as HTMLSelectElement;
+        const categoryCustomBox = document.getElementById('new-category-input-box');
+        const categoryCustomInput = document.getElementById('prod-category-custom') as HTMLInputElement;
+
+        (document.getElementById('prod-name') as HTMLInputElement).value = prod.name;
+
+        const options = Array.from(categorySelect?.options || []).map(o => o.value);
+        if (options.includes(prod.category)) {
+          categorySelect.value = prod.category;
+          if (categoryCustomBox) categoryCustomBox.style.display = 'none';
+        } else {
+          categorySelect.value = '__NEW_CATEGORY__';
+          if (categoryCustomBox) categoryCustomBox.style.display = 'block';
+          if (categoryCustomInput) categoryCustomInput.value = prod.category || '';
+        }
+
+        (document.getElementById('prod-code') as HTMLInputElement).value = prod.code || '';
+        (document.getElementById('prod-desc') as HTMLTextAreaElement).value = prod.description || '';
+        (document.getElementById('prod-price') as HTMLInputElement).value = prod.price.toString();
+        (document.getElementById('prod-stock') as HTMLInputElement).value = prod.stock.toString();
+        (document.getElementById('prod-img') as HTMLInputElement).value = prod.image_url || '';
+
+        const fileInput = document.getElementById('prod-image-file') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+
+        const formCard = document.getElementById('product-form-card');
+        if (formCard) formCard.style.display = 'block';
+        formCard?.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+
+  document.querySelectorAll('.delete-prod-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      if (confirm('¿Estas seguro de eliminar este producto? Se eliminara permanentemente.')) {
+        try {
+          await api.products.delete(id);
+          await loadProducts();
+          await renderAdminProducts();
+        } catch (err: any) {
+          alert(err.message || 'Error al eliminar');
+        }
+      }
+    });
+  });
+}
+
+async function renderAdminProducts() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  const existingCategories = Array.from(new Set(productsList.map(p => p.category).filter(Boolean)));
+  if (!existingCategories.includes('General')) existingCategories.push('General');
+
+  const filteredProducts = getAdminFilteredProducts();
 
   panel.innerHTML = `
     <div class="animate-on-scroll animate-fade-up visible">
@@ -3330,30 +3420,8 @@ async function renderAdminProducts() {
                 <th class="text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody>
-              ${filteredProducts.map(prod => `
-                <tr>
-                  <td>
-                    <img src="${prod.image_url}" style="width:48px; height:48px; object-fit:cover; border-radius:8px;" alt="${prod.name}">
-                  </td>
-                  <td>
-                    <strong>${prod.name}</strong>
-                    ${prod.code ? `<br><small style="color:var(--primary); font-weight:600; font-size:11px;">🏷️ ${prod.code}</small>` : ''}
-                    <br><small style="color:var(--text-secondary); max-width:200px; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.description || ''}</small>
-                  </td>
-                  <td>${prod.category || 'General'}</td>
-                  <td><strong>$${Number(prod.price).toFixed(2)}</strong></td>
-                  <td class="text-center" style="font-weight:600; ${prod.stock < 5 ? 'color:var(--danger)' : ''}">${prod.stock}</td>
-                  <td class="text-right">
-                    <button class="btn btn-secondary btn-icon edit-prod-btn" style="padding:6px;" data-id="${prod.id}">
-                      📝
-                    </button>
-                    <button class="btn btn-danger btn-icon delete-prod-btn" style="padding:6px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.2); color:var(--danger);" data-id="${prod.id}">
-                      ${icons.trash}
-                    </button>
-                  </td>
-                </tr>
-              `).join('')}
+            <tbody id="admin-products-table-body">
+              ${renderAdminProductsRows(filteredProducts)}
             </tbody>
           </table>
         </div>
@@ -3468,7 +3536,15 @@ function bindProductCRUDEvents() {
   const applyProductsSearch = () => {
     if (searchInput) {
       adminProductsSearchQuery = searchInput.value;
-      renderAdminProducts();
+      if (adminProductsSearchDebounceTimer) {
+        window.clearTimeout(adminProductsSearchDebounceTimer);
+      }
+      adminProductsSearchDebounceTimer = window.setTimeout(() => {
+        const tableBody = document.getElementById('admin-products-table-body');
+        if (!tableBody) return;
+        tableBody.innerHTML = renderAdminProductsRows(getAdminFilteredProducts());
+        bindProductTableActions();
+      }, 40);
     }
   };
 
@@ -3477,7 +3553,11 @@ function bindProductCRUDEvents() {
     if (searchInput) {
       searchInput.value = '';
       adminProductsSearchQuery = '';
-      renderAdminProducts();
+      const tableBody = document.getElementById('admin-products-table-body');
+      if (tableBody) {
+        tableBody.innerHTML = renderAdminProductsRows(getAdminFilteredProducts());
+        bindProductTableActions();
+      }
     }
   });
 
@@ -3559,59 +3639,7 @@ function bindProductCRUDEvents() {
     }
   });
 
-  // Evento Editar
-  document.querySelectorAll('.edit-prod-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
-      const prod = productsList.find(p => p.id === id);
-      if (prod) {
-        editingProductId = prod.id;
-        if (formTitle) formTitle.innerText = `Editar Producto: ${prod.name}`;
-
-        (document.getElementById('prod-name') as HTMLInputElement).value = prod.name;
-        
-        // Seleccionar o agregar categoría al editar
-        const options = Array.from(categorySelect?.options || []).map(o => o.value);
-        if (options.includes(prod.category)) {
-          categorySelect.value = prod.category;
-          if (categoryCustomBox) categoryCustomBox.style.display = 'none';
-        } else {
-          categorySelect.value = '__NEW_CATEGORY__';
-          if (categoryCustomBox) categoryCustomBox.style.display = 'block';
-          if (categoryCustomInput) categoryCustomInput.value = prod.category || '';
-        }
-
-        (document.getElementById('prod-code') as HTMLInputElement).value = prod.code || '';
-        (document.getElementById('prod-desc') as HTMLTextAreaElement).value = prod.description || '';
-        (document.getElementById('prod-price') as HTMLInputElement).value = prod.price.toString();
-        (document.getElementById('prod-stock') as HTMLInputElement).value = prod.stock.toString();
-        (document.getElementById('prod-img') as HTMLInputElement).value = prod.image_url || '';
-        
-        // Limpiar el selector de archivo local
-        const fileInput = document.getElementById('prod-image-file') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
-
-        if (formCard) formCard.style.display = 'block';
-        formCard?.scrollIntoView({ behavior: 'smooth' });
-      }
-    });
-  });
-
-  // Evento Eliminar
-  document.querySelectorAll('.delete-prod-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
-      if (confirm('¿Estas seguro de eliminar este producto? Se eliminara permanentemente.')) {
-        try {
-          await api.products.delete(id);
-          await loadProducts();
-          await renderAdminProducts();
-        } catch (err: any) {
-          alert(err.message || 'Error al eliminar');
-        }
-      }
-    });
-  });
+  bindProductTableActions();
 }
 
 // ==========================================================================
