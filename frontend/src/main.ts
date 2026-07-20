@@ -39,6 +39,8 @@ let posCustomersList: User[] = [];
 let posSelectedCustomerId: number | null = null;
 let posDiscount = 0;
 let posApplyTax = true;
+let posApplyCurrencyDiscount = false;
+let posCurrencyDiscountPercent = 0;
 let posCouponCode = '';
 let posCouponDiscountPercent = 0;
 let posIsPending = false;
@@ -66,7 +68,7 @@ interface POSPaymentLine {
 }
 
 let posPaymentLines: POSPaymentLine[] = [
-  { id: 1, method: 'efectivo_usd', amountUsd: 0 }
+  { id: 1, method: 'efectivo_usd', amountUsd: 0, amountVes: 0 }
 ];
 
 // Instancias de Chart.js para destruirlas al cambiar de pestaña
@@ -2227,8 +2229,12 @@ async function renderAdminPOS() {
     
     // Cálculos de totales del POS
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const totalPaidInDivisasUsd = posPaymentLines
+      .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
+      .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
+    const currencyDiscountAmount = posApplyCurrencyDiscount ? (totalPaidInDivisasUsd * (posCurrencyDiscountPercent / 100)) : 0;
     const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
-    const totalDiscount = couponDiscountAmount + posDiscount;
+    const totalDiscount = couponDiscountAmount + posDiscount + currencyDiscountAmount;
     const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
     const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
     const posTotal = taxableSubtotal + taxAmount;
@@ -2365,40 +2371,98 @@ async function renderAdminPOS() {
             <input type="hidden" id="pos-client-phone" value="${posCustomerPhone}">
             <input type="hidden" id="pos-is-pending" value="${posIsPending ? '1' : '0'}">
 
-            <!-- Módulo de Métodos de Pago Combinados / Mixtos -->
+            <!-- Módulo de Métodos de Pago Combinados / Mixtos (Dólares & Bolívares) -->
             <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <label class="form-label" style="font-size:10px; text-transform:uppercase; font-weight:700; margin:0;">💳 Métodos de Pago *</label>
+                <label class="form-label" style="font-size:10px; text-transform:uppercase; font-weight:700; margin:0; color:var(--text-muted);">
+                  💳 Métodos de Pago (Bs. & $) *
+                </label>
                 <button type="button" class="btn btn-secondary" id="add-pos-payment-line-btn" style="padding:3px 8px; font-size:10px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-weight:700;">
                   ➕ Añadir Otro Método
                 </button>
               </div>
 
               <div id="pos-payment-lines-container" style="display:flex; flex-direction:column; gap:8px;">
-                ${posPaymentLines.map((line, idx) => `
-                  <div class="pos-payment-row" data-index="${idx}" style="display:grid; grid-template-columns: 1fr auto auto; gap:6px; align-items:center; background:rgba(0,0,0,0.2); padding:6px; border-radius:8px; border:1px solid var(--border-glass);">
-                    <select class="form-control pos-pay-method-select" data-index="${idx}" style="padding:4px 6px; font-size:11px; font-weight:700;">
-                      <option value="efectivo_usd" ${line.method === 'efectivo_usd' ? 'selected' : ''}>💵 Efectivo USD ($)</option>
-                      <option value="pago_movil" ${line.method === 'pago_movil' ? 'selected' : ''}>📱 Pago Móvil (Bs.)</option>
-                      <option value="punto_de_venta" ${line.method === 'punto_de_venta' ? 'selected' : ''}>💳 Punto de Venta (Bs.)</option>
-                      <option value="transferencia_ves" ${line.method === 'transferencia_ves' ? 'selected' : ''}>🏛️ Transferencia (Bs.)</option>
-                      <option value="zelle" ${line.method === 'zelle' ? 'selected' : ''}>💸 Zelle ($)</option>
-                      <option value="binance" ${line.method === 'binance' ? 'selected' : ''}>🟡 Binance Pay ($)</option>
-                      <option value="efectivo_ves" ${line.method === 'efectivo_ves' ? 'selected' : ''}>💵 Efectivo Bs. (VES)</option>
-                      <option value="paypal" ${line.method === 'paypal' ? 'selected' : ''}>🅿️ PayPal ($)</option>
-                    </select>
+                ${posPaymentLines.map((line, idx) => {
+                  const isVes = ['pago_movil', 'punto_de_venta', 'transferencia_ves', 'efectivo_ves'].includes(line.method);
+                  const vesEquivalent = line.amountUsd ? (line.amountUsd * rateUsdToVes) : 0;
+                  const usdEquivalent = (line.amountVes || 0) / (rateUsdToVes || 1);
 
-                    <div style="display:flex; align-items:center; gap:3px;">
-                      <span style="font-size:10px; color:var(--primary); font-weight:700;">$</span>
-                      <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-usd" data-index="${idx}" value="${line.amountUsd !== undefined && line.amountUsd > 0 ? line.amountUsd : ''}" placeholder="0.00" style="width:75px; padding:4px; font-size:11px; text-align:right; font-weight:700;">
+                  return `
+                    <div class="pos-payment-row" data-index="${idx}" style="display:flex; flex-direction:column; gap:6px; background:rgba(0,0,0,0.25); padding:8px 10px; border-radius:8px; border:1px solid var(--border-glass);">
+                      <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                        <select class="form-control pos-pay-method-select" data-index="${idx}" style="padding:4px 6px; font-size:11px; font-weight:700; flex-grow:1;">
+                          <optgroup label="💵 En Dólares ($)">
+                            <option value="efectivo_usd" ${line.method === 'efectivo_usd' ? 'selected' : ''}>💵 Efectivo USD ($)</option>
+                            <option value="zelle" ${line.method === 'zelle' ? 'selected' : ''}>💸 Zelle ($)</option>
+                            <option value="binance" ${line.method === 'binance' ? 'selected' : ''}>🟡 Binance Pay ($)</option>
+                            <option value="paypal" ${line.method === 'paypal' ? 'selected' : ''}>🅿️ PayPal ($)</option>
+                          </optgroup>
+                          <optgroup label="🇻🇪 En Bolívares (Bs.)">
+                            <option value="pago_movil" ${line.method === 'pago_movil' ? 'selected' : ''}>📱 Pago Móvil (Bs.)</option>
+                            <option value="punto_de_venta" ${line.method === 'punto_de_venta' ? 'selected' : ''}>💳 Punto de Venta / Tarjeta (Bs.)</option>
+                            <option value="transferencia_ves" ${line.method === 'transferencia_ves' ? 'selected' : ''}>🏛️ Transferencia Bancaria (Bs.)</option>
+                            <option value="efectivo_ves" ${line.method === 'efectivo_ves' ? 'selected' : ''}>💵 Efectivo Bolívares (Bs.)</option>
+                          </optgroup>
+                        </select>
+
+                        ${posPaymentLines.length > 1 ? `
+                          <button type="button" class="btn btn-danger remove-pos-payment-line" data-index="${idx}" style="padding:2px 6px; font-size:10px; background:rgba(239,68,68,0.2); color:#f87171; border:none;" title="Quitar método">✕</button>
+                        ` : ''}
+                      </div>
+
+                      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                        ${isVes ? `
+                          <!-- Input para Bolívares -->
+                          <div style="display:flex; align-items:center; gap:4px; flex-grow:1;">
+                            <span style="font-size:11px; color:#f59e0b; font-weight:800;">Bs.</span>
+                            <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-ves" data-index="${idx}" value="${line.amountVes ? line.amountVes : (line.amountUsd ? (line.amountUsd * rateUsdToVes).toFixed(2) : '')}" placeholder="0.00" style="padding:4px 6px; font-size:12px; text-align:right; font-weight:700; color:#f59e0b;">
+                          </div>
+                          <div style="font-size:11px; color:var(--text-muted); font-weight:700; white-space:nowrap;">
+                            = <strong style="color:var(--primary);">$ ${usdEquivalent.toFixed(2)}</strong>
+                          </div>
+                        ` : `
+                          <!-- Input para Dólares -->
+                          <div style="display:flex; align-items:center; gap:4px; flex-grow:1;">
+                            <span style="font-size:11px; color:var(--primary); font-weight:800;">$</span>
+                            <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-usd" data-index="${idx}" value="${line.amountUsd ? line.amountUsd : ''}" placeholder="0.00" style="padding:4px 6px; font-size:12px; text-align:right; font-weight:700; color:var(--primary);">
+                          </div>
+                          <div style="font-size:11px; color:var(--text-muted); font-weight:700; white-space:nowrap;">
+                            = <strong style="color:#f59e0b;">Bs. ${vesEquivalent.toFixed(2)}</strong>
+                          </div>
+                        `}
+
+                        <button type="button" class="btn btn-secondary fill-pos-payment-balance" data-index="${idx}" style="padding:2px 6px; font-size:10px; font-weight:700; background:rgba(255,255,255,0.06);" title="Llenar saldo pendiente">
+                          ⚡ Rellenar
+                        </button>
+                      </div>
                     </div>
-
-                    ${posPaymentLines.length > 1 ? `
-                      <button type="button" class="btn btn-danger remove-pos-payment-line" data-index="${idx}" style="padding:2px 6px; font-size:10px; background:rgba(239,68,68,0.2); color:#f87171; border:none;" title="Quitar método">✕</button>
-                    ` : '<div style="width:16px;"></div>'}
-                  </div>
-                `).join('')}
+                  `;
+                }).join('')}
               </div>
+            </div>
+
+            <!-- Descuento Especial por Pago en Divisas ($) -->
+            <div style="background:rgba(99,102,241,0.04); border:1px solid rgba(99,102,241,0.25); border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label style="font-size:11px; font-weight:700; color:#818cf8; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                  <input type="checkbox" id="pos-apply-currency-discount-cb" ${posApplyCurrencyDiscount ? 'checked' : ''} style="cursor:pointer;">
+                  <span>💵 Aplicar Descuento por Pago en Divisas ($)</span>
+                </label>
+              </div>
+
+              ${posApplyCurrencyDiscount ? `
+                <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                  <span style="font-size:10px; color:var(--text-muted);">% Descuento en Divisas:</span>
+                  <input type="number" step="0.5" min="0" max="100" class="form-control" id="pos-currency-discount-percent-input" value="${posCurrencyDiscountPercent || ''}" placeholder="Ej. 5%" style="width:80px; padding:4px 6px; font-size:12px; text-align:right; font-weight:700;">
+                  <span style="font-size:11px; color:var(--success); font-weight:700;">
+                    = -$ ${currencyDiscountAmount.toFixed(2)}
+                  </span>
+                </div>
+                <div style="font-size:9px; color:var(--text-muted); font-style:italic;">
+                  * Se aplica únicamente sobre $ ${totalPaidInDivisasUsd.toFixed(2)} pagados en divisas.
+                </div>
+              ` : ''}
             </div>
 
             <!-- Descuento Dual (% y $) -->
@@ -3113,21 +3177,93 @@ function bindPOSEvents() {
     await renderAdminPOS();
   });
 
-  // Selección Visual de Método de Pago (Cards)
-  document.querySelectorAll('.pay-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      document.querySelectorAll('.pay-card').forEach(c => {
-        c.classList.remove('active');
-        (c as HTMLElement).style.border = '1px solid var(--border-glass)';
-        (c as HTMLElement).style.background = 'rgba(255,255,255,0.02)';
-      });
-      const target = e.currentTarget as HTMLElement;
-      target.classList.add('active');
-      target.style.border = '1px solid var(--primary)';
-      target.style.background = 'rgba(99,102,241,0.1)';
-      const method = target.dataset.method || 'efectivo_usd';
-      (document.getElementById('pos-client-payment') as HTMLInputElement).value = method;
+  // Añadir/Remover/Modificar Métodos de Pago
+  document.getElementById('add-pos-payment-line-btn')?.addEventListener('click', async () => {
+    const nextId = posPaymentLines.length > 0 ? Math.max(...posPaymentLines.map(p => p.id)) + 1 : 1;
+    posPaymentLines.push({ id: nextId, method: 'pago_movil', amountUsd: 0, amountVes: 0 });
+    await renderAdminPOS();
+  });
+
+  document.querySelectorAll('.remove-pos-payment-line').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const idx = parseInt((e.currentTarget as HTMLButtonElement).dataset.index || '0');
+      if (posPaymentLines.length > 1) {
+        posPaymentLines.splice(idx, 1);
+        await renderAdminPOS();
+      }
     });
+  });
+
+  document.querySelectorAll('.pos-pay-method-select').forEach(select => {
+    select.addEventListener('change', async (e) => {
+      const idx = parseInt((e.currentTarget as HTMLSelectElement).dataset.index || '0');
+      const val = (e.currentTarget as HTMLSelectElement).value;
+      if (posPaymentLines[idx]) {
+        posPaymentLines[idx].method = val;
+        await renderAdminPOS();
+      }
+    });
+  });
+
+  document.querySelectorAll('.pos-pay-amount-usd').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const idx = parseInt((e.currentTarget as HTMLInputElement).dataset.index || '0');
+      const val = parseFloat((e.currentTarget as HTMLInputElement).value);
+      if (posPaymentLines[idx]) {
+        posPaymentLines[idx].amountUsd = isNaN(val) ? 0 : val;
+        posPaymentLines[idx].amountVes = posPaymentLines[idx].amountUsd * rateUsdToVes;
+      }
+    });
+  });
+
+  document.querySelectorAll('.pos-pay-amount-ves').forEach(input => {
+    input.addEventListener('input', (e) => {
+      const idx = parseInt((e.currentTarget as HTMLInputElement).dataset.index || '0');
+      const val = parseFloat((e.currentTarget as HTMLInputElement).value);
+      if (posPaymentLines[idx]) {
+        posPaymentLines[idx].amountVes = isNaN(val) ? 0 : val;
+        posPaymentLines[idx].amountUsd = rateUsdToVes > 0 ? (posPaymentLines[idx].amountVes / rateUsdToVes) : 0;
+      }
+    });
+  });
+
+  document.querySelectorAll('.fill-pos-payment-balance').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const idx = parseInt((e.currentTarget as HTMLButtonElement).dataset.index || '0');
+      const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+      const totalPaidInDivisasUsd = posPaymentLines
+        .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
+        .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
+      const currencyDiscountAmount = posApplyCurrencyDiscount ? (totalPaidInDivisasUsd * (posCurrencyDiscountPercent / 100)) : 0;
+      const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
+      const totalDiscount = couponDiscountAmount + posDiscount + currencyDiscountAmount;
+      const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
+      const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
+      const posTotal = taxableSubtotal + taxAmount;
+
+      const otherPaid = posPaymentLines.reduce((sum, line, i) => i === idx ? sum : sum + (line.amountUsd || 0), 0);
+      const remainingUsd = Math.max(0, posTotal - otherPaid);
+      if (posPaymentLines[idx]) {
+        posPaymentLines[idx].amountUsd = remainingUsd;
+        posPaymentLines[idx].amountVes = remainingUsd * rateUsdToVes;
+        await renderAdminPOS();
+      }
+    });
+  });
+
+  const currencyDiscountCb = document.getElementById('pos-apply-currency-discount-cb') as HTMLInputElement;
+  currencyDiscountCb?.addEventListener('change', async (e) => {
+    posApplyCurrencyDiscount = (e.target as HTMLInputElement).checked;
+    await renderAdminPOS();
+  });
+
+  const currencyDiscountPercentIn = document.getElementById('pos-currency-discount-percent-input') as HTMLInputElement;
+  currencyDiscountPercentIn?.addEventListener('input', (e) => {
+    const val = parseFloat((e.target as HTMLInputElement).value);
+    posCurrencyDiscountPercent = isNaN(val) ? 0 : val;
+  });
+  currencyDiscountPercentIn?.addEventListener('change', async () => {
+    await renderAdminPOS();
   });
 
   // Descuento por Porcentaje %
@@ -3170,19 +3306,42 @@ function bindPOSEvents() {
   document.getElementById('pos-checkout-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const name = (document.getElementById('pos-client-name') as HTMLInputElement).value;
-    const email = (document.getElementById('pos-client-email') as HTMLInputElement).value;
-    const phone = (document.getElementById('pos-client-phone') as HTMLInputElement).value;
+    const name = posCustomerName || (document.getElementById('pos-client-name') as HTMLInputElement)?.value || 'Consumidor Final';
+    const email = posCustomerEmail || (document.getElementById('pos-client-email') as HTMLInputElement)?.value || undefined;
+    const phone = posCustomerPhone || (document.getElementById('pos-client-phone') as HTMLInputElement)?.value || undefined;
     const ciPrefix = (document.getElementById('pos-client-ci-prefix') as HTMLSelectElement)?.value || 'V-';
-    const ciNum = (document.getElementById('pos-client-ci-num') as HTMLInputElement)?.value.trim() || '';
-    const customerCi = ciNum ? `${ciPrefix}${ciNum}` : undefined;
-    const payment = (document.getElementById('pos-client-payment') as HTMLInputElement).value;
+    const ciNum = posCustomerCi || (document.getElementById('pos-client-ci-num') as HTMLInputElement)?.value?.trim() || '';
+    const customerCi = ciNum ? (ciNum.includes('-') ? ciNum : `${ciPrefix}${ciNum}`) : undefined;
 
-    const concept = (document.getElementById('pos-concept-input') as HTMLInputElement)?.value.trim() || undefined;
-    const note = (document.getElementById('pos-note-input') as HTMLTextAreaElement)?.value.trim() || undefined;
+    const payment = posPaymentLines.map(l => {
+      const isVes = ['pago_movil', 'punto_de_venta', 'transferencia_ves', 'efectivo_ves'].includes(l.method);
+      const nameMap: Record<string, string> = {
+        'efectivo_usd': 'Efectivo $',
+        'pago_movil': 'Pago Móvil (Bs.)',
+        'punto_de_venta': 'Punto de Venta (Bs.)',
+        'transferencia_ves': 'Transferencia (Bs.)',
+        'zelle': 'Zelle ($)',
+        'binance': 'Binance Pay ($)',
+        'efectivo_ves': 'Efectivo Bs.',
+        'paypal': 'PayPal ($)'
+      };
+      const methodName = nameMap[l.method] || l.method;
+      if (isVes) {
+        const vesAmt = l.amountVes || (l.amountUsd * rateUsdToVes);
+        const usdAmt = l.amountUsd || (vesAmt / rateUsdToVes);
+        return `${methodName}: Bs. ${vesAmt.toFixed(2)} ($${usdAmt.toFixed(2)})`;
+      } else {
+        const usdAmt = l.amountUsd || 0;
+        const vesAmt = usdAmt * rateUsdToVes;
+        return `${methodName}: $${usdAmt.toFixed(2)} (Bs. ${vesAmt.toFixed(2)})`;
+      }
+    }).join(' + ') || 'Efectivo $';
+
+    const concept = (document.getElementById('pos-concept-input') as HTMLInputElement)?.value?.trim() || undefined;
+    const note = (document.getElementById('pos-note-input') as HTMLTextAreaElement)?.value?.trim() || undefined;
 
     const isQuotation = (document.getElementById('pos-is-quotation') as HTMLInputElement)?.checked || false;
-    const isPending = (document.getElementById('pos-is-pending') as HTMLInputElement)?.value === '1';
+    const isPending = posIsPending;
 
     // Validación de Cliente Registrado & Advertencia Sin Garantía
     const isCustomerDataProvided = name && name.trim() !== '' && name.toLowerCase() !== 'consumidor final' && ciNum && ciNum.trim() !== '';
@@ -3204,13 +3363,19 @@ function bindPOSEvents() {
     }));
 
     const btn = document.getElementById('pos-submit-btn') as HTMLButtonElement;
-    btn.disabled = true;
-    btn.innerText = 'Registrando...';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Registrando...';
+    }
 
     // Totales finales a pasar
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const totalPaidInDivisasUsd = posPaymentLines
+      .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
+      .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
+    const currencyDiscountAmount = posApplyCurrencyDiscount ? (totalPaidInDivisasUsd * (posCurrencyDiscountPercent / 100)) : 0;
     const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
-    const totalDiscount = couponDiscountAmount + posDiscount;
+    const totalDiscount = couponDiscountAmount + posDiscount + currencyDiscountAmount;
     const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
     const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
 
@@ -3240,6 +3405,9 @@ function bindPOSEvents() {
       posSelectedCustomerId = null;
       posDiscount = 0;
       posApplyTax = true;
+      posApplyCurrencyDiscount = false;
+      posCurrencyDiscountPercent = 0;
+      posPaymentLines = [{ id: 1, method: 'efectivo_usd', amountUsd: 0, amountVes: 0 }];
       posCouponCode = '';
       posCouponDiscountPercent = 0;
       posIsPending = false;
@@ -3264,7 +3432,7 @@ function bindPOSEvents() {
         ...result,
         customerName: name,
         is_quotation: isQuotation ? 1 : 0
-      }, phone, email, itemsFormatted);
+      }, phone || '', email || '', itemsFormatted);
 
       // Renderizar POS de nuevo
       await renderAdminPOS();
