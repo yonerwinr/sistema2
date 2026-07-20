@@ -2228,14 +2228,33 @@ async function renderAdminPOS() {
     
     // Cálculos de totales del POS
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    const totalPaidInDivisasUsd = posPaymentLines
-      .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
-      .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
-    
+
     // Porcentaje de descuento diferencial automático entre Tasa Paralela (Binance) y BCV
     const autoCurrencyDiscountPct = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
       ? (((rateBinanceToVes - rateUsdToVes) / rateBinanceToVes) * 100)
       : 0;
+
+    // Si no es venta a crédito (posIsPending = false) y solo hay 1 método de pago en posPaymentLines,
+    // se asume que se paga la totalidad de la venta con ese único método de pago.
+    if (!posIsPending && posPaymentLines.length === 1) {
+      const tempCouponDiscount = posSubtotal * (posCouponDiscountPercent / 100);
+      const tempBaseTaxable = Math.max(0, posSubtotal - tempCouponDiscount - posDiscount);
+      const tempBaseTax = posApplyTax ? tempBaseTaxable * 0.16 : 0;
+      const tempBaseTotal = tempBaseTaxable + tempBaseTax;
+
+      const isDivisa = ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(posPaymentLines[0].method);
+      const tempCurrencyDiscount = (posApplyCurrencyDiscount && isDivisa)
+        ? tempBaseTotal * (autoCurrencyDiscountPct / 100)
+        : 0;
+
+      const finalEstimatedTotal = Math.max(0, tempBaseTotal - tempCurrencyDiscount);
+      posPaymentLines[0].amountUsd = finalEstimatedTotal;
+      posPaymentLines[0].amountVes = finalEstimatedTotal * rateUsdToVes;
+    }
+
+    const totalPaidInDivisasUsd = posPaymentLines
+      .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
+      .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
 
     const currencyDiscountAmount = posApplyCurrencyDiscount
       ? totalPaidInDivisasUsd * (autoCurrencyDiscountPct / 100)
@@ -2245,6 +2264,11 @@ async function renderAdminPOS() {
     const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
     const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
     const posTotal = taxableSubtotal + taxAmount;
+
+    if (!posIsPending && posPaymentLines.length === 1) {
+      posPaymentLines[0].amountUsd = posTotal;
+      posPaymentLines[0].amountVes = posTotal * rateUsdToVes;
+    }
 
     panel.innerHTML = `
       <!-- Barra Superior de Acciones POS -->
@@ -3308,6 +3332,45 @@ function bindPOSEvents() {
     const ciNum = posCustomerCi || (document.getElementById('pos-client-ci-num') as HTMLInputElement)?.value?.trim() || '';
     const customerCi = ciNum ? (ciNum.includes('-') ? ciNum : `${ciPrefix}${ciNum}`) : undefined;
 
+    // Totales finales a pasar
+    const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const autoCurrencyDiscountPct = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
+      ? (((rateBinanceToVes - rateUsdToVes) / rateBinanceToVes) * 100)
+      : 0;
+
+    // Si la venta no es a crédito y sólo hay 1 método de pago, asegurar que cubra el 100% del total
+    if (!posIsPending && posPaymentLines.length === 1) {
+      const tempCouponDiscount = posSubtotal * (posCouponDiscountPercent / 100);
+      const tempBaseTaxable = Math.max(0, posSubtotal - tempCouponDiscount - posDiscount);
+      const tempBaseTax = posApplyTax ? tempBaseTaxable * 0.16 : 0;
+      const tempBaseTotal = tempBaseTaxable + tempBaseTax;
+
+      const isDivisa = ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(posPaymentLines[0].method);
+      const tempCurrencyDiscount = (posApplyCurrencyDiscount && isDivisa)
+        ? tempBaseTotal * (autoCurrencyDiscountPct / 100)
+        : 0;
+
+      const finalEstimatedTotal = Math.max(0, tempBaseTotal - tempCurrencyDiscount);
+      posPaymentLines[0].amountUsd = finalEstimatedTotal;
+      posPaymentLines[0].amountVes = finalEstimatedTotal * rateUsdToVes;
+    }
+
+    const totalPaidInDivisasUsd = posPaymentLines
+      .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
+      .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
+
+    const currencyDiscountAmount = posApplyCurrencyDiscount ? (totalPaidInDivisasUsd * (autoCurrencyDiscountPct / 100)) : 0;
+    const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
+    const totalDiscount = couponDiscountAmount + posDiscount + currencyDiscountAmount;
+    const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
+    const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
+    const posTotal = taxableSubtotal + taxAmount;
+
+    if (!posIsPending && posPaymentLines.length === 1) {
+      posPaymentLines[0].amountUsd = posTotal;
+      posPaymentLines[0].amountVes = posTotal * rateUsdToVes;
+    }
+
     const payment = posPaymentLines.map(l => {
       const isVes = ['pago_movil', 'punto_de_venta', 'transferencia_ves', 'efectivo_ves'].includes(l.method);
       const nameMap: Record<string, string> = {
@@ -3362,17 +3425,6 @@ function bindPOSEvents() {
       btn.disabled = true;
       btn.innerText = 'Registrando...';
     }
-
-    // Totales finales a pasar
-    const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-    const totalPaidInDivisasUsd = posPaymentLines
-      .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
-      .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
-    const currencyDiscountAmount = posApplyCurrencyDiscount ? (totalPaidInDivisasUsd * (posCurrencyDiscountPercent / 100)) : 0;
-    const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
-    const totalDiscount = couponDiscountAmount + posDiscount + currencyDiscountAmount;
-    const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
-    const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
 
     try {
       const result = await api.sales.checkoutPOS({
