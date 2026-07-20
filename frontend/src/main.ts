@@ -1358,7 +1358,10 @@ function bindSuccessEvents() {
 // ==========================================================================
 // VISTA: LOGIN / REGISTRO
 // ==========================================================================
-let activeAuthTab: 'login' | 'register' = 'login';
+let activeAuthTab: 'login' | 'register' | 'forgot' = 'login';
+let forgotStep: 'email' | 'code' = 'email';
+let resetTargetEmail = '';
+let resetPreviewUrl = '';
 
 function renderAuthView(): string {
   return `
@@ -1381,12 +1384,15 @@ function renderAuthView(): string {
               <input type="email" class="form-control" id="login-email" required placeholder="admin@sistema.com o cliente@correo.com">
             </div>
             <div class="form-group">
-              <label class="form-label" for="login-password">Contrasena</label>
+              <label class="form-label" for="login-password">Contraseña</label>
               <input type="password" class="form-control" id="login-password" required placeholder="••••••••">
+              <div style="text-align: right; margin-top: 6px;">
+                <a href="#" id="link-forgot-pass" style="font-size: 12px; color: var(--primary); font-weight: 600; text-decoration: none;">¿Olvidaste tu contraseña?</a>
+              </div>
             </div>
-            <button type="submit" class="btn btn-primary w-100 mt-4" id="login-submit-btn">Ingresar</button>
+            <button type="submit" class="btn btn-primary w-100 mt-3" id="login-submit-btn">Ingresar</button>
           </form>
-        ` : `
+        ` : activeAuthTab === 'register' ? `
           <form id="register-form">
             <div class="form-group">
               <label class="form-label" for="reg-name">Nombre Completo</label>
@@ -1399,7 +1405,7 @@ function renderAuthView(): string {
                   <option value="V-">V-</option>
                   <option value="E-">E-</option>
                 </select>
-                <input type="text" class="form-control" id="reg-ci-num" required placeholder="12345678" pattern="\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" style="flex-grow: 1;">
+                <input type="text" class="form-control" id="reg-ci-num" required placeholder="12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" style="flex-grow: 1;">
               </div>
             </div>
             <div class="form-group">
@@ -1416,6 +1422,50 @@ function renderAuthView(): string {
             </div>
             <button type="submit" class="btn btn-primary w-100 mt-4" id="reg-submit-btn">Crear Cuenta</button>
           </form>
+        ` : `
+          <div style="margin-top: 10px;">
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 8px;">Recuperar Contraseña 🔐</h3>
+            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.4;">
+              ${forgotStep === 'email' 
+                ? 'Ingresa tu correo electrónico registrado y te enviaremos un código de verificación de 6 dígitos.' 
+                : `Ingresa el código enviado a <strong style="color:var(--text-main);">${resetTargetEmail}</strong> y tu nueva contraseña.`}
+            </p>
+
+            ${forgotStep === 'email' ? `
+              <form id="forgot-email-form">
+                <div class="form-group mb-3">
+                  <label class="form-label" for="forgot-email-input">Correo Electrónico</label>
+                  <input type="email" class="form-control" id="forgot-email-input" required placeholder="Ej. usuario@correo.com" value="${resetTargetEmail}">
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="forgot-send-btn">Enviar Código al Correo</button>
+              </form>
+            ` : `
+              <form id="reset-pass-form">
+                <div class="form-group mb-3">
+                  <label class="form-label" for="reset-code-input">Código de Verificación (6 dígitos)</label>
+                  <input type="text" class="form-control" id="reset-code-input" required placeholder="123456" maxlength="6" pattern="\\d{6}" title="Ingrese el código de 6 dígitos" style="font-size: 20px; font-weight: 800; letter-spacing: 6px; text-align: center; color: var(--primary);">
+                </div>
+                <div class="form-group mb-3">
+                  <label class="form-label" for="reset-new-pass-input">Nueva Contraseña</label>
+                  <input type="password" class="form-control" id="reset-new-pass-input" required minlength="6" placeholder="Mínimo 6 caracteres">
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mb-2" id="reset-submit-btn">Restablecer Contraseña</button>
+              </form>
+              ${resetPreviewUrl ? `
+                <div style="margin-top: 12px; text-align: center;">
+                  <a href="${resetPreviewUrl}" target="_blank" class="btn btn-secondary w-100" style="font-size: 12px; display: inline-block;">
+                    🔍 Ver correo enviado en Ethereal Mail
+                  </a>
+                </div>
+              ` : ''}
+            `}
+
+            <div style="text-align: center; margin-top: 16px;">
+              <a href="#" id="link-back-login" style="font-size: 12px; color: var(--text-muted); text-decoration: none;">
+                ⬅ Volver al Inicio de Sesión
+              </a>
+            </div>
+          </div>
         `}
 
         <div style="margin: 20px 0; text-align: center; color: var(--text-muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -1441,6 +1491,65 @@ function bindAuthEvents() {
   document.getElementById('tab-register-btn')?.addEventListener('click', () => {
     activeAuthTab = 'register';
     renderApp();
+  });
+
+  document.getElementById('link-forgot-pass')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    activeAuthTab = 'forgot';
+    forgotStep = 'email';
+    renderApp();
+  });
+
+  document.getElementById('link-back-login')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    activeAuthTab = 'login';
+    renderApp();
+  });
+
+  // Evento Solicitar Código de Recuperación
+  document.getElementById('forgot-email-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = (document.getElementById('forgot-email-input') as HTMLInputElement).value.trim();
+    const btn = document.getElementById('forgot-send-btn') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.innerText = 'Enviando código...';
+
+    try {
+      const res = await api.auth.forgotPassword(email);
+      resetTargetEmail = email;
+      resetPreviewUrl = res.emailPreviewUrl || '';
+      forgotStep = 'code';
+      alert(res.message);
+      renderApp();
+    } catch (err: any) {
+      alert(err.message || 'Error al enviar código de recuperación');
+      btn.disabled = false;
+      btn.innerText = 'Enviar Código al Correo';
+    }
+  });
+
+  // Evento Restablecer Contraseña con Código
+  document.getElementById('reset-pass-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const code = (document.getElementById('reset-code-input') as HTMLInputElement).value.trim();
+    const newPassword = (document.getElementById('reset-new-pass-input') as HTMLInputElement).value;
+    const btn = document.getElementById('reset-submit-btn') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.innerText = 'Guardando nueva clave...';
+
+    try {
+      const res = await api.auth.resetPassword({ email: resetTargetEmail, code, newPassword });
+      alert(res.message);
+      activeAuthTab = 'login';
+      forgotStep = 'email';
+      resetTargetEmail = '';
+      resetPreviewUrl = '';
+      renderApp();
+    } catch (err: any) {
+      alert(err.message || 'Error al restablecer la contraseña');
+      btn.disabled = false;
+      btn.innerText = 'Restablecer Contraseña';
+    }
   });
 
   // Evento Login

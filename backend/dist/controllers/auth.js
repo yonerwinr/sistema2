@@ -8,6 +8,7 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
+const email_1 = require("../services/email");
 const router = (0, express_1.Router)();
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secreta_pos_online_token_key_987654321';
 // Registro de Usuario (Clientes)
@@ -261,6 +262,69 @@ router.delete('/staff/:id', auth_1.authenticate, async (req, res) => {
     catch (error) {
         console.error('Error al eliminar personal:', error);
         res.status(500).json({ message: 'Error al eliminar usuario' });
+    }
+});
+// Solicitar código de recuperación de contraseña por correo
+router.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ message: 'El correo electrónico es obligatorio' });
+    }
+    try {
+        const [users] = await db_1.default.query('SELECT id, name, email FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'No existe ninguna cuenta registrada con este correo electrónico' });
+        }
+        const user = users[0];
+        // Generar código aleatorio de 6 dígitos (ej. 849201)
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        // Expiración en 15 minutos
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+        // Guardar en base de datos
+        await db_1.default.query('UPDATE users SET reset_code = ?, reset_code_expires_at = ? WHERE id = ?', [code, expiresAt, user.id]);
+        // Enviar correo electrónico
+        const emailPreviewUrl = await (0, email_1.sendPasswordResetEmail)(user.email, user.name, code);
+        res.json({
+            message: 'Hemos enviado un código de 6 dígitos a tu correo electrónico',
+            emailPreviewUrl: emailPreviewUrl !== 'Email enviado' ? emailPreviewUrl : undefined
+        });
+    }
+    catch (error) {
+        console.error('Error en /forgot-password:', error);
+        res.status(500).json({ message: 'Error interno al enviar el código de recuperación' });
+    }
+});
+// Restablecer contraseña utilizando el código de 6 dígitos
+router.post('/reset-password', async (req, res) => {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) {
+        return res.status(400).json({ message: 'Correo, código y nueva contraseña son obligatorios' });
+    }
+    if (newPassword.length < 6) {
+        return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+    try {
+        const [users] = await db_1.default.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        const user = users[0];
+        if (!user.reset_code || user.reset_code.trim() !== code.trim()) {
+            return res.status(400).json({ message: 'El código de verificación es incorrecto' });
+        }
+        if (!user.reset_code_expires_at || new Date(user.reset_code_expires_at) < new Date()) {
+            return res.status(400).json({ message: 'El código de verificación ha expirado. Por favor solicita uno nuevo.' });
+        }
+        // Encriptar nueva contraseña
+        const salt = await bcryptjs_1.default.genSalt(10);
+        const hashedPassword = await bcryptjs_1.default.hash(newPassword, salt);
+        // Actualizar contraseña y limpiar código
+        await db_1.default.query('UPDATE users SET password = ?, reset_code = NULL, reset_code_expires_at = NULL WHERE id = ?', [hashedPassword, user.id]);
+        res.json({ message: '¡Contraseña restablecida con éxito! Ya puedes iniciar sesión con tu nueva clave.' });
+    }
+    catch (error) {
+        console.error('Error en /reset-password:', error);
+        res.status(500).json({ message: 'Error interno al restablecer la contraseña' });
     }
 });
 exports.default = router;

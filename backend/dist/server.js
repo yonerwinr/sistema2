@@ -52,7 +52,7 @@ async function runMigrations() {
         catch (err) {
             console.error('Error al modificar columna password en la tabla users:', err.message);
         }
-        // Verificar y agregar columna ci a la tabla users
+        // Verificar y agregar columna ci, reset_code y reset_code_expires_at a la tabla users
         try {
             const [userCols] = await conn.query('SHOW COLUMNS FROM users');
             const userColNames = userCols.map((c) => c.Field);
@@ -60,9 +60,13 @@ async function runMigrations() {
                 await conn.query('ALTER TABLE users ADD COLUMN ci VARCHAR(30) NULL UNIQUE');
                 console.log('Columna "ci" agregada a la tabla users.');
             }
+            if (!userColNames.includes('reset_code')) {
+                await conn.query('ALTER TABLE users ADD COLUMN reset_code VARCHAR(10) NULL, ADD COLUMN reset_code_expires_at DATETIME NULL');
+                console.log('Columnas "reset_code" y "reset_code_expires_at" agregadas a la tabla users.');
+            }
         }
         catch (err) {
-            console.error('Error al agregar columna ci a la tabla users:', err.message);
+            console.error('Error al actualizar columnas en la tabla users:', err.message);
         }
         // Verificar y agregar columna customer_ci a la tabla sales
         try {

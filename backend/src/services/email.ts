@@ -429,3 +429,62 @@ export async function sendPlainEmail(to: string, subject: string, text: string):
     throw error;
   }
 }
+
+export async function sendPasswordResetEmail(toEmail: string, userName: string, code: string): Promise<string> {
+  try {
+    const client = await getTransporter();
+    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@facilitoapp.com';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 0; }
+          .container { max-width: 500px; margin: 40px auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #edf2f7; box-shadow: 0 10px 15px rgba(0,0,0,0.05); }
+          .header { background: linear-gradient(135deg, #ff7a00 0%, #8b5cf6 100%); padding: 28px; text-align: center; color: #ffffff; }
+          .content { padding: 32px; text-align: center; }
+          .code-box { display: inline-block; background: #f1f5f9; padding: 16px 32px; border-radius: 12px; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #ff7a00; border: 2px dashed #ff7a00; margin: 20px 0; }
+          .footer { background: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #a0aec0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0; font-size:22px;">FacilitoApp 🐒</h1>
+            <p style="margin:4px 0 0 0; opacity:0.9; font-size:13px;">Recuperación de Contraseña</p>
+          </div>
+          <div class="content">
+            <h3 style="color:#2d3748; margin-top:0;">Hola, ${userName} 👋</h3>
+            <p style="color:#4a5568; font-size:14px; line-height:1.5;">Has solicitado restablecer tu contraseña. Usa el siguiente código de verificación de 6 dígitos:</p>
+            <div class="code-box">${code}</div>
+            <p style="color:#718096; font-size:12px;">Este código es válido por <strong>15 minutos</strong>. Si no solicitaste este cambio, puedes ignorar este correo de forma segura.</p>
+          </div>
+          <div class="footer">
+            <p>FacilitoApp 🐒 - Tu solución inteligente para compras y POS.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const info = await client.sendMail({
+      from: `"FacilitoApp 🐒" <${fromAddress}>`,
+      to: toEmail,
+      subject: `Código de recuperación: ${code} - FacilitoApp 🐒`,
+      text: `Hola ${userName}, tu código para restablecer tu contraseña en FacilitoApp es: ${code}. Este código vence en 15 minutos.`,
+      html: htmlContent
+    });
+
+    const testUrl = nodemailer.getTestMessageUrl(info);
+    if (testUrl) {
+      console.log(`[RESET CODE SENT] Código ${code} enviado a ${toEmail} - Preview: ${testUrl}`);
+      return testUrl;
+    }
+    return 'Email enviado';
+  } catch (error) {
+    console.error('Error enviando correo de recuperación:', error);
+    throw error;
+  }
+}
