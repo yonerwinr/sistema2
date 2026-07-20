@@ -2232,7 +2232,15 @@ async function renderAdminPOS() {
     const totalPaidInDivisasUsd = posPaymentLines
       .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
       .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
-    const currencyDiscountAmount = posApplyCurrencyDiscount ? (totalPaidInDivisasUsd * (posCurrencyDiscountPercent / 100)) : 0;
+    
+    // Porcentaje de descuento diferencial automático entre Tasa Paralela (Binance) y BCV
+    const autoCurrencyDiscountPct = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
+      ? (((rateBinanceToVes - rateUsdToVes) / rateBinanceToVes) * 100)
+      : 0;
+
+    const currencyDiscountAmount = posApplyCurrencyDiscount
+      ? totalPaidInDivisasUsd * (autoCurrencyDiscountPct / 100)
+      : 0;
     const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
     const totalDiscount = couponDiscountAmount + posDiscount + currencyDiscountAmount;
     const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
@@ -2447,20 +2455,25 @@ async function renderAdminPOS() {
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <label style="font-size:11px; font-weight:700; color:#818cf8; display:flex; align-items:center; gap:6px; cursor:pointer;">
                   <input type="checkbox" id="pos-apply-currency-discount-cb" ${posApplyCurrencyDiscount ? 'checked' : ''} style="cursor:pointer;">
-                  <span>💵 Aplicar Descuento por Pago en Divisas ($)</span>
+                  <span>💵 Descuento Fijo por Pago en Divisas ($)</span>
                 </label>
+                <span style="font-size:9px; color:var(--text-muted); font-weight:600;">Binance: Bs. ${rateBinanceToVes.toFixed(2)} | BCV: Bs. ${rateUsdToVes.toFixed(2)}</span>
               </div>
 
               ${posApplyCurrencyDiscount ? `
-                <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-                  <span style="font-size:10px; color:var(--text-muted);">% Descuento en Divisas:</span>
-                  <input type="number" step="0.5" min="0" max="100" class="form-control" id="pos-currency-discount-percent-input" value="${posCurrencyDiscountPercent || ''}" placeholder="Ej. 5%" style="width:80px; padding:4px 6px; font-size:12px; text-align:right; font-weight:700;">
-                  <span style="font-size:11px; color:var(--success); font-weight:700;">
-                    = -$ ${currencyDiscountAmount.toFixed(2)}
-                  </span>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:4px;">
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <span style="font-size:10px; color:var(--text-muted);">% Descuento Automático:</span>
+                    <span class="badge" style="background:rgba(99,102,241,0.15); color:#818cf8; font-weight:800; font-size:12px; padding:4px 8px; border:1px solid rgba(99,102,241,0.3);">
+                      ${autoCurrencyDiscountPct.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div style="font-size:12px; color:var(--success); font-weight:800;">
+                    -$ ${currencyDiscountAmount.toFixed(2)}
+                  </div>
                 </div>
                 <div style="font-size:9px; color:var(--text-muted); font-style:italic;">
-                  * Se aplica únicamente sobre $ ${totalPaidInDivisasUsd.toFixed(2)} pagados en divisas.
+                  * Descuento Fijo del ${autoCurrencyDiscountPct.toFixed(2)}% (calculado por sistema) aplicado únicamente sobre $ ${totalPaidInDivisasUsd.toFixed(2)} pagados en divisas.
                 </div>
               ` : ''}
             </div>
