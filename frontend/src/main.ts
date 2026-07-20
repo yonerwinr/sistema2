@@ -3101,6 +3101,9 @@ async function renderAdminProducts() {
   const panel = document.getElementById('dashboard-content-panel');
   if (!panel) return;
 
+  const existingCategories = Array.from(new Set(productsList.map(p => p.category).filter(Boolean)));
+  if (!existingCategories.includes('General')) existingCategories.push('General');
+
   panel.innerHTML = `
     <div class="animate-on-scroll animate-fade-up visible">
       <div class="flex justify-between align-center mb-4">
@@ -3120,8 +3123,14 @@ async function renderAdminProducts() {
               <input type="text" class="form-control" id="prod-name" required placeholder="Ej. MacBook Air M3">
             </div>
             <div class="form-group">
-              <label class="form-label" for="prod-category">Categoria</label>
-              <input type="text" class="form-control" id="prod-category" required placeholder="Ej. Laptops">
+              <label class="form-label" for="prod-category-select">Categoría</label>
+              <select class="form-control" id="prod-category-select" style="padding: 8px 12px; font-size:13px;">
+                ${existingCategories.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+                <option value="__NEW_CATEGORY__" style="color:var(--primary); font-weight:700;">➕ Agregar nueva categoría...</option>
+              </select>
+              <div id="new-category-input-box" style="display:none; margin-top:6px;">
+                <input type="text" class="form-control" id="prod-category-custom" placeholder="Escriba el nombre de la nueva categoría..." style="padding: 6px 10px; font-size: 12px;">
+              </div>
             </div>
           </div>
 
@@ -3333,6 +3342,20 @@ function bindProductCRUDEvents() {
     }
   });
 
+  // Toggle para caja de texto de nueva categoría
+  const categorySelect = document.getElementById('prod-category-select') as HTMLSelectElement;
+  const categoryCustomBox = document.getElementById('new-category-input-box');
+  const categoryCustomInput = document.getElementById('prod-category-custom') as HTMLInputElement;
+
+  categorySelect?.addEventListener('change', () => {
+    if (categorySelect.value === '__NEW_CATEGORY__') {
+      if (categoryCustomBox) categoryCustomBox.style.display = 'block';
+      if (categoryCustomInput) categoryCustomInput.focus();
+    } else {
+      if (categoryCustomBox) categoryCustomBox.style.display = 'none';
+    }
+  });
+
   ['calc-purchase-date', 'calc-bcv-rate', 'calc-binance-rate', 'calc-black-cost', 'calc-profit-margin'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', updateProductPriceCalc);
     document.getElementById(id)?.addEventListener('change', updateProductPriceCalc);
@@ -3349,6 +3372,7 @@ function bindProductCRUDEvents() {
     form.reset();
     if (formTitle) formTitle.innerText = 'Agregar Nuevo Producto';
     if (formCard) formCard.style.display = 'block';
+    if (categoryCustomBox) categoryCustomBox.style.display = 'none';
     formCard?.scrollIntoView({ behavior: 'smooth' });
     updateProductPriceCalc();
   });
@@ -3369,7 +3393,20 @@ function bindProductCRUDEvents() {
 
     try {
       const name = (document.getElementById('prod-name') as HTMLInputElement).value;
-      const category = (document.getElementById('prod-category') as HTMLInputElement).value;
+      
+      let category = categorySelect?.value || 'General';
+      if (category === '__NEW_CATEGORY__') {
+        const customCatName = categoryCustomInput?.value.trim();
+        if (!customCatName) {
+          alert('Por favor ingrese el nombre de la nueva categoría');
+          submitBtn.disabled = false;
+          cancelBtn.disabled = false;
+          submitBtn.innerText = originalText;
+          return;
+        }
+        category = customCatName;
+      }
+
       const description = (document.getElementById('prod-desc') as HTMLTextAreaElement).value;
       const price = parseFloat((document.getElementById('prod-price') as HTMLInputElement).value);
       const stock = parseInt((document.getElementById('prod-stock') as HTMLInputElement).value);
@@ -3390,10 +3427,10 @@ function bindProductCRUDEvents() {
 
       if (editingProductId) {
         await api.products.update(editingProductId, payload);
-        alert('Producto actualizado con exito');
+        alert('Producto actualizado con éxito');
       } else {
         await api.products.create(payload);
-        alert('Producto creado con exito');
+        alert('Producto creado con éxito');
       }
 
       if (formCard) formCard.style.display = 'none';
@@ -3418,7 +3455,18 @@ function bindProductCRUDEvents() {
         if (formTitle) formTitle.innerText = `Editar Producto: ${prod.name}`;
 
         (document.getElementById('prod-name') as HTMLInputElement).value = prod.name;
-        (document.getElementById('prod-category') as HTMLInputElement).value = prod.category || '';
+        
+        // Seleccionar o agregar categoría al editar
+        const options = Array.from(categorySelect?.options || []).map(o => o.value);
+        if (options.includes(prod.category)) {
+          categorySelect.value = prod.category;
+          if (categoryCustomBox) categoryCustomBox.style.display = 'none';
+        } else {
+          categorySelect.value = '__NEW_CATEGORY__';
+          if (categoryCustomBox) categoryCustomBox.style.display = 'block';
+          if (categoryCustomInput) categoryCustomInput.value = prod.category || '';
+        }
+
         (document.getElementById('prod-code') as HTMLInputElement).value = prod.code || '';
         (document.getElementById('prod-desc') as HTMLTextAreaElement).value = prod.description || '';
         (document.getElementById('prod-price') as HTMLInputElement).value = prod.price.toString();
