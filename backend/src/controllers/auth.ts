@@ -202,7 +202,7 @@ router.get('/customers', authenticate, async (req: AuthRequest, res: Response) =
 
   try {
     const [customers]: any = await pool.query(
-      'SELECT id, name, email, phone FROM users WHERE role = "customer" ORDER BY name ASC'
+      'SELECT id, name, email, phone, ci FROM users WHERE role = "customer" ORDER BY name ASC'
     );
     res.json(customers);
   } catch (error) {
@@ -219,7 +219,7 @@ router.get('/staff', authenticate, async (req: AuthRequest, res: Response) => {
 
   try {
     const [staff]: any = await pool.query(
-      'SELECT id, name, email, role, phone FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC'
+      'SELECT id, name, email, role, phone, ci FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC'
     );
     res.json(staff);
   } catch (error) {
@@ -234,7 +234,7 @@ router.post('/staff', authenticate, async (req: AuthRequest, res: Response) => {
     return res.status(403).json({ message: 'No autorizado' });
   }
 
-  const { name, email, password, role, phone } = req.body;
+  const { name, email, password, role, phone, ci } = req.body;
 
   if (!name || !email || !password || !role) {
     return res.status(400).json({ message: 'Nombre, correo, contraseña y rol son obligatorios' });
@@ -255,8 +255,8 @@ router.post('/staff', authenticate, async (req: AuthRequest, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     await pool.query(
-      'INSERT INTO users (name, email, password, role, phone) VALUES (?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, role, phone || null]
+      'INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, role, phone || null, ci || null]
     );
 
     res.status(201).json({ message: 'Usuario de personal creado con éxito' });
@@ -273,7 +273,7 @@ router.put('/staff/:id', authenticate, async (req: AuthRequest, res: Response) =
   }
 
   const { id } = req.params;
-  const { name, email, password, role, phone } = req.body;
+  const { name, email, password, role, phone, ci } = req.body;
 
   if (!name || !email || !role) {
     return res.status(400).json({ message: 'Nombre, correo y rol son obligatorios' });
@@ -294,13 +294,13 @@ router.put('/staff/:id', authenticate, async (req: AuthRequest, res: Response) =
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
       await pool.query(
-        'UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ? WHERE id = ?',
-        [name, email, hashedPassword, role, phone || null, id]
+        'UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ?, ci = ? WHERE id = ?',
+        [name, email, hashedPassword, role, phone || null, ci || null, id]
       );
     } else {
       await pool.query(
-        'UPDATE users SET name = ?, email = ?, role = ?, phone = ? WHERE id = ?',
-        [name, email, role, phone || null, id]
+        'UPDATE users SET name = ?, email = ?, role = ?, phone = ?, ci = ? WHERE id = ?',
+        [name, email, role, phone || null, ci || null, id]
       );
     }
 

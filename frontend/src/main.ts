@@ -561,9 +561,21 @@ function bindCartEvents() {
       const nameInput = document.getElementById('checkout-name') as HTMLInputElement;
       const emailInput = document.getElementById('checkout-email') as HTMLInputElement;
       const phoneInput = document.getElementById('checkout-phone') as HTMLInputElement;
+      const ciPrefixInput = document.getElementById('checkout-ci-prefix') as HTMLSelectElement;
+      const ciNumInput = document.getElementById('checkout-ci-num') as HTMLInputElement;
+
       if (nameInput) nameInput.value = currentUser.name;
       if (emailInput) emailInput.value = currentUser.email;
       if (phoneInput) phoneInput.value = currentUser.phone || '';
+      if (currentUser.ci) {
+        const parts = currentUser.ci.split('-');
+        if (parts.length === 2) {
+          if (ciPrefixInput) ciPrefixInput.value = `${parts[0]}-`;
+          if (ciNumInput) ciNumInput.value = parts[1];
+        } else if (ciNumInput) {
+          ciNumInput.value = currentUser.ci;
+        }
+      }
     }
   });
 }
@@ -579,16 +591,28 @@ function renderCheckoutModal(): string {
         <h2 class="mb-4" style="font-size:22px; font-weight:700;">Finalizar Compra</h2>
         
         <form id="checkout-form">
-          <div class="form-group">
+          <div class="form-group mb-3">
             <label class="form-label" for="checkout-name">Nombre Completo</label>
             <input type="text" class="form-control" id="checkout-name" required placeholder="Ej. Juan Perez">
           </div>
-          <div class="form-group">
+          <div class="form-group mb-3">
+            <label class="form-label" for="checkout-ci-num">Cédula / Documento de Identidad</label>
+            <div style="display: flex; gap: 8px;">
+              <select class="form-control" id="checkout-ci-prefix" style="width: 80px; font-weight: 700; flex-shrink: 0;">
+                <option value="V-">V-</option>
+                <option value="E-">E-</option>
+                <option value="J-">J-</option>
+                <option value="G-">G-</option>
+              </select>
+              <input type="text" class="form-control" id="checkout-ci-num" required placeholder="12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" style="flex-grow: 1;">
+            </div>
+          </div>
+          <div class="form-group mb-3">
             <label class="form-label" for="checkout-email">Correo Electronico</label>
             <input type="email" class="form-control" id="checkout-email" required placeholder="Ej. juan@correo.com">
             <small style="color:var(--text-muted); font-size:11px;">Recibiras tu factura en este correo.</small>
           </div>
-          <div class="form-group">
+          <div class="form-group mb-3">
             <label class="form-label" for="checkout-phone">WhatsApp / Telefono</label>
             <input type="tel" class="form-control" id="checkout-phone" placeholder="Ej. +5491122334455">
             <small style="color:var(--text-muted); font-size:11px;">Codigo de pais incluido (ej. +54 o +57).</small>
@@ -691,6 +715,9 @@ function bindCheckoutEvents() {
     const name = (document.getElementById('checkout-name') as HTMLInputElement).value;
     const email = (document.getElementById('checkout-email') as HTMLInputElement).value;
     const phone = (document.getElementById('checkout-phone') as HTMLInputElement).value;
+    const ciPrefix = (document.getElementById('checkout-ci-prefix') as HTMLSelectElement).value;
+    const ciNum = (document.getElementById('checkout-ci-num') as HTMLInputElement).value.trim();
+    const customerCi = ciNum ? `${ciPrefix}${ciNum}` : undefined;
     const payment = (document.getElementById('checkout-payment') as HTMLSelectElement).value;
 
     const checkoutBtn = document.getElementById('checkout-submit-btn') as HTMLButtonElement;
@@ -712,6 +739,7 @@ function bindCheckoutEvents() {
         customerName: name,
         customerEmail: email,
         customerPhone: phone,
+        customerCi,
         paymentMethod: payment,
         items,
         discount,
@@ -905,6 +933,10 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       ctx.font = '12px Outfit, Segoe UI';
       ctx.fillStyle = '#e2e8f0';
       let nextY = yOffset + 40;
+      if (sale.customer_ci) {
+        ctx.fillText(`C.I. / RIF: ${sale.customer_ci}`, 30, nextY);
+        nextY += 20;
+      }
       if (sale.customer_phone) {
         ctx.fillText(`Tel: ${sale.customer_phone}`, 30, nextY);
         nextY += 20;
@@ -1361,6 +1393,16 @@ function renderAuthView(): string {
               <input type="text" class="form-control" id="reg-name" required placeholder="Ej. Juan Perez">
             </div>
             <div class="form-group">
+              <label class="form-label" for="reg-ci-num">Cédula de Identidad</label>
+              <div style="display: flex; gap: 8px;">
+                <select class="form-control" id="reg-ci-prefix" style="width: 80px; font-weight: 700; flex-shrink: 0;">
+                  <option value="V-">V-</option>
+                  <option value="E-">E-</option>
+                </select>
+                <input type="text" class="form-control" id="reg-ci-num" required placeholder="12345678" pattern="\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" style="flex-grow: 1;">
+              </div>
+            </div>
+            <div class="form-group">
               <label class="form-label" for="reg-email">Correo Electronico</label>
               <input type="email" class="form-control" id="reg-email" required placeholder="Ej. juan@correo.com">
             </div>
@@ -1433,16 +1475,20 @@ function bindAuthEvents() {
   document.getElementById('register-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = (document.getElementById('reg-name') as HTMLInputElement).value;
+    const ciPrefix = (document.getElementById('reg-ci-prefix') as HTMLSelectElement).value;
+    const ciNum = (document.getElementById('reg-ci-num') as HTMLInputElement).value.trim();
     const email = (document.getElementById('reg-email') as HTMLInputElement).value;
     const password = (document.getElementById('reg-password') as HTMLInputElement).value;
     const phone = (document.getElementById('reg-phone') as HTMLInputElement).value;
+
+    const ci = `${ciPrefix}${ciNum}`;
 
     const btn = document.getElementById('reg-submit-btn') as HTMLButtonElement;
     btn.disabled = true;
     btn.innerText = 'Cargando...';
 
     try {
-      const res = await api.auth.register({ name, email, password, phone });
+      const res = await api.auth.register({ name, email, password, phone, ci });
       localStorage.setItem('token', res.token);
       currentUser = res.user;
       navigate('store');
@@ -2029,6 +2075,18 @@ async function renderAdminPOS() {
               <input type="text" class="form-control" id="pos-client-name" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. Consumidor Final" value="${posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.name || '') : 'Consumidor Final'}">
             </div>
             <div class="form-group mb-2">
+              <label class="form-label" style="font-size:10px;">Cédula de Identidad / RIF</label>
+              <div style="display: flex; gap: 6px;">
+                <select class="form-control" id="pos-client-ci-prefix" style="width: 70px; padding: 8px 6px; font-size:12px; font-weight:700; flex-shrink: 0;">
+                  <option value="V-">V-</option>
+                  <option value="E-">E-</option>
+                  <option value="J-">J-</option>
+                  <option value="G-">G-</option>
+                </select>
+                <input type="text" class="form-control" id="pos-client-ci-num" style="padding: 8px 12px; font-size:13px; flex-grow: 1;" placeholder="12345678" pattern="\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos">
+              </div>
+            </div>
+            <div class="form-group mb-2">
               <label class="form-label" style="font-size:10px;">Correo (Opcional para Factura)</label>
               <input type="email" class="form-control" id="pos-client-email" style="padding: 8px 12px; font-size:13px;" placeholder="Ej. cliente@correo.com" value="${posSelectedCustomerId ? (posCustomersList.find(c => c.id === posSelectedCustomerId)?.email || '') : ''}">
             </div>
@@ -2202,6 +2260,9 @@ function bindPOSEvents() {
   const clientSelect = document.getElementById('pos-client-select') as HTMLSelectElement;
   clientSelect?.addEventListener('change', (e) => {
     const val = (e.target as HTMLSelectElement).value;
+    const ciPrefixInput = document.getElementById('pos-client-ci-prefix') as HTMLSelectElement;
+    const ciNumInput = document.getElementById('pos-client-ci-num') as HTMLInputElement;
+
     if (val) {
       posSelectedCustomerId = parseInt(val);
       const client = posCustomersList.find(c => c.id === posSelectedCustomerId);
@@ -2209,12 +2270,24 @@ function bindPOSEvents() {
         (document.getElementById('pos-client-name') as HTMLInputElement).value = client.name;
         (document.getElementById('pos-client-email') as HTMLInputElement).value = client.email;
         (document.getElementById('pos-client-phone') as HTMLInputElement).value = client.phone || '';
+        if (client.ci) {
+          const parts = client.ci.split('-');
+          if (parts.length === 2) {
+            if (ciPrefixInput) ciPrefixInput.value = `${parts[0]}-`;
+            if (ciNumInput) ciNumInput.value = parts[1];
+          } else if (ciNumInput) {
+            ciNumInput.value = client.ci;
+          }
+        } else if (ciNumInput) {
+          ciNumInput.value = '';
+        }
       }
     } else {
       posSelectedCustomerId = null;
       (document.getElementById('pos-client-name') as HTMLInputElement).value = 'Consumidor Final';
       (document.getElementById('pos-client-email') as HTMLInputElement).value = '';
       (document.getElementById('pos-client-phone') as HTMLInputElement).value = '';
+      if (ciNumInput) ciNumInput.value = '';
     }
   });
 
@@ -2286,6 +2359,9 @@ function bindPOSEvents() {
     const name = (document.getElementById('pos-client-name') as HTMLInputElement).value;
     const email = (document.getElementById('pos-client-email') as HTMLInputElement).value;
     const phone = (document.getElementById('pos-client-phone') as HTMLInputElement).value;
+    const ciPrefix = (document.getElementById('pos-client-ci-prefix') as HTMLSelectElement)?.value || 'V-';
+    const ciNum = (document.getElementById('pos-client-ci-num') as HTMLInputElement)?.value.trim() || '';
+    const customerCi = ciNum ? `${ciPrefix}${ciNum}` : undefined;
     const payment = (document.getElementById('pos-client-payment') as HTMLSelectElement).value;
 
     const isQuotation = (document.getElementById('pos-is-quotation') as HTMLInputElement).checked;
@@ -2312,6 +2388,7 @@ function bindPOSEvents() {
         customerName: name,
         customerEmail: email,
         customerPhone: phone,
+        customerCi,
         customerUserId: posSelectedCustomerId || undefined,
         paymentMethod: payment,
         items,
@@ -3468,12 +3545,22 @@ async function renderAdminStaff() {
                 <input type="text" class="form-control" id="staff-phone" placeholder="Ej. +584120000000">
               </div>
               <div class="form-group">
-                <label class="form-label" for="staff-role">Privilegios / Rol</label>
-                <select class="form-control" id="staff-role" required>
-                  <option value="seller">Vendedor (Acceso exclusivo a POS)</option>
-                  <option value="admin">Administrador (Acceso total al sistema)</option>
-                </select>
+                <label class="form-label" for="staff-ci-num">Cédula de Identidad</label>
+                <div style="display: flex; gap: 6px;">
+                  <select class="form-control" id="staff-ci-prefix" style="width: 70px; font-weight: 700; flex-shrink: 0;">
+                    <option value="V-">V-</option>
+                    <option value="E-">E-</option>
+                  </select>
+                  <input type="text" class="form-control" id="staff-ci-num" placeholder="12345678" pattern="\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" style="flex-grow: 1;">
+                </div>
               </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="staff-role">Privilegios / Rol</label>
+              <select class="form-control" id="staff-role" required>
+                <option value="seller">Vendedor (Acceso exclusivo a POS)</option>
+                <option value="admin">Administrador (Acceso total al sistema)</option>
+              </select>
             </div>
             <div class="form-group">
               <label class="form-label" for="staff-password" id="staff-pass-label">Contraseña</label>
@@ -3495,6 +3582,7 @@ async function renderAdminStaff() {
               <thead>
                 <tr>
                   <th>Nombre</th>
+                  <th>Cédula</th>
                   <th>Correo</th>
                   <th>Teléfono</th>
                   <th>Rol</th>
@@ -3505,6 +3593,7 @@ async function renderAdminStaff() {
                 ${staffList.map(member => `
                   <tr>
                     <td><strong>${member.name}</strong></td>
+                    <td><span class="badge" style="background:rgba(255,255,255,0.05); font-weight:700;">${member.ci || 'N/D'}</span></td>
                     <td>${member.email}</td>
                     <td>${member.phone || 'N/D'}</td>
                     <td>
@@ -3524,7 +3613,7 @@ async function renderAdminStaff() {
                     </td>
                   </tr>
                 `).join('')}
-                ${staffList.length === 0 ? '<tr><td colspan="5" class="text-center">No hay personal registrado.</td></tr>' : ''}
+                ${staffList.length === 0 ? '<tr><td colspan="6" class="text-center">No hay personal registrado.</td></tr>' : ''}
               </tbody>
             </table>
           </div>
@@ -3566,10 +3655,13 @@ function bindStaffEvents() {
     const name = (document.getElementById('staff-name') as HTMLInputElement).value;
     const email = (document.getElementById('staff-email') as HTMLInputElement).value;
     const phone = (document.getElementById('staff-phone') as HTMLInputElement).value;
+    const ciPrefix = (document.getElementById('staff-ci-prefix') as HTMLSelectElement).value;
+    const ciNum = (document.getElementById('staff-ci-num') as HTMLInputElement).value.trim();
+    const ci = ciNum ? `${ciPrefix}${ciNum}` : null;
     const role = (document.getElementById('staff-role') as HTMLSelectElement).value;
     const password = passInput.value;
 
-    const payload: any = { name, email, role, phone };
+    const payload: any = { name, email, role, phone, ci };
     if (password || !editingStaffId) {
       payload.password = password;
     }
@@ -3603,6 +3695,20 @@ function bindStaffEvents() {
         (document.getElementById('staff-email') as HTMLInputElement).value = member.email;
         (document.getElementById('staff-phone') as HTMLInputElement).value = member.phone || '';
         (document.getElementById('staff-role') as HTMLSelectElement).value = member.role;
+        
+        const ciPrefixIn = document.getElementById('staff-ci-prefix') as HTMLSelectElement;
+        const ciNumIn = document.getElementById('staff-ci-num') as HTMLInputElement;
+        if (member.ci) {
+          const parts = member.ci.split('-');
+          if (parts.length === 2) {
+            if (ciPrefixIn) ciPrefixIn.value = `${parts[0]}-`;
+            if (ciNumIn) ciNumIn.value = parts[1];
+          } else if (ciNumIn) {
+            ciNumIn.value = member.ci;
+          }
+        } else if (ciNumIn) {
+          ciNumIn.value = '';
+        }
         
         if (passInput) {
           passInput.value = '';

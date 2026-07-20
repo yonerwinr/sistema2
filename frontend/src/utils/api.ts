@@ -37,6 +37,7 @@ export interface User {
   email: string;
   role: 'admin' | 'customer' | 'seller';
   phone?: string;
+  ci?: string;
 }
 
 export interface Product {
@@ -56,6 +57,7 @@ export interface Sale {
   customer_name: string;
   customer_email?: string;
   customer_phone?: string;
+  customer_ci?: string;
   total: number;
   payment_method: 'cash' | 'card' | 'transfer';
   type: 'online' | 'pos';
@@ -191,6 +193,7 @@ export const api = {
       customerName: string;
       customerEmail?: string;
       customerPhone?: string;
+      customerCi?: string;
       paymentMethod: string;
       items: { productId: number; quantity: number }[];
       discount?: number;
@@ -204,6 +207,7 @@ export const api = {
       customerName: string;
       customerEmail?: string;
       customerPhone?: string;
+      customerCi?: string;
       customerUserId?: number;
       paymentMethod: string;
       items: { productId: number; quantity: number }[];

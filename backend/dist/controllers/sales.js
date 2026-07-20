@@ -19,7 +19,7 @@ const router = (0, express_1.Router)();
 // - GET /all: Historial de todas las ventas (requiere admin)
 // Registrar Venta Online (Cliente / Invitado)
 router.post('/checkout', async (req, res) => {
-    const { userId, customerName, customerEmail, customerPhone, paymentMethod, items, discount, tax, couponCode } = req.body;
+    const { userId, customerName, customerEmail, customerPhone, customerCi, paymentMethod, items, discount, tax, couponCode } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: 'El carrito no puede estar vacio' });
     }
@@ -83,11 +83,12 @@ router.post('/checkout', async (req, res) => {
         const finalTotal = total - (discount || 0) + (tax || 0);
         const initialPaid = paymentMethod === 'transfer' ? 0.00 : finalTotal;
         // Registrar la venta
-        const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)', [
+        const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, customer_ci, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)', [
             userId || null,
             customerName || 'Cliente Online',
             customerEmail || null,
             customerPhone || null,
+            customerCi || null,
             finalTotal,
             paymentMethod || 'card',
             'online',
@@ -110,6 +111,7 @@ router.post('/checkout', async (req, res) => {
             customer_name: customerName,
             customer_email: customerEmail,
             customer_phone: customerPhone,
+            customer_ci: customerCi || null,
             total: finalTotal,
             payment_method: paymentMethod,
             type: 'online',
@@ -152,7 +154,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
     if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
         return res.status(403).json({ message: 'No autorizado. Solo administradores y vendedores pueden registrar ventas POS' });
     }
-    const { customerName, customerEmail, customerPhone, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId } = req.body;
+    const { customerName, customerEmail, customerPhone, customerCi, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId } = req.body;
     if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: 'Debe agregar al menos un producto' });
     }
@@ -234,6 +236,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
           customer_name = ?, 
           customer_email = ?, 
           customer_phone = ?, 
+          customer_ci = ?,
           total = ?, 
           payment_method = ?, 
           type = 'pos', 
@@ -249,6 +252,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
                 customerName || 'Consumidor Final',
                 customerEmail || null,
                 customerPhone || null,
+                customerCi || null,
                 finalTotal,
                 paymentMethod || 'cash',
                 saleStatus,
@@ -263,11 +267,12 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
         }
         else {
             // Registrar la venta nueva
-            const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code, seller_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+            const [saleResult] = await conn.query('INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, customer_ci, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code, seller_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
                 customerUserId || null,
                 customerName || 'Consumidor Final',
                 customerEmail || null,
                 customerPhone || null,
+                customerCi || null,
                 finalTotal,
                 paymentMethod || 'cash',
                 'pos',

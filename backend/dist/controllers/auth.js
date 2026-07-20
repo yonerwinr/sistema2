@@ -160,7 +160,7 @@ router.get('/customers', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado. Solo administradores y vendedores pueden ver la lista de clientes' });
     }
     try {
-        const [customers] = await db_1.default.query('SELECT id, name, email, phone FROM users WHERE role = "customer" ORDER BY name ASC');
+        const [customers] = await db_1.default.query('SELECT id, name, email, phone, ci FROM users WHERE role = "customer" ORDER BY name ASC');
         res.json(customers);
     }
     catch (error) {
@@ -174,7 +174,7 @@ router.get('/staff', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado' });
     }
     try {
-        const [staff] = await db_1.default.query('SELECT id, name, email, role, phone FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC');
+        const [staff] = await db_1.default.query('SELECT id, name, email, role, phone, ci FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC');
         res.json(staff);
     }
     catch (error) {
@@ -187,7 +187,7 @@ router.post('/staff', auth_1.authenticate, async (req, res) => {
     if (req.user?.role !== 'admin') {
         return res.status(403).json({ message: 'No autorizado' });
     }
-    const { name, email, password, role, phone } = req.body;
+    const { name, email, password, role, phone, ci } = req.body;
     if (!name || !email || !password || !role) {
         return res.status(400).json({ message: 'Nombre, correo, contraseña y rol son obligatorios' });
     }
@@ -202,7 +202,7 @@ router.post('/staff', auth_1.authenticate, async (req, res) => {
         }
         const salt = await bcryptjs_1.default.genSalt(10);
         const hashedPassword = await bcryptjs_1.default.hash(password, salt);
-        await db_1.default.query('INSERT INTO users (name, email, password, role, phone) VALUES (?, ?, ?, ?, ?)', [name, email, hashedPassword, role, phone || null]);
+        await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, ?, ?, ?, ?)', [name, email, hashedPassword, role, phone || null, ci || null]);
         res.status(201).json({ message: 'Usuario de personal creado con éxito' });
     }
     catch (error) {
@@ -216,7 +216,7 @@ router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado' });
     }
     const { id } = req.params;
-    const { name, email, password, role, phone } = req.body;
+    const { name, email, password, role, phone, ci } = req.body;
     if (!name || !email || !role) {
         return res.status(400).json({ message: 'Nombre, correo y rol son obligatorios' });
     }
@@ -232,10 +232,10 @@ router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
         if (password) {
             const salt = await bcryptjs_1.default.genSalt(10);
             const hashedPassword = await bcryptjs_1.default.hash(password, salt);
-            await db_1.default.query('UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ? WHERE id = ?', [name, email, hashedPassword, role, phone || null, id]);
+            await db_1.default.query('UPDATE users SET name = ?, email = ?, password = ?, role = ?, phone = ?, ci = ? WHERE id = ?', [name, email, hashedPassword, role, phone || null, ci || null, id]);
         }
         else {
-            await db_1.default.query('UPDATE users SET name = ?, email = ?, role = ?, phone = ? WHERE id = ?', [name, email, role, phone || null, id]);
+            await db_1.default.query('UPDATE users SET name = ?, email = ?, role = ?, phone = ?, ci = ? WHERE id = ?', [name, email, role, phone || null, ci || null, id]);
         }
         res.json({ message: 'Usuario de personal actualizado con éxito' });
     }
