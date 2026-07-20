@@ -58,6 +58,17 @@ let posConfirmedUnregisteredWarning = false;
 let showFreeSaleModal = false;
 let showExpenseModal = false;
 
+interface POSPaymentLine {
+  id: number;
+  method: string;
+  amountUsd: number;
+  amountVes?: number;
+}
+
+let posPaymentLines: POSPaymentLine[] = [
+  { id: 1, method: 'efectivo_usd', amountUsd: 0 }
+];
+
 // Instancias de Chart.js para destruirlas al cambiar de pestaña
 let revenueChartInstance: Chart | null = null;
 let paymentChartInstance: Chart | null = null;
@@ -2182,12 +2193,20 @@ async function renderAdminPOS() {
       posProducts = [];
     }
     
-    // Cálculos de totales
+    // Cálculos de totales y descuento de divisas asignado SOLAMENTE a la parte pagada en dólares / Binance
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+
+    const usdMethodsList = ['efectivo_usd', 'binance', 'zelle', 'efectivo_eur', 'paypal'];
+    const totalUsdPaidInUsdMethods = posPaymentLines
+      .filter(l => usdMethodsList.includes(l.method))
+      .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
+
     const currencyDiffRatio = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
       ? (1 - (rateUsdToVes / rateBinanceToVes))
       : 0;
-    const autoCurrencyDiscountAmount = posSubtotal * currencyDiffRatio;
+
+    // El descuento de divisas (Binance) aplica EXCLUSIVAMENTE a los pagos en dólares físicos / Binance
+    const autoCurrencyDiscountAmount = totalUsdPaidInUsdMethods * currencyDiffRatio;
     const effectiveCurrencyDiscount = posApplyCurrencyDiscount
       ? (posCurrencyDiscount > 0 ? posCurrencyDiscount : autoCurrencyDiscountAmount)
       : 0;
@@ -2336,30 +2355,65 @@ async function renderAdminPOS() {
             <input type="hidden" id="pos-client-phone" value="${posCustomerPhone}">
             <input type="hidden" id="pos-is-pending" value="${posIsPending ? '1' : '0'}">
 
-            <!-- Cuadrícula de Métodos de Pago (Cards Seleccionables) -->
-            <div>
-              <label class="form-label" style="font-size:10px; text-transform:uppercase; font-weight:700;">Método de Pago *</label>
-              <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">
-                <div class="pay-card active" data-method="efectivo_usd" style="border:1px solid var(--primary); background:rgba(99,102,241,0.1); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:700;">
-                  💵<br>Efectivo
+            <!-- Módulo de Métodos de Pago Combinados / Mixtos Ilimitados -->
+            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label class="form-label" style="font-size:10px; text-transform:uppercase; font-weight:700; margin:0;">💳 Métodos de Pago Divididos / Mixtos *</label>
+                <button type="button" class="btn btn-secondary" id="add-pos-payment-line-btn" style="padding:3px 8px; font-size:10px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-weight:700;">
+                  ➕ Añadir Otro Método
+                </button>
+              </div>
+
+              <div id="pos-payment-lines-container" style="display:flex; flex-direction:column; gap:8px;">
+                ${posPaymentLines.map((line, idx) => `
+                  <div class="pos-payment-row" data-index="${idx}" style="display:grid; grid-template-columns: 1fr auto auto; gap:6px; align-items:center; background:rgba(0,0,0,0.2); padding:6px; border-radius:8px; border:1px solid var(--border-glass);">
+                    <select class="form-control pos-pay-method-select" data-index="${idx}" style="padding:4px 6px; font-size:11px; font-weight:700;">
+                      <option value="efectivo_usd" ${line.method === 'efectivo_usd' ? 'selected' : ''}>💵 Efectivo USD ($)</option>
+                      <option value="pago_movil" ${line.method === 'pago_movil' ? 'selected' : ''}>📱 Pago Móvil (Bs.)</option>
+                      <option value="punto_de_venta" ${line.method === 'punto_de_venta' ? 'selected' : ''}>💳 Punto de Venta (Bs.)</option>
+                      <option value="transferencia_ves" ${line.method === 'transferencia_ves' ? 'selected' : ''}>🏛️ Transferencia (Bs.)</option>
+                      <option value="zelle" ${line.method === 'zelle' ? 'selected' : ''}>💸 Zelle ($)</option>
+                      <option value="binance" ${line.method === 'binance' ? 'selected' : ''}>🟡 Binance Pay ($)</option>
+                      <option value="efectivo_ves" ${line.method === 'efectivo_ves' ? 'selected' : ''}>💵 Efectivo Bs. (VES)</option>
+                      <option value="efectivo_eur" ${line.method === 'efectivo_eur' ? 'selected' : ''}>💶 Efectivo EUR (€)</option>
+                      <option value="paypal" ${line.method === 'paypal' ? 'selected' : ''}>🅿️ PayPal ($)</option>
+                    </select>
+
+                    ${['pago_movil', 'punto_de_venta', 'transferencia_ves', 'efectivo_ves'].includes(line.method) ? `
+                      <div style="display:flex; align-items:center; gap:3px;">
+                        <span style="font-size:10px; color:#f59e0b; font-weight:700;">Bs.</span>
+                        <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-ves" data-index="${idx}" value="${line.amountVes !== undefined && line.amountVes > 0 ? line.amountVes : ''}" placeholder="0.00" style="width:75px; padding:4px; font-size:11px; text-align:right; font-weight:700;">
+                      </div>
+                    ` : `
+                      <div style="display:flex; align-items:center; gap:3px;">
+                        <span style="font-size:10px; color:var(--primary); font-weight:700;">$</span>
+                        <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-usd" data-index="${idx}" value="${line.amountUsd !== undefined && line.amountUsd > 0 ? line.amountUsd : ''}" placeholder="0.00" style="width:75px; padding:4px; font-size:11px; text-align:right; font-weight:700;">
+                      </div>
+                    `}
+
+                    ${posPaymentLines.length > 1 ? `
+                      <button type="button" class="btn btn-danger remove-pos-payment-line" data-index="${idx}" style="padding:2px 6px; font-size:10px; background:rgba(239,68,68,0.2); color:#f87171; border:none;" title="Quitar método">✕</button>
+                    ` : '<div style="width:16px;"></div>'}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Descuento de Divisas (Aplica EXCLUSIVAMENTE a la parte en Dólares / Binance) -->
+            <div style="padding: 8px 10px; background: rgba(245, 158, 11, 0.04); border: 1px solid rgba(245, 158, 11, 0.25); border-radius:10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <input type="checkbox" id="pos-apply-currency-discount" ${posApplyCurrencyDiscount ? 'checked' : ''} style="width: 15px; height: 15px; accent-color: #f59e0b; cursor: pointer;">
+                  <div>
+                    <label for="pos-apply-currency-discount" style="font-size: 10px; font-weight: 700; color: #f59e0b; margin: 0; cursor: pointer;">
+                      💵 Descuento Divisas (Aplicado a $${totalUsdPaidInUsdMethods.toFixed(2)} en USD/Binance)
+                    </label>
+                  </div>
                 </div>
-                <div class="pay-card" data-method="punto_de_venta" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
-                  💳<br>Tarjeta
-                </div>
-                <div class="pay-card" data-method="transferencia_ves" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
-                  🏛️<br>Transferencia
-                </div>
-                <div class="pay-card" data-method="binance" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
-                  🟡<br>Binance
-                </div>
-                <div class="pay-card" data-method="pago_movil" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
-                  📱<br>Pago Móvil
-                </div>
-                <div class="pay-card" data-method="zelle" style="border:1px solid var(--border-glass); background:rgba(255,255,255,0.02); padding:8px 4px; border-radius:8px; text-align:center; cursor:pointer; font-size:10px; font-weight:600;">
-                  💸<br>Zelle
+                <div style="font-weight: 700; font-size: 11px; color: #f59e0b; white-space: nowrap;">
+                  -$${autoCurrencyDiscountAmount.toFixed(2)}
                 </div>
               </div>
-              <input type="hidden" id="pos-client-payment" value="efectivo_usd">
             </div>
 
             <!-- Descuento Dual (% y $) -->

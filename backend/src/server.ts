@@ -157,10 +157,10 @@ async function runMigrations() {
       console.error('Error al agregar columna code a la tabla products:', err.message);
     }
 
-    // Modificar columna payment_method para permitir VARCHAR(50)
+    // Modificar columna payment_method para permitir TEXT (pagos mixtos ilimitados)
     try {
-      await conn.query("ALTER TABLE sales MODIFY COLUMN payment_method VARCHAR(50) NOT NULL DEFAULT 'cash'");
-      console.log('Columna "payment_method" de la tabla sales modificada a VARCHAR(50).');
+      await conn.query("ALTER TABLE sales MODIFY COLUMN payment_method TEXT NOT NULL");
+      console.log('Columna "payment_method" de la tabla sales modificada a TEXT.');
     } catch (err: any) {
       console.error('Error al modificar columna payment_method:', err.message);
     }
