@@ -598,6 +598,25 @@ router.delete('/coupons/:id', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ message: 'Error al eliminar cupón' });
     }
 });
+// Obtener historial completo del sistema y registros de auditoría (Solo Admin)
+router.get('/audit-logs', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado' });
+    }
+    try {
+        const [logs] = await db_1.default.query('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 500');
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by, seller.name as seller_name 
+       FROM sales s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
+       ORDER BY s.created_at DESC`);
+        res.json({ logs, sales });
+    }
+    catch (error) {
+        console.error('Error al obtener registros de auditoría:', error);
+        res.status(500).json({ message: 'Error al obtener histórico de auditoría' });
+    }
+});
 // Historial de Todas las Ventas (Solo Admin)
 router.get('/', auth_1.authenticate, async (req, res) => {
     if (req.user?.role !== 'admin') {

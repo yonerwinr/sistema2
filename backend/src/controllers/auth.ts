@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import pool from '../config/db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { sendPasswordResetEmail } from '../services/email';
+import { logAuditEvent } from '../services/audit';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secreta_pos_online_token_key_987654321';
@@ -260,6 +261,15 @@ router.post('/staff', authenticate, async (req: AuthRequest, res: Response) => {
       [name, email, hashedPassword, role, phone || null, ci || null]
     );
 
+    logAuditEvent({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      userRole: req.user?.role,
+      actionType: 'staff_crud',
+      title: `Nuevo Vendedor / Personal Creado: ${name}`,
+      details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}`
+    });
+
     res.status(201).json({ message: 'Usuario de personal creado con éxito' });
   } catch (error) {
     console.error('Error al crear personal:', error);
@@ -305,6 +315,15 @@ router.put('/staff/:id', authenticate, async (req: AuthRequest, res: Response) =
       );
     }
 
+    logAuditEvent({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      userRole: req.user?.role,
+      actionType: 'staff_crud',
+      title: `Personal Actualizado (ID #${id}): ${name}`,
+      details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}`
+    });
+
     res.json({ message: 'Usuario de personal actualizado con éxito' });
   } catch (error) {
     console.error('Error al actualizar personal:', error);
@@ -327,6 +346,16 @@ router.delete('/staff/:id', authenticate, async (req: AuthRequest, res: Response
 
   try {
     await pool.query('DELETE FROM users WHERE id = ?', [id]);
+
+    logAuditEvent({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      userRole: req.user?.role,
+      actionType: 'staff_crud',
+      title: `Personal Eliminado (ID #${id})`,
+      details: `Acción ejecutada por el Administrador ${req.user?.name}`
+    });
+
     res.json({ message: 'Usuario de personal eliminado con éxito' });
   } catch (error) {
     console.error('Error al eliminar personal:', error);

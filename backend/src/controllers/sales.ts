@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { sendInvoiceEmail, sendPlainEmail } from '../services/email';
 import { syncSaleToSheets } from '../services/sheets';
 import { syncExchangeRatesFromBCV } from '../services/rates';
+import { logAuditEvent } from '../services/audit';
 
 const router = Router();
 
@@ -707,6 +708,29 @@ router.delete('/coupons/:id', authenticate, async (req: AuthRequest, res: Respon
   } catch (error) {
     console.error('Error al eliminar cupón:', error);
     res.status(500).json({ message: 'Error al eliminar cupón' });
+  }
+});
+
+// Obtener historial completo del sistema y registros de auditoría (Solo Admin)
+router.get('/audit-logs', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  try {
+    const [logs]: any = await pool.query('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 500');
+    const [sales]: any = await pool.query(
+      `SELECT s.*, u.name as registered_by, seller.name as seller_name 
+       FROM sales s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
+       ORDER BY s.created_at DESC`
+    );
+
+    res.json({ logs, sales });
+  } catch (error) {
+    console.error('Error al obtener registros de auditoría:', error);
+    res.status(500).json({ message: 'Error al obtener histórico de auditoría' });
   }
 });
 

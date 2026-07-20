@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import pool from '../config/db';
 import { authenticate, isAdmin, AuthRequest } from '../middleware/auth';
+import { logAuditEvent } from '../services/audit';
 
 const router = Router();
 
@@ -98,6 +99,15 @@ router.post('/', authenticate, isAdmin, async (req: AuthRequest, res: Response) 
       [code || null, name, description || null, price, stock, image_url || null, category || null]
     );
 
+    logAuditEvent({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      userRole: req.user?.role,
+      actionType: 'product_crud',
+      title: `Nuevo Producto Creado: ${name}`,
+      details: `Precio: $${price}, Stock: ${stock}, Categoría: ${category || 'General'}`
+    });
+
     res.status(201).json({
       id: result.insertId,
       code,
@@ -141,6 +151,15 @@ router.put('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Response
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
+    logAuditEvent({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      userRole: req.user?.role,
+      actionType: 'product_crud',
+      title: `Producto Actualizado (ID #${id}): ${name}`,
+      details: `Nuevo precio: $${price}, Nuevo stock: ${stock}, Categoría: ${category || 'General'}`
+    });
+
     res.json({
       id: parseInt(id),
       code,
@@ -165,6 +184,16 @@ router.delete('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Respo
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
+
+    logAuditEvent({
+      userId: req.user?.id,
+      userName: req.user?.name,
+      userRole: req.user?.role,
+      actionType: 'product_crud',
+      title: `Producto Eliminado (ID #${id})`,
+      details: `Eliminado por el Administrador ${req.user?.name}`
+    });
+
     res.json({ message: 'Producto eliminado exitosamente' });
   } catch (error) {
     console.error('Error al eliminar producto:', error);

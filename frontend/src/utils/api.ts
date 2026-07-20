@@ -81,6 +81,17 @@ export interface Coupon {
   created_at?: string;
 }
 
+export interface AuditLog {
+  id: number;
+  user_id?: number;
+  user_name?: string;
+  user_role?: string;
+  action_type: 'sale_online' | 'sale_pos' | 'quotation' | 'staff_crud' | 'user_edit' | 'product_crud' | 'coupon_crud' | 'settings';
+  title: string;
+  details?: string;
+  created_at: string;
+}
+
 export interface SaleDetail {
   sale: Sale;
   items: {
@@ -233,6 +244,7 @@ export const api = {
     getHistory: () => request<Sale[]>('/sales/history'),
     getDetails: (id: number) => request<SaleDetail>(`/sales/${id}`),
     getAllAdmin: () => request<Sale[]>('/sales'),
+    getAuditLogs: () => request<{ logs: AuditLog[]; sales: Sale[] }>('/sales/audit-logs'),
     resendEmail: (id: number, email: string) => request<{ message: string; emailPreviewUrl?: string }>(`/sales/${id}/resend-email`, {
       method: 'POST',
       body: JSON.stringify({ email }),

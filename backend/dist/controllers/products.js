@@ -8,6 +8,7 @@ const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
+const audit_1 = require("../services/audit");
 const router = (0, express_1.Router)();
 // Configuración de almacenamiento para Multer (Imágenes Locales)
 const storage = multer_1.default.diskStorage({
@@ -86,6 +87,14 @@ router.post('/', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
             }
         }
         const [result] = await db_1.default.query('INSERT INTO products (code, name, description, price, stock, image_url, category) VALUES (?, ?, ?, ?, ?, ?, ?)', [code || null, name, description || null, price, stock, image_url || null, category || null]);
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'product_crud',
+            title: `Nuevo Producto Creado: ${name}`,
+            details: `Precio: $${price}, Stock: ${stock}, Categoría: ${category || 'General'}`
+        });
         res.status(201).json({
             id: result.insertId,
             code,
@@ -121,6 +130,14 @@ router.put('/:id', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Producto no encontrado' });
         }
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'product_crud',
+            title: `Producto Actualizado (ID #${id}): ${name}`,
+            details: `Nuevo precio: $${price}, Nuevo stock: ${stock}, Categoría: ${category || 'General'}`
+        });
         res.json({
             id: parseInt(id),
             code,
@@ -145,6 +162,14 @@ router.delete('/:id', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Producto no encontrado' });
         }
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'product_crud',
+            title: `Producto Eliminado (ID #${id})`,
+            details: `Eliminado por el Administrador ${req.user?.name}`
+        });
         res.json({ message: 'Producto eliminado exitosamente' });
     }
     catch (error) {

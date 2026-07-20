@@ -92,6 +92,25 @@ async function runMigrations() {
         catch (err) {
             console.error('Error al agregar columna seller_id a la tabla sales:', err.message);
         }
+        // Verificar y crear tabla audit_logs si no existe
+        try {
+            await conn.query(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NULL,
+          user_name VARCHAR(255) NULL,
+          user_role VARCHAR(50) NULL,
+          action_type VARCHAR(50) NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          details TEXT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+            console.log('Tabla "audit_logs" lista para registro de auditoría.');
+        }
+        catch (err) {
+            console.error('Error al crear tabla audit_logs:', err.message);
+        }
         // Verificar y agregar columna code a la tabla products
         try {
             const [prodCols] = await conn.query('SHOW COLUMNS FROM products');

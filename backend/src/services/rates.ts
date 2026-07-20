@@ -1,4 +1,5 @@
 import pool from '../config/db';
+import { logAuditEvent } from './audit';
 
 export async function syncExchangeRatesFromBCV(): Promise<{ usdToVes: number; eurToVes: number }> {
   console.log('[RATES SERVICE] Sincronizando tasas de cambio desde BCV...');
@@ -57,6 +58,12 @@ export async function syncExchangeRatesFromBCV(): Promise<{ usdToVes: number; eu
       'INSERT INTO settings (settings_key, settings_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE settings_value = ?',
       ['eur_to_ves_rate', eurRate.toString(), eurRate.toString()]
     );
+
+    logAuditEvent({
+      actionType: 'settings',
+      title: 'Tasas Oficiales BCV Sincronizadas',
+      details: `USD/VES = Bs. ${usdRate.toFixed(2)} | EUR/VES = Bs. ${eurRate.toFixed(2)}`
+    });
 
     console.log(`[RATES SERVICE] Sincronización exitosa: USD = Bs. ${usdRate} | EUR = Bs. ${eurRate}`);
     return { usdToVes: usdRate, eurToVes: eurRate };

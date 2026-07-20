@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.syncExchangeRatesFromBCV = syncExchangeRatesFromBCV;
 exports.startRatesCron = startRatesCron;
 const db_1 = __importDefault(require("../config/db"));
+const audit_1 = require("./audit");
 async function syncExchangeRatesFromBCV() {
     console.log('[RATES SERVICE] Sincronizando tasas de cambio desde BCV...');
     try {
@@ -52,6 +53,11 @@ async function syncExchangeRatesFromBCV() {
         // Guardar en la base de datos
         await db_1.default.query('INSERT INTO settings (settings_key, settings_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE settings_value = ?', ['usd_to_ves_rate', usdRate.toString(), usdRate.toString()]);
         await db_1.default.query('INSERT INTO settings (settings_key, settings_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE settings_value = ?', ['eur_to_ves_rate', eurRate.toString(), eurRate.toString()]);
+        (0, audit_1.logAuditEvent)({
+            actionType: 'settings',
+            title: 'Tasas Oficiales BCV Sincronizadas',
+            details: `USD/VES = Bs. ${usdRate.toFixed(2)} | EUR/VES = Bs. ${eurRate.toFixed(2)}`
+        });
         console.log(`[RATES SERVICE] Sincronización exitosa: USD = Bs. ${usdRate} | EUR = Bs. ${eurRate}`);
         return { usdToVes: usdRate, eurToVes: eurRate };
     }

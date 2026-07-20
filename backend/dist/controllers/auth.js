@@ -9,6 +9,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
 const email_1 = require("../services/email");
+const audit_1 = require("../services/audit");
 const router = (0, express_1.Router)();
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secreta_pos_online_token_key_987654321';
 // Registro de Usuario (Clientes)
@@ -204,6 +205,14 @@ router.post('/staff', auth_1.authenticate, async (req, res) => {
         const salt = await bcryptjs_1.default.genSalt(10);
         const hashedPassword = await bcryptjs_1.default.hash(password, salt);
         await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, ?, ?, ?, ?)', [name, email, hashedPassword, role, phone || null, ci || null]);
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'staff_crud',
+            title: `Nuevo Vendedor / Personal Creado: ${name}`,
+            details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}`
+        });
         res.status(201).json({ message: 'Usuario de personal creado con éxito' });
     }
     catch (error) {
@@ -238,6 +247,14 @@ router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
         else {
             await db_1.default.query('UPDATE users SET name = ?, email = ?, role = ?, phone = ?, ci = ? WHERE id = ?', [name, email, role, phone || null, ci || null, id]);
         }
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'staff_crud',
+            title: `Personal Actualizado (ID #${id}): ${name}`,
+            details: `Correo: ${email}, Rol: ${role}, Cédula: ${ci || 'N/D'}`
+        });
         res.json({ message: 'Usuario de personal actualizado con éxito' });
     }
     catch (error) {
@@ -257,6 +274,14 @@ router.delete('/staff/:id', auth_1.authenticate, async (req, res) => {
     }
     try {
         await db_1.default.query('DELETE FROM users WHERE id = ?', [id]);
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'staff_crud',
+            title: `Personal Eliminado (ID #${id})`,
+            details: `Acción ejecutada por el Administrador ${req.user?.name}`
+        });
         res.json({ message: 'Usuario de personal eliminado con éxito' });
     }
     catch (error) {

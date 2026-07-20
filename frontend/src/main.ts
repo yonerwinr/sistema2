@@ -1,6 +1,6 @@
 import { Chart, registerables } from 'chart.js';
 import { api } from './utils/api';
-import type { Product, User, SaleDetail } from './utils/api';
+import type { Product, User, SaleDetail, AuditLog, Sale } from './utils/api';
 import { initScrollAnimations } from './utils/scroll-animation';
 import './index.css';
 
@@ -2826,57 +2826,190 @@ function bindProductCRUDEvents() {
 // ==========================================================================
 // SUB-VISTA: HISTORIAL DE VENTAS
 // ==========================================================================
+// ==========================================================================
+// SUB-VISTA: HISTÓRICO COMPLETO DEL SISTEMA Y AUDITORÍA DE MODIFICACIONES
+// ==========================================================================
+let historyFilterType = 'all';
+let historySearchQuery = '';
+
 async function renderAdminSales() {
   const panel = document.getElementById('dashboard-content-panel');
   if (!panel) return;
 
+  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando histórico del sistema y registro de auditoría...</div>`;
+
   try {
-    const sales = await api.sales.getAllAdmin();
+    const { logs, sales } = await api.sales.getAuditLogs();
+
+    // Combinar ventas y logs de auditoría en un único listado cronológico
+    const combinedEvents: any[] = [];
+
+    // 1. Agregar logs de auditoría (Acciones del sistema, staff, productos, cupones, tasas)
+    if (Array.isArray(logs)) {
+      logs.forEach((log: AuditLog) => {
+        combinedEvents.push({
+          id: `log-${log.id}`,
+          rawId: log.id,
+          isSale: false,
+          actionType: log.action_type,
+          title: log.title,
+          userName: log.user_name || 'Sistema',
+          userRole: log.user_role || 'sistema',
+          details: log.details || '',
+          createdAt: new Date(log.created_at),
+          createdAtStr: new Date(log.created_at).toLocaleString('es-ES')
+        });
+      });
+    }
+
+    // 2. Agregar ventas históricas (POS, Online y Cotizaciones)
+    if (Array.isArray(sales)) {
+      sales.forEach((sale: Sale) => {
+        const isQuotation = sale.is_quotation === 1;
+        const typeKey = isQuotation ? 'quotation' : (sale.type === 'pos' ? 'sale_pos' : 'sale_online');
+        
+        combinedEvents.push({
+          id: `sale-${sale.id}`,
+          rawId: sale.id,
+          isSale: true,
+          saleData: sale,
+          actionType: typeKey,
+          title: isQuotation ? `Cotización #${sale.id} ($${Number(sale.total).toFixed(2)})` : `Venta ${sale.type.toUpperCase()} #${sale.id} ($${Number(sale.total).toFixed(2)})`,
+          userName: sale.seller_name || sale.customer_name || 'Cliente',
+          userRole: sale.seller_name ? 'vendedor' : 'cliente',
+          details: `Cliente: ${sale.customer_name}${sale.customer_ci ? ' (' + sale.customer_ci + ')' : ''} | Pago: ${sale.payment_method.toUpperCase()} | Total: $${Number(sale.total).toFixed(2)}${sale.customer_phone ? ' | Tel: ' + sale.customer_phone : ''}`,
+          createdAt: new Date(sale.created_at),
+          createdAtStr: new Date(sale.created_at).toLocaleString('es-ES')
+        });
+      });
+    }
+
+    // Ordenar cronológicamente por fecha más reciente
+    combinedEvents.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    // Filtrar según el tipo seleccionado y la búsqueda de texto
+    const filteredEvents = combinedEvents.filter(ev => {
+      if (historyFilterType !== 'all' && ev.actionType !== historyFilterType) {
+        return false;
+      }
+      if (historySearchQuery) {
+        const q = historySearchQuery.toLowerCase();
+        const matchesTitle = ev.title.toLowerCase().includes(q);
+        const matchesUser = ev.userName.toLowerCase().includes(q);
+        const matchesDetails = ev.details.toLowerCase().includes(q);
+        return matchesTitle || matchesUser || matchesDetails;
+      }
+      return true;
+    });
+
+    const getBadgeStyle = (type: string) => {
+      switch (type) {
+        case 'sale_pos': return { bg: 'rgba(255,122,0,0.15)', color: '#ff7a00', label: '🛒 Venta POS' };
+        case 'sale_online': return { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', label: '🌐 Venta Online' };
+        case 'quotation': return { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6', label: '📝 Cotización' };
+        case 'staff_crud': return { bg: 'rgba(16,185,129,0.15)', color: '#10b981', label: '👥 Personal / Vendedor' };
+        case 'product_crud': return { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', label: '📦 Inventario / Producto' };
+        case 'coupon_crud': return { bg: 'rgba(236,72,153,0.15)', color: '#ec4899', label: '🎟️ Cupón' };
+        case 'settings': return { bg: 'rgba(6,182,212,0.15)', color: '#06b6d4', label: '💱 Tasa BCV / Ajustes' };
+        default: return { bg: 'rgba(255,255,255,0.05)', color: '#ffffff', label: '📋 Registro' };
+      }
+    };
 
     panel.innerHTML = `
       <div class="animate-on-scroll animate-fade-up visible">
-        <h2 class="mb-4" style="font-size:26px; font-weight:800;">Historico de Ventas</h2>
-        
+        <div class="flex justify-between align-center mb-2" style="flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 style="font-size:26px; font-weight:800; margin:0;">Histórico del Sistema & Auditoría 📋</h2>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Registro de todas las operaciones, ventas, cotizaciones, cambios de inventario y personal.</p>
+          </div>
+        </div>
+
+        <!-- Barra de Filtros por Categoría y Buscador -->
+        <div class="card mb-4" style="padding:16px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
+          <div class="flex justify-between align-center mb-3" style="flex-wrap:wrap; gap:12px;">
+            <!-- Buscador general -->
+            <div style="flex-grow:1; max-width:400px;">
+              <input type="text" class="form-control" id="history-search-input" placeholder="🔍 Buscar por cliente, vendedor, producto o acción..." value="${historySearchQuery}">
+            </div>
+          </div>
+
+          <!-- Botones de Filtro por Categoría -->
+          <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch;">
+            <button class="btn ${historyFilterType === 'all' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="all" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+              🌐 Todos (${combinedEvents.length})
+            </button>
+            <button class="btn ${historyFilterType === 'sale_pos' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="sale_pos" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+              🛒 Ventas POS
+            </button>
+            <button class="btn ${historyFilterType === 'sale_online' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="sale_online" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+              🌐 Ventas Online
+            </button>
+            <button class="btn ${historyFilterType === 'quotation' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="quotation" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+              📝 Cotizaciones
+            </button>
+            <button class="btn ${historyFilterType === 'staff_crud' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="staff_crud" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+              👥 Vendedores / Personal
+            </button>
+            <button class="btn ${historyFilterType === 'product_crud' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="product_crud" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+              📦 Productos / Inventario
+            </button>
+            <button class="btn ${historyFilterType === 'coupon_crud' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="coupon_crud" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+              🎟️ Cupones
+            </button>
+            <button class="btn ${historyFilterType === 'settings' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="settings" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+              💱 Tasas BCV / Ajustes
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabla de Eventos e Histórico -->
         <div class="card">
           <div class="table-responsive">
             <table class="table-custom">
               <thead>
                 <tr>
-                  <th>No. Factura</th>
-                  <th>Cliente</th>
-                  <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th>Cajero / Vendedor</th>
-                  <th>Metodo Pago</th>
-                  <th>Total</th>
+                  <th>Fecha / Hora</th>
+                  <th>Categoría</th>
+                  <th>Responsable / Usuario</th>
+                  <th>Acción / Operación</th>
+                  <th>Detalle de la Modificación</th>
                   <th class="text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                ${sales.map(sale => `
-                  <tr>
-                    <td><strong>#${sale.id}</strong></td>
-                    <td>
-                      <strong>${sale.customer_name}</strong>
-                      ${sale.customer_phone ? `<br><small style="color:var(--text-secondary)">📱 ${sale.customer_phone}</small>` : ''}
-                    </td>
-                    <td>${new Date(sale.created_at).toLocaleString('es-ES')}</td>
-                    <td><span class="badge-status" style="background:rgba(255,255,255,0.05); color:white;">${sale.type.toUpperCase()}</span></td>
-                    <td>
-                      <span style="font-weight: 600; color: var(--text-secondary); font-size:12px;">
-                        👤 ${sale.seller_name || 'Online (Tienda)'}
-                      </span>
-                    </td>
-                    <td><span style="text-transform:uppercase; font-size:12px; font-weight:600;">${sale.payment_method}</span></td>
-                    <td><strong style="color:var(--primary); font-size:15px;">$${Number(sale.total).toFixed(2)}</strong></td>
-                    <td class="text-right">
-                      <button class="btn btn-secondary btn-icon view-sale-details" style="padding:6px 12px; border-radius:6px; font-size:12px;" data-id="${sale.id}">
-                        🔍 Detalles
-                      </button>
-                    </td>
-                  </tr>
-                `).join('')}
-                ${sales.length === 0 ? '<tr><td colspan="8" class="text-center">No se han registrado ventas aun.</td></tr>' : ''}
+                ${filteredEvents.map(ev => {
+                  const badge = getBadgeStyle(ev.actionType);
+                  return `
+                    <tr>
+                      <td style="font-size:12px; white-space:nowrap; color:var(--text-secondary);">${ev.createdAtStr}</td>
+                      <td>
+                        <span class="badge-status" style="background:${badge.bg}; color:${badge.color}; font-size:11px; font-weight:700; text-transform:uppercase;">
+                          ${badge.label}
+                        </span>
+                      </td>
+                      <td>
+                        <strong>👤 ${ev.userName}</strong>
+                        ${ev.userRole ? `<br><small style="color:var(--text-muted); font-size:10px; text-transform:uppercase;">(${ev.userRole})</small>` : ''}
+                      </td>
+                      <td><strong>${ev.title}</strong></td>
+                      <td style="font-size:12px; color:var(--text-secondary); max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${ev.details}">
+                        ${ev.details || 'Sin detalles'}
+                      </td>
+                      <td class="text-right">
+                        ${ev.isSale ? `
+                          <button class="btn btn-secondary btn-icon view-sale-details" style="padding:6px 12px; font-size:12px;" data-id="${ev.rawId}">
+                            🔍 Ver Factura
+                          </button>
+                        ` : `
+                          <button class="btn btn-secondary btn-icon view-log-details" style="padding:6px 12px; font-size:12px;" data-title="${ev.title}" data-details="${encodeURIComponent(ev.details)}" data-user="${ev.userName}" data-date="${ev.createdAtStr}">
+                            ℹ️ Detalle
+                          </button>
+                        `}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+                ${filteredEvents.length === 0 ? '<tr><td colspan="6" class="text-center">No hay registros de auditoría o eventos en esta categoría.</td></tr>' : ''}
               </tbody>
             </table>
           </div>
@@ -2887,11 +3020,28 @@ async function renderAdminSales() {
     bindSalesHistoryEvents();
 
   } catch (error) {
-    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar historial del servidor.</div>`;
+    console.error(error);
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar el histórico de auditoría del servidor.</div>`;
   }
 }
 
 function bindSalesHistoryEvents() {
+  // Eventos de filtro por categoría
+  document.querySelectorAll('.history-filter-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      historyFilterType = (e.currentTarget as HTMLButtonElement).dataset.type || 'all';
+      await renderAdminSales();
+    });
+  });
+
+  // Evento de búsqueda por texto
+  const searchIn = document.getElementById('history-search-input') as HTMLInputElement;
+  searchIn?.addEventListener('input', (e) => {
+    historySearchQuery = (e.target as HTMLInputElement).value;
+    renderAdminSales();
+  });
+
+  // Evento ver factura
   document.querySelectorAll('.view-sale-details').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
@@ -2901,6 +3051,19 @@ function bindSalesHistoryEvents() {
       } catch (err: any) {
         alert(err.message || 'Error al obtener detalles de la venta');
       }
+    });
+  });
+
+  // Evento ver detalle de auditoría
+  document.querySelectorAll('.view-log-details').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const target = e.currentTarget as HTMLButtonElement;
+      const title = target.dataset.title || 'Detalle de Auditoría';
+      const details = decodeURIComponent(target.dataset.details || '');
+      const user = target.dataset.user || 'Sistema';
+      const date = target.dataset.date || '';
+
+      alert(`📋 DETALLE DE AUDITORÍA Y MODIFICACIÓN\n\n📌 Operación: ${title}\n👤 Ejecutado por: ${user}\n🕒 Fecha: ${date}\n\n📝 Detalle:\n${details}`);
     });
   });
 }
