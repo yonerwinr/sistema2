@@ -360,6 +360,27 @@ body::after {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
+/* Estilos Globales para Selects y Options (Legibilidad Total) */
+select, select.form-control {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  cursor: pointer;
+}
+
+select option {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+select option:checked,
+select option:hover {
+  background-color: #ff7a00 !important;
+  color: #ffffff !important;
+}
+
 /* ==========================================================================
    TIENDA ONLINE (E-COMMERCE) - VISTA DE USUARIO
    ========================================================================== */
