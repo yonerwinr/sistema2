@@ -378,6 +378,33 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
         res.status(400).json({ message: error.message || 'Error al procesar la venta POS' });
     }
 });
+// Historial de Compras de un Cliente específico por ID (SOLO Admin)
+router.get('/customer-history/:id', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'No autorizado. Solo los administradores pueden ver el historial de compras de un cliente.' });
+    }
+    const { id } = req.params;
+    try {
+        const [userRow] = await db_1.default.query('SELECT id, name, ci FROM users WHERE id = ?', [id]);
+        if (userRow.length === 0) {
+            return res.status(404).json({ message: 'Cliente no encontrado' });
+        }
+        const customer = userRow[0];
+        const [sales] = await db_1.default.query(`SELECT s.*, seller.name as seller_name 
+       FROM sales s 
+       LEFT JOIN users seller ON s.seller_id = seller.id 
+       WHERE (s.user_id = ? OR (s.customer_ci = ? AND s.customer_ci IS NOT NULL AND s.customer_ci != ''))
+       ORDER BY s.created_at DESC`, [customer.id, customer.ci]);
+        res.json({
+            customer,
+            sales: sales || []
+        });
+    }
+    catch (error) {
+        console.error('Error al obtener historial de compras del cliente:', error);
+        res.status(500).json({ message: 'Error al obtener historial de compras' });
+    }
+});
 // Historial de Compras de un Cliente (Público autenticado)
 router.get('/history', auth_1.authenticate, async (req, res) => {
     if (!req.user)

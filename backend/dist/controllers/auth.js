@@ -241,6 +241,80 @@ router.post('/register-customer', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ message: error.message || 'Error al registrar cliente en la base de datos' });
     }
 });
+// Actualizar datos de cliente (Vendedores y Admin)
+router.put('/customers/:id', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
+        return res.status(403).json({ message: 'No autorizado para editar clientes' });
+    }
+    const { id } = req.params;
+    const { name, ci, email, phone, address, client_type, representative_name, representative_ci, representative_phone, representative_position } = req.body;
+    if (!name || !ci) {
+        return res.status(400).json({ message: 'El nombre/razón social y la cédula/RIF son obligatorios' });
+    }
+    const cleanCi = ci.trim();
+    const cleanName = name.trim();
+    const cleanPhone = phone ? phone.trim() : null;
+    const cleanAddress = address ? address.trim() : null;
+    let cleanEmail = email ? email.trim() : null;
+    const cleanType = client_type || (cleanCi.toUpperCase().startsWith('J-') ? 'juridico' : cleanCi.toUpperCase().startsWith('G-') ? 'gubernamental' : 'natural');
+    const cleanRepName = representative_name ? representative_name.trim() : null;
+    const cleanRepCi = representative_ci ? representative_ci.trim() : null;
+    const cleanRepPhone = representative_phone ? representative_phone.trim() : null;
+    const cleanRepPosition = representative_position ? representative_position.trim() : null;
+    if (!cleanEmail) {
+        cleanEmail = `${cleanCi.toLowerCase().replace(/[^a-z0-9]/g, '')}@cliente.local`;
+    }
+    try {
+        const [existingCi] = await db_1.default.query('SELECT id FROM users WHERE ci = ? AND id != ?', [cleanCi, id]);
+        if (existingCi.length > 0) {
+            return res.status(400).json({ message: `La Cédula / RIF (${cleanCi}) ya está en uso por otro cliente` });
+        }
+        await db_1.default.query(`UPDATE users 
+       SET name = ?, email = ?, phone = ?, ci = ?, address = ?, client_type = ?, 
+           representative_name = ?, representative_ci = ?, representative_phone = ?, representative_position = ?
+       WHERE id = ? AND role = "customer"`, [cleanName, cleanEmail, cleanPhone, cleanCi, cleanAddress, cleanType, cleanRepName, cleanRepCi, cleanRepPhone, cleanRepPosition, id]);
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'user_edit',
+            title: `Cliente Actualizado: ${cleanName}`,
+            details: `ID #${id}, Cédula/RIF: ${cleanCi}, Teléfono: ${cleanPhone || 'N/A'}`
+        });
+        res.json({ message: 'Cliente actualizado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al actualizar cliente:', error);
+        res.status(500).json({ message: 'Error al actualizar cliente en la base de datos' });
+    }
+});
+// Eliminar cliente (Vendedores y Admin)
+router.delete('/customers/:id', auth_1.authenticate, async (req, res) => {
+    if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
+        return res.status(403).json({ message: 'No autorizado para eliminar clientes' });
+    }
+    const { id } = req.params;
+    try {
+        const [cust] = await db_1.default.query('SELECT name, ci FROM users WHERE id = ? AND role = "customer"', [id]);
+        if (cust.length === 0) {
+            return res.status(404).json({ message: 'Cliente no encontrado' });
+        }
+        await db_1.default.query('DELETE FROM users WHERE id = ? AND role = "customer"', [id]);
+        (0, audit_1.logAuditEvent)({
+            userId: req.user?.id,
+            userName: req.user?.name,
+            userRole: req.user?.role,
+            actionType: 'user_edit',
+            title: `Cliente Eliminado: ${cust[0].name}`,
+            details: `ID #${id}, Cédula/RIF: ${cust[0].ci || 'N/A'}`
+        });
+        res.json({ message: 'Cliente eliminado con éxito' });
+    }
+    catch (error) {
+        console.error('Error al eliminar cliente:', error);
+        res.status(500).json({ message: 'Error al eliminar cliente' });
+    }
+});
 // Buscar cliente por cédula (POS Step-1)
 router.get('/customer-by-ci', auth_1.authenticate, async (req, res) => {
     const { ci } = req.query;

@@ -58,6 +58,10 @@ let showFreeSaleModal = false;
 let showExpenseModal = false;
 let showRegisterCustomerModal = false;
 let adminCustomerSearchQuery = '';
+let editingCustomer: User | null = null;
+let showEditCustomerModal = false;
+let customerHistoryData: { customer: User; sales: Sale[] } | null = null;
+let showCustomerHistoryModal = false;
 
 interface POSPaymentLine {
   id: number;
@@ -5544,7 +5548,7 @@ async function renderAdminCustomers() {
         <div class="flex justify-between align-center mb-4">
           <div>
             <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Gestión de Clientes Registrados</h2>
-            <p style="font-size:12px; color:var(--text-secondary);">Directorio de clientes registrados en el sistema</p>
+            <p style="font-size:12px; color:var(--text-secondary);">Directorio de clientes en el sistema (Vendedores & Administrador)</p>
           </div>
           <button type="button" class="btn btn-primary" id="admin-add-customer-btn" style="padding:10px 16px; font-weight:700;">
             ➕ Registrar Nuevo Cliente
@@ -5563,7 +5567,7 @@ async function renderAdminCustomers() {
                   <th>Cliente</th>
                   <th>Cédula / RIF</th>
                   <th>Teléfono</th>
-                  <th>Correo</th>
+                  <th>Correo / Dirección</th>
                   <th class="text-right">Acciones</th>
                 </tr>
               </thead>
@@ -5580,11 +5584,27 @@ async function renderAdminCustomers() {
                       </span>
                     </td>
                     <td>${cust.phone || (cust.representative_phone ? `📱 ${cust.representative_phone}` : 'N/D')}</td>
-                    <td>${cust.email || 'N/D'}</td>
+                    <td>
+                      <div>${cust.email || 'N/D'}</div>
+                      ${cust.address ? `<small style="color:var(--text-muted); font-size:10px;">📍 ${cust.address}</small>` : ''}
+                    </td>
                     <td class="text-right">
-                      <button type="button" class="btn btn-secondary select-customer-pos-btn" style="padding:6px 12px; font-size:12px;" data-ci="${cust.ci || ''}" data-name="${cust.name}">
-                        🛒 Asignar al POS
-                      </button>
+                      <div style="display:inline-flex; gap:6px; align-items:center; justify-content:flex-end;">
+                        <button type="button" class="btn btn-secondary select-customer-pos-btn" style="padding:4px 8px; font-size:11px;" data-ci="${cust.ci || ''}" data-name="${cust.name}" title="Asignar a la caja POS">
+                          🛒 POS
+                        </button>
+                        <button type="button" class="btn btn-secondary edit-customer-btn" style="padding:4px 8px; font-size:11px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8;" data-id="${cust.id}" title="Editar cliente">
+                          ✏️ Editar
+                        </button>
+                        <button type="button" class="btn btn-danger delete-customer-btn" style="padding:4px 8px; font-size:11px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;" data-id="${cust.id}" data-name="${cust.name}" title="Eliminar cliente">
+                          🗑️
+                        </button>
+                        ${currentUser?.role === 'admin' ? `
+                          <button type="button" class="btn btn-success view-customer-history-btn" style="padding:4px 8px; font-size:11px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#34d399;" data-id="${cust.id}" title="Ver historial de compras (Solo Administrador)">
+                            📜 Historial
+                          </button>
+                        ` : ''}
+                      </div>
                     </td>
                   </tr>
                 `).join('')}
@@ -5594,6 +5614,160 @@ async function renderAdminCustomers() {
           </div>
         </div>
       </div>
+
+      <!-- Modal Editar Cliente -->
+      ${showEditCustomerModal && editingCustomer ? `
+        <div class="modal-overlay open" id="edit-customer-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 540px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827; max-height:90vh; overflow-y:auto;">
+            <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">✏️</div>
+            <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Editar Cliente</h3>
+            <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
+              Modifique la información del cliente.
+            </p>
+
+            <form id="edit-customer-form">
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Tipo de Documento & Cédula / RIF *</label>
+                <div style="display: flex; gap: 8px;">
+                  <select class="form-control" id="edit-cust-ci-prefix" style="width: 130px; font-weight: 700; flex-shrink: 0; font-size: 13px;">
+                    <option value="V-" ${editingCustomer.ci?.startsWith('V-') ? 'selected' : ''}>V- Natural (Ven)</option>
+                    <option value="E-" ${editingCustomer.ci?.startsWith('E-') ? 'selected' : ''}>E- Natural (Ext)</option>
+                    <option value="J-" ${editingCustomer.ci?.startsWith('J-') ? 'selected' : ''}>J- Jurídico (Empresa)</option>
+                    <option value="G-" ${editingCustomer.ci?.startsWith('G-') ? 'selected' : ''}>G- Gubernamental</option>
+                    <option value="P-" ${editingCustomer.ci?.startsWith('P-') ? 'selected' : ''}>P- Pasaporte</option>
+                  </select>
+                  <input type="text" class="form-control" id="edit-cust-ci-num" value="${editingCustomer.ci?.replace(/^[VEJGP]-/, '') || ''}" required placeholder="Ej: 12345678" style="font-size: 13px; font-weight: 700;">
+                </div>
+              </div>
+
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Nombre Completo o Razón Social *</label>
+                <input type="text" class="form-control" id="edit-cust-name" value="${editingCustomer.name || ''}" required placeholder="Ej. Juan Pérez / Inversiones C.A." style="font-size: 13px;">
+              </div>
+
+              <div class="grid grid-2 gap-2 mb-3">
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Teléfono</label>
+                  <input type="text" class="form-control" id="edit-cust-phone" value="${editingCustomer.phone || ''}" placeholder="Ej. 0414-1234567" style="font-size: 13px;">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Correo Electrónico</label>
+                  <input type="email" class="form-control" id="edit-cust-email" value="${editingCustomer.email || ''}" placeholder="cliente@correo.com" style="font-size: 13px;">
+                </div>
+              </div>
+
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Dirección Fiscal / Habitación</label>
+                <input type="text" class="form-control" id="edit-cust-address" value="${editingCustomer.address || ''}" placeholder="Ej: Av. Bolívar, Local 12..." style="font-size: 13px;">
+              </div>
+
+              <!-- Sección Encargado (Para Jurídicos/Gubernamentales) -->
+              <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border-glass); padding: 12px; border-radius: 10px; margin-bottom: 16px;">
+                <div style="font-size: 11px; font-weight: 800; color: #818cf8; margin-bottom: 8px;">👔 Datos del Encargado / Comprador Autorizado (Opcional)</div>
+                
+                <div class="grid grid-2 gap-2 mb-2">
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 10px;">Nombre Encargado</label>
+                    <input type="text" class="form-control" id="edit-cust-rep-name" value="${editingCustomer.representative_name || ''}" placeholder="Ej: Pedro Gómez" style="font-size: 12px; padding: 6px;">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 10px;">Cédula Encargado</label>
+                    <input type="text" class="form-control" id="edit-cust-rep-ci" value="${editingCustomer.representative_ci || ''}" placeholder="Ej: V-15987654" style="font-size: 12px; padding: 6px;">
+                  </div>
+                </div>
+
+                <div class="grid grid-2 gap-2">
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 10px;">Teléfono Encargado</label>
+                    <input type="text" class="form-control" id="edit-cust-rep-phone" value="${editingCustomer.representative_phone || ''}" placeholder="Ej: 0412-9876543" style="font-size: 12px; padding: 6px;">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 10px;">Cargo / Rol</label>
+                    <input type="text" class="form-control" id="edit-cust-rep-position" value="${editingCustomer.representative_position || ''}" placeholder="Ej: Gerente de Compras" style="font-size: 12px; padding: 6px;">
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+                <button type="button" class="btn btn-secondary" id="close-edit-customer-btn" style="font-size: 12px; padding: 8px 16px;">
+                  Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary" id="submit-edit-customer-btn" style="font-size: 12px; padding: 8px 16px; font-weight: 700;">
+                  💾 Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Modal Historial de Compras (Solo Admin) -->
+      ${showCustomerHistoryModal && customerHistoryData && currentUser?.role === 'admin' ? `
+        <div class="modal-overlay open" id="customer-history-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 820px; width: 94%; padding: 24px; border-radius: 16px; border: 1px solid #10b981; background: #111827; max-height:90vh; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:12px; margin-bottom:16px;">
+              <div>
+                <h3 style="font-size: 20px; font-weight: 800; color: #10b981; margin:0;">📜 Historial de Compras del Cliente</h3>
+                <div style="font-size: 13px; font-weight: 700; color: white; margin-top:2px;">
+                  ${customerHistoryData.customer.name} <span style="color:var(--text-muted); font-weight:600;">(${customerHistoryData.customer.ci || 'Sin Cédula'})</span>
+                </div>
+              </div>
+              <button type="button" id="close-customer-history-btn" style="background:none; border:none; color:var(--text-muted); font-size:24px; cursor:pointer;">✕</button>
+            </div>
+
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
+              <div class="card" style="padding:12px; background:rgba(255,255,255,0.02); text-align:center;">
+                <div style="font-size:11px; color:var(--text-muted); font-weight:700;">Total de Compras</div>
+                <div style="font-size:20px; font-weight:900; color:white;">${customerHistoryData.sales.length}</div>
+              </div>
+              <div class="card" style="padding:12px; background:rgba(16,185,129,0.05); text-align:center; border:1px solid rgba(16,185,129,0.2);">
+                <div style="font-size:11px; color:#10b981; font-weight:700;">Monto Total Comprado ($)</div>
+                <div style="font-size:20px; font-weight:900; color:#10b981;">
+                  $${customerHistoryData.sales.filter(s => s.status !== 'cancelled' && !s.is_quotation).reduce((sum, s) => sum + Number(s.total), 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table-custom">
+                <thead>
+                  <tr>
+                    <th># Venta</th>
+                    <th>Fecha</th>
+                    <th>Método de Pago</th>
+                    <th>Estado</th>
+                    <th>Total ($)</th>
+                    <th>Vendedor</th>
+                    <th class="text-right">Detalle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${customerHistoryData.sales.map(sale => `
+                    <tr>
+                      <td><strong>#${sale.id}</strong></td>
+                      <td style="font-size:12px;">${new Date(sale.created_at).toLocaleString()}</td>
+                      <td style="font-size:11px;">${sale.payment_method || 'Efectivo $'}</td>
+                      <td>
+                        <span class="badge" style="background:${sale.status === 'completed' ? 'rgba(16,185,129,0.15)' : sale.status === 'pending' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)'}; color:${sale.status === 'completed' ? '#10b981' : sale.status === 'pending' ? '#f87171' : 'white'};">
+                          ${sale.is_quotation ? '📝 Cotización' : sale.status === 'completed' ? '✅ Pagada' : sale.status === 'pending' ? '🔴 Deuda Pendiente' : 'Cancelada'}
+                        </span>
+                      </td>
+                      <td><strong style="color:var(--primary);">$${Number(sale.total).toFixed(2)}</strong></td>
+                      <td style="font-size:12px; color:var(--text-muted);">${(sale as any).seller_name || 'Sistema'}</td>
+                      <td class="text-right">
+                        <button type="button" class="btn btn-secondary view-sale-detail-history-btn" data-id="${sale.id}" style="padding:3px 8px; font-size:11px;">
+                          👁️ Ver Factura
+                        </button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                  ${customerHistoryData.sales.length === 0 ? '<tr><td colspan="7" class="text-center">Este cliente no posee compras registradas.</td></tr>' : ''}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ` : ''}
     `;
 
     bindCustomersEvents();
@@ -5612,12 +5786,14 @@ function bindCustomersEvents() {
     }, 350);
   });
 
+  // Registrar cliente abre modal
   document.getElementById('admin-add-customer-btn')?.addEventListener('click', async () => {
     showRegisterCustomerModal = true;
     activeAdminView = 'pos';
     await renderAdminPOS();
   });
 
+  // Asignar cliente al POS
   document.querySelectorAll('.select-customer-pos-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const target = e.currentTarget as HTMLButtonElement;
@@ -5625,6 +5801,127 @@ function bindCustomersEvents() {
       posCustomerCi = target.dataset.ci || '';
       activeAdminView = 'pos';
       await renderAdminPOS();
+    });
+  });
+
+  // Abrir Modal Editar Cliente
+  document.querySelectorAll('.edit-customer-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const customers = await api.auth.getCustomers();
+      const target = customers.find(c => c.id === id);
+      if (target) {
+        editingCustomer = target;
+        showEditCustomerModal = true;
+        await renderAdminCustomers();
+      }
+    });
+  });
+
+  // Cerrar Modal Editar Cliente
+  document.getElementById('close-edit-customer-btn')?.addEventListener('click', async () => {
+    showEditCustomerModal = false;
+    editingCustomer = null;
+    await renderAdminCustomers();
+  });
+
+  // Guardar Edición de Cliente
+  document.getElementById('edit-customer-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+
+    const prefix = (document.getElementById('edit-cust-ci-prefix') as HTMLSelectElement).value;
+    const num = (document.getElementById('edit-cust-ci-num') as HTMLInputElement).value.trim();
+    const ci = `${prefix}${num}`;
+    const name = (document.getElementById('edit-cust-name') as HTMLInputElement).value.trim();
+    const phone = (document.getElementById('edit-cust-phone') as HTMLInputElement).value.trim();
+    const email = (document.getElementById('edit-cust-email') as HTMLInputElement).value.trim();
+    const address = (document.getElementById('edit-cust-address') as HTMLInputElement).value.trim();
+
+    const client_type = prefix === 'J-' ? 'juridico' : prefix === 'G-' ? 'gubernamental' : 'natural';
+
+    const repName = (document.getElementById('edit-cust-rep-name') as HTMLInputElement)?.value.trim() || undefined;
+    const repCi = (document.getElementById('edit-cust-rep-ci') as HTMLInputElement)?.value.trim() || undefined;
+    const repPhone = (document.getElementById('edit-cust-rep-phone') as HTMLInputElement)?.value.trim() || undefined;
+    const repPosition = (document.getElementById('edit-cust-rep-position') as HTMLInputElement)?.value.trim() || undefined;
+
+    const submitBtn = document.getElementById('submit-edit-customer-btn') as HTMLButtonElement;
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      await api.auth.updateCustomer(editingCustomer.id, {
+        name,
+        ci,
+        phone: phone || undefined,
+        email: email || undefined,
+        address: address || undefined,
+        client_type,
+        representative_name: repName,
+        representative_ci: repCi,
+        representative_phone: repPhone,
+        representative_position: repPosition
+      });
+
+      alert('¡Cliente actualizado con éxito!');
+      showEditCustomerModal = false;
+      editingCustomer = null;
+      await renderAdminCustomers();
+    } catch (err: any) {
+      alert(err.message || 'Error al actualizar cliente');
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+
+  // Eliminar Cliente
+  document.querySelectorAll('.delete-customer-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const name = (e.currentTarget as HTMLButtonElement).dataset.name || 'este cliente';
+
+      if (confirm(`¿Estás seguro de que deseas eliminar permanentemente al cliente "${name}"?`)) {
+        try {
+          await api.auth.deleteCustomer(id);
+          alert('¡Cliente eliminado con éxito!');
+          await renderAdminCustomers();
+        } catch (err: any) {
+          alert(err.message || 'Error al eliminar cliente');
+        }
+      }
+    });
+  });
+
+  // Ver Historial de Compras (Solo Admin)
+  document.querySelectorAll('.view-customer-history-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      try {
+        const data = await api.sales.getCustomerSalesHistory(id);
+        customerHistoryData = data;
+        showCustomerHistoryModal = true;
+        await renderAdminCustomers();
+      } catch (err: any) {
+        alert(err.message || 'Error al obtener historial de compras del cliente');
+      }
+    });
+  });
+
+  // Cerrar Modal Historial
+  document.getElementById('close-customer-history-btn')?.addEventListener('click', async () => {
+    showCustomerHistoryModal = false;
+    customerHistoryData = null;
+    await renderAdminCustomers();
+  });
+
+  // Ver Factura individual dentro del Historial
+  document.querySelectorAll('.view-sale-detail-history-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      try {
+        const details = await api.sales.getDetails(id);
+        showSaleDetails(details);
+      } catch (err: any) {
+        alert(err.message || 'Error al cargar detalle de la venta');
+      }
     });
   });
 }

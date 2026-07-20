@@ -182,6 +182,13 @@ export const api = {
       body: JSON.stringify(body),
     }),
     getCustomerByCi: (ci: string) => request<User>(`/auth/customer-by-ci?ci=${encodeURIComponent(ci)}`),
+    updateCustomer: (id: number, body: any) => request<{ message: string }>(`/auth/customers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+    deleteCustomer: (id: number) => request<{ message: string }>(`/auth/customers/${id}`, {
+      method: 'DELETE',
+    }),
     getStaff: () => request<User[]>('/auth/staff'),
     createStaff: (body: any) => request<{ message: string }>('/auth/staff', {
       method: 'POST',
@@ -282,6 +289,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
     getHistory: () => request<Sale[]>('/sales/history'),
+    getCustomerSalesHistory: (customerId: number) => request<{ customer: User; sales: Sale[] }>(`/sales/customer-history/${customerId}`),
     getDetails: (id: number) => request<SaleDetail>(`/sales/${id}`),
     getAllAdmin: () => request<Sale[]>('/sales'),
     getAuditLogs: () => request<{ logs: AuditLog[]; sales: Sale[] }>('/sales/audit-logs'),
