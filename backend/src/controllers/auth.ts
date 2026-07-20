@@ -204,7 +204,7 @@ router.get('/customers', authenticate, async (req: AuthRequest, res: Response) =
 
   try {
     const [customers]: any = await pool.query(
-      'SELECT id, name, email, phone, ci, client_type, representative_name, representative_ci, representative_phone, representative_position, created_at FROM users WHERE role = "customer" ORDER BY name ASC'
+      'SELECT id, name, email, phone, ci, address, client_type, representative_name, representative_ci, representative_phone, representative_position, created_at FROM users WHERE role = "customer" ORDER BY name ASC'
     );
     res.json(customers);
   } catch (error) {
@@ -224,6 +224,7 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
     ci,
     email,
     phone,
+    address,
     client_type,
     representative_name,
     representative_ci,
@@ -238,6 +239,7 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
   const cleanCi = ci.trim();
   const cleanName = name.trim();
   const cleanPhone = phone ? phone.trim() : null;
+  const cleanAddress = address ? address.trim() : null;
   let cleanEmail = email ? email.trim() : null;
   const cleanType = client_type || (cleanCi.toUpperCase().startsWith('J-') ? 'juridico' : cleanCi.toUpperCase().startsWith('G-') ? 'gubernamental' : 'natural');
 
@@ -253,13 +255,13 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
   try {
     // Verificar si la cédula/RIF ya existe
     const [existingCI]: any = await pool.query(
-      'SELECT id, name, email, phone, ci, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ?',
+      'SELECT id, name, email, phone, ci, address, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ?',
       [cleanCi]
     );
 
     if (existingCI.length > 0) {
-      return res.status(200).json({
-        message: 'El cliente ya se encuentra registrado en el sistema',
+      return res.status(400).json({
+        message: `El cliente con Cédula / RIF (${cleanCi}) ya se encuentra registrado a nombre de: ${existingCI[0].name}`,
         user: existingCI[0]
       });
     }
@@ -272,9 +274,9 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
 
     const [result]: any = await pool.query(
       `INSERT INTO users 
-        (name, email, password, role, phone, ci, client_type, representative_name, representative_ci, representative_phone, representative_position) 
-       VALUES (?, ?, NULL, "customer", ?, ?, ?, ?, ?, ?, ?)`,
-      [cleanName, cleanEmail, cleanPhone, cleanCi, cleanType, cleanRepName, cleanRepCi, cleanRepPhone, cleanRepPosition]
+        (name, email, password, role, phone, ci, address, client_type, representative_name, representative_ci, representative_phone, representative_position) 
+       VALUES (?, ?, NULL, "customer", ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [cleanName, cleanEmail, cleanPhone, cleanCi, cleanAddress, cleanType, cleanRepName, cleanRepCi, cleanRepPhone, cleanRepPosition]
     );
 
     const newCustomerId = result.insertId;
@@ -285,7 +287,7 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
       userRole: req.user?.role,
       actionType: 'user_edit',
       title: `Nuevo Cliente Registrado: ${cleanName}`,
-      details: `Cédula/RIF: ${cleanCi}, Tipo: ${cleanType}, Encargado: ${cleanRepName || 'N/A'}`
+      details: `Cédula/RIF: ${cleanCi}, Dirección: ${cleanAddress || 'N/A'}, Tipo: ${cleanType}, Encargado: ${cleanRepName || 'N/A'}`
     });
 
     res.status(201).json({
@@ -296,6 +298,7 @@ router.post('/register-customer', authenticate, async (req: AuthRequest, res: Re
         email: cleanEmail,
         phone: cleanPhone,
         ci: cleanCi,
+        address: cleanAddress,
         role: 'customer',
         client_type: cleanType,
         representative_name: cleanRepName,
@@ -318,7 +321,7 @@ router.get('/customer-by-ci', authenticate, async (req: AuthRequest, res: Respon
   }
   try {
     const [users]: any = await pool.query(
-      'SELECT id, name, email, phone, ci, role, permissions, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ? LIMIT 1',
+      'SELECT id, name, email, phone, ci, address, role, permissions, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ? LIMIT 1',
       [ci]
     );
     if (users.length === 0) {

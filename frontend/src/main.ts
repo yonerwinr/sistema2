@@ -46,7 +46,6 @@ let posCouponDiscountPercent = 0;
 let posIsPending = false;
 let posInitialPayment = 0;
 let posLoadedQuotationId: number | null = null;
-let posClientIdentified = false;
 let posCustomerName = 'Consumidor Final';
 let posCustomerCi = '';
 let posCustomerEmail = '';
@@ -2529,52 +2528,6 @@ async function renderAdminPOS() {
         </div>
       </div>
 
-      ${!posClientIdentified && !posLoadedQuotationId ? `
-        <div class="modal-overlay open" id="pos-id-modal" style="z-index: 9999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
-          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 460px; width: 90%; padding: 28px; border-radius: 16px; border: 1px solid var(--border-glass); background: #111827;">
-            <div style="font-size: 38px; text-align: center; margin-bottom: 6px;">🆔</div>
-            <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px;">Identificación del Cliente</h3>
-            <p style="font-size: 12px; color: var(--text-secondary); text-align: center; margin-bottom: 20px;">
-              Ingrese la Cédula o RIF para buscar y cargar los datos del cliente en el POS.
-            </p>
-
-            <form id="pos-id-search-form" class="mb-4">
-              <div class="form-group mb-3">
-                <label class="form-label" style="font-size: 11px; text-transform: uppercase; font-weight: 700;">Cédula de Identidad / RIF</label>
-                <div style="display: flex; gap: 8px;">
-                  <select class="form-control" id="pos-id-prefix" style="width: 80px; font-weight: 700; flex-shrink: 0; font-size: 14px;">
-                    <option value="V-">V-</option>
-                    <option value="E-">E-</option>
-                    <option value="J-">J-</option>
-                    <option value="G-">G-</option>
-                  </select>
-                  <input type="text" class="form-control" id="pos-id-num" placeholder="Ej. 12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" required style="flex-grow: 1; font-size: 15px; font-weight: 600;">
-                </div>
-              </div>
-              <div style="display:flex; gap:8px;">
-                <button type="submit" class="btn btn-primary" id="pos-id-submit-btn" style="padding: 10px; font-size: 13px; font-weight: 700; flex:1;">
-                  🔍 Buscar Cliente
-                </button>
-                <button type="button" class="btn btn-success" id="pos-id-register-btn" style="padding: 10px; font-size: 13px; font-weight: 700; background:#6366f1; border-color:#6366f1; flex:1;">
-                  ➕ Registrar Nuevo
-                </button>
-              </div>
-            </form>
-
-            <div style="position: relative; text-align: center; margin: 18px 0;">
-              <hr style="border: 0; border-top: 1px solid var(--border-glass);">
-              <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: #111827; padding: 0 10px; font-size: 10px; color: var(--text-muted); text-transform: uppercase;">
-                O continuar sin registrar
-              </span>
-            </div>
-
-            <button type="button" class="btn btn-secondary w-100" id="pos-id-skip-btn" style="padding: 10px; font-size: 12px; font-weight: 600;">
-              👤 Consumidor Final (Usuario No Registrado)
-            </button>
-          </div>
-        </div>
-      ` : ''}
-
       ${showRegisterCustomerModal ? `
         <div class="modal-overlay open" id="register-customer-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
           <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 520px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827; max-height:90vh; overflow-y:auto;">
@@ -2613,6 +2566,11 @@ async function renderAdminPOS() {
                   <label class="form-label" style="font-size: 11px; font-weight: 700;">Correo Electrónico</label>
                   <input type="email" class="form-control" id="reg-cust-email" placeholder="cliente@correo.com" style="font-size: 13px;">
                 </div>
+              </div>
+
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Dirección Fiscal / Habitación</label>
+                <textarea class="form-control" id="reg-cust-address" rows="2" placeholder="Ej. Av. Bolívar, Edif. Centro, Piso 3, Ofic. 32, Valencia, Carabobo" style="font-size: 12px;"></textarea>
               </div>
 
               <!-- Sección Dinámica: Datos del Encargado / Representante (Aparece cuando es J- o G-) -->
@@ -2728,13 +2686,26 @@ async function renderAdminPOS() {
 
             <form id="expense-form">
               <div class="form-group mb-3">
-                <label class="form-label" style="font-size: 11px; font-weight: 700;">Concepto del Gasto</label>
-                <input type="text" class="form-control" id="expense-title" placeholder="Ej. Pago de Transporte / Compra de Insumos" required style="font-size: 13px;">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Concepto del Gasto *</label>
+                <input type="text" class="form-control" id="expense-title" placeholder="Ej. Pago de Transporte / Pasajes / Insumos" required style="font-size: 13px;">
               </div>
 
-              <div class="form-group mb-3">
-                <label class="form-label" style="font-size: 11px; font-weight: 700;">Monto del Gasto ($)</label>
-                <input type="number" step="0.01" min="0.01" class="form-control" id="expense-amount" placeholder="0.00" required style="font-size: 13px;">
+              <div class="grid-2 gap-2 mb-3">
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Monto ($) *</label>
+                  <input type="number" step="0.01" min="0.01" class="form-control" id="expense-amount" placeholder="0.00" required style="font-size: 13px;">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 11px; font-weight: 700;">Frecuencia</label>
+                  <select class="form-control" id="pos-expense-type-select" style="font-size: 12px; font-weight: 700;">
+                    <option value="unexpected">🔴 Imprevisto / Único</option>
+                    <option value="daily">📆 Diario (Todos los días)</option>
+                    <option value="weekly">🗓️ Semanal (Cada 7 días)</option>
+                    <option value="biweekly">📋 Quincenal (Cada 15 días)</option>
+                    <option value="monthly">📅 Mensual (Cada mes)</option>
+                    <option value="yearly">🏆 Anual (Cada año)</option>
+                  </select>
+                </div>
               </div>
 
               <div class="form-group mb-4">
@@ -2832,12 +2803,15 @@ function bindPOSEvents() {
       if (repPosVal) repPosition = repPosVal;
     }
 
+    const address = (document.getElementById('reg-cust-address') as HTMLTextAreaElement)?.value.trim();
+
     try {
       const res = await api.auth.registerCustomer({
         name,
         ci,
         phone: phone || undefined,
         email: email || undefined,
+        address: address || undefined,
         client_type,
         representative_name: repName,
         representative_ci: repCi,
@@ -2850,7 +2824,6 @@ function bindPOSEvents() {
       posCustomerCi = res.user.ci || ci;
       posCustomerPhone = res.user.phone || phone || '';
       posCustomerEmail = res.user.email || email || '';
-      posClientIdentified = true;
       showRegisterCustomerModal = false;
 
       alert(`¡Cliente "${res.user.name}" registrado y seleccionado con éxito!`);
@@ -2877,7 +2850,6 @@ function bindPOSEvents() {
       posCustomerEmail = customer.email || '';
       posCustomerPhone = customer.phone || '';
       posCustomerCi = customer.ci || fullCi;
-      posClientIdentified = true;
 
       alert(`¡Cliente Identificado Con Éxito!\n\nNombre: ${customer.name}\nCédula: ${customer.ci}\nCorreo: ${customer.email || 'N/D'}`);
       await renderAdminPOS();
@@ -2895,7 +2867,6 @@ function bindPOSEvents() {
         posCustomerName = 'Consumidor Final';
         posCustomerCi = fullCi;
         posSelectedCustomerId = null;
-        posClientIdentified = true;
         await renderAdminPOS();
       }
     }
@@ -2907,12 +2878,10 @@ function bindPOSEvents() {
     posCustomerCi = '';
     posCustomerEmail = '';
     posCustomerPhone = '';
-    posClientIdentified = true;
     await renderAdminPOS();
   });
 
   document.getElementById('change-pos-client-btn')?.addEventListener('click', async () => {
-    posClientIdentified = false;
     await renderAdminPOS();
   });
 
@@ -3080,18 +3049,31 @@ function bindPOSEvents() {
 
   document.getElementById('expense-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const title = (document.getElementById('expense-title') as HTMLInputElement).value;
+    const title = (document.getElementById('expense-title') as HTMLInputElement).value.trim();
     const amount = parseFloat((document.getElementById('expense-amount') as HTMLInputElement).value);
-    const details = (document.getElementById('expense-details') as HTMLTextAreaElement).value;
+    const expenseType = ((document.getElementById('pos-expense-type-select') as HTMLSelectElement)?.value || 'unexpected') as any;
+    const details = (document.getElementById('expense-details') as HTMLTextAreaElement).value.trim();
 
     if (!title || isNaN(amount) || amount <= 0) {
       alert('Por favor ingrese un concepto y monto válidos.');
       return;
     }
 
-    alert(`🔴 Gasto de Caja Registrado con Éxito:\n\nConcepto: ${title}\nMonto: $${amount.toFixed(2)}\nDetalle: ${details || 'Sin observaciones'}`);
-    showExpenseModal = false;
-    await renderAdminPOS();
+    try {
+      await api.expenses.create({
+        name: title,
+        amount,
+        currency: 'USD',
+        expense_type: expenseType,
+        description: details || undefined,
+        is_active: true
+      });
+      alert(`🔴 Gasto Registrado con Éxito:\n\nConcepto: ${title}\nMonto: $${amount.toFixed(2)}\nFrecuencia: ${expenseType}`);
+      showExpenseModal = false;
+      await renderAdminPOS();
+    } catch (err: any) {
+      alert(err.message || 'Error al guardar gasto');
+    }
   });
 
   // Eventos Venta Libre (Producto No Registrado)
@@ -3426,7 +3408,6 @@ function bindPOSEvents() {
       posIsPending = false;
       posInitialPayment = 0;
       posLoadedQuotationId = null;
-      posClientIdentified = false;
       posCustomerName = 'Consumidor Final';
       posCustomerCi = '';
       posCustomerEmail = '';
@@ -4959,10 +4940,14 @@ async function renderAdminExpenses() {
                 <input type="text" class="form-control" id="expense-name" required placeholder="Ej. Mensualidad de hosting">
               </div>
               <div class="form-group">
-                <label class="form-label" for="expense-type">Tipo</label>
+                <label class="form-label" for="expense-type">Frecuencia / Tipo de Gasto</label>
                 <select class="form-control" id="expense-type">
-                  <option value="monthly">Mensual</option>
-                  <option value="unexpected">Imprevisto</option>
+                  <option value="daily">📆 Diario (Todos los días)</option>
+                  <option value="weekly">🗓️ Semanal (Cada 7 días)</option>
+                  <option value="biweekly">📋 Quincenal (Cada 15 días)</option>
+                  <option value="monthly" selected>📅 Mensual (Cada mes)</option>
+                  <option value="yearly">🏆 Anual (Cada año)</option>
+                  <option value="unexpected">🔴 Imprevisto / Único</option>
                 </select>
               </div>
             </div>
@@ -4975,16 +4960,16 @@ async function renderAdminExpenses() {
               <div class="form-group">
                 <label class="form-label" for="expense-currency">Moneda</label>
                 <select class="form-control" id="expense-currency">
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="VES">VES</option>
+                  <option value="USD">USD ($)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="VES">VES (Bs.)</option>
                 </select>
               </div>
             </div>
 
             <div class="form-group">
               <label class="form-label" for="expense-description">Descripción</label>
-              <textarea class="form-control" id="expense-description" rows="2" placeholder="Ej. Pago mensual de servidor o técnico del aire"></textarea>
+              <textarea class="form-control" id="expense-description" rows="2" placeholder="Ej. Pago de alquiler, nómina, pasajes o licencias"></textarea>
             </div>
 
             <div class="grid-2">
@@ -5000,7 +4985,7 @@ async function renderAdminExpenses() {
 
             <div class="form-group mb-3">
               <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
-                <input type="checkbox" id="expense-active" checked> Activo / Cobrar normalmente
+                <input type="checkbox" id="expense-active" checked> Activo / Programado
               </label>
             </div>
 
@@ -5017,7 +5002,7 @@ async function renderAdminExpenses() {
               <thead>
                 <tr>
                   <th>Nombre</th>
-                  <th>Tipo</th>
+                  <th>Frecuencia</th>
                   <th>Monto</th>
                   <th>Moneda</th>
                   <th>Equivalente en BS</th>
@@ -5027,30 +5012,54 @@ async function renderAdminExpenses() {
                 </tr>
               </thead>
               <tbody>
-                ${expenses.map(exp => `
-                  <tr>
-                    <td>
-                      <strong>${exp.name}</strong>
-                      ${exp.description ? `<br><small style="color:var(--text-secondary);">${exp.description}</small>` : ''}
-                    </td>
-                    <td>${exp.expense_type === 'monthly' ? 'Mensual' : 'Imprevisto'}</td>
-                    <td><strong>${Number(exp.amount).toFixed(2)}</strong></td>
-                    <td>${exp.currency}</td>
-                    <td>${exp.amount_ves !== null && exp.amount_ves !== undefined ? `Bs. ${Number(exp.amount_ves).toFixed(2)}` : '—'}</td>
-                    <td>${exp.next_due_date || '—'}</td>
-                    <td>
-                      <span class="badge" style="background:${exp.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color:${exp.is_active ? 'var(--success)' : 'var(--danger)'}; padding:2px 6px; font-size:11px;">
-                        ${exp.is_active ? 'Activo' : 'Suspendido'}
-                      </span>
-                    </td>
-                    <td>
-                      <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <button class="btn btn-secondary edit-expense-btn" data-id="${exp.id}" style="padding:6px 10px; font-size:11px;">✏️</button>
-                        <button class="btn btn-danger delete-expense-btn" data-id="${exp.id}" style="padding:6px 10px; font-size:11px;">🗑️</button>
-                      </div>
-                    </td>
-                  </tr>
-                `).join('')}
+                ${expenses.map(exp => {
+                  let badgeHtml = '';
+                  switch (exp.expense_type) {
+                    case 'daily':
+                      badgeHtml = `<span class="badge" style="background:rgba(59,130,246,0.15); color:#60a5fa; font-weight:700;">📆 Diario</span>`;
+                      break;
+                    case 'weekly':
+                      badgeHtml = `<span class="badge" style="background:rgba(16,185,129,0.15); color:#34d399; font-weight:700;">🗓️ Semanal</span>`;
+                      break;
+                    case 'biweekly':
+                      badgeHtml = `<span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; font-weight:700;">📋 Quincenal (15 días)</span>`;
+                      break;
+                    case 'monthly':
+                      badgeHtml = `<span class="badge" style="background:rgba(99,102,241,0.15); color:#818cf8; font-weight:700;">📅 Mensual</span>`;
+                      break;
+                    case 'yearly':
+                      badgeHtml = `<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc; font-weight:700;">🏆 Anual</span>`;
+                      break;
+                    default:
+                      badgeHtml = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#f87171; font-weight:700;">🔴 Único / Imprevisto</span>`;
+                      break;
+                  }
+
+                  return `
+                    <tr>
+                      <td>
+                        <strong>${exp.name}</strong>
+                        ${exp.description ? `<br><small style="color:var(--text-secondary);">${exp.description}</small>` : ''}
+                      </td>
+                      <td>${badgeHtml}</td>
+                      <td><strong>${Number(exp.amount).toFixed(2)}</strong></td>
+                      <td>${exp.currency}</td>
+                      <td>${exp.amount_ves !== null && exp.amount_ves !== undefined ? `Bs. ${Number(exp.amount_ves).toFixed(2)}` : '—'}</td>
+                      <td>${exp.next_due_date || '—'}</td>
+                      <td>
+                        <span class="badge" style="background:${exp.is_active ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color:${exp.is_active ? 'var(--success)' : 'var(--danger)'}; padding:2px 6px; font-size:11px;">
+                          ${exp.is_active ? 'Activo' : 'Suspendido'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                          <button class="btn btn-secondary edit-expense-btn" data-id="${exp.id}" style="padding:6px 10px; font-size:11px;">✏️</button>
+                          <button class="btn btn-danger delete-expense-btn" data-id="${exp.id}" style="padding:6px 10px; font-size:11px;">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
                 ${expenses.length === 0 ? '<tr><td colspan="8" class="text-center">No hay gastos registrados.</td></tr>' : ''}
               </tbody>
             </table>
@@ -5103,7 +5112,7 @@ async function renderAdminExpenses() {
           description: (document.getElementById('expense-description') as HTMLTextAreaElement).value.trim(),
           amount: parseFloat((document.getElementById('expense-amount') as HTMLInputElement).value),
           currency: (document.getElementById('expense-currency') as HTMLSelectElement).value,
-          expense_type: ((document.getElementById('expense-type') as HTMLSelectElement).value === 'monthly' ? 'monthly' : 'unexpected'),
+          expense_type: (document.getElementById('expense-type') as HTMLSelectElement).value as any,
           is_active: (document.getElementById('expense-active') as HTMLInputElement).checked,
           start_date: (document.getElementById('expense-start-date') as HTMLInputElement).value || null,
           next_due_date: (document.getElementById('expense-next-due-date') as HTMLInputElement).value || null,
@@ -5562,7 +5571,6 @@ function bindCustomersEvents() {
       const target = e.currentTarget as HTMLButtonElement;
       posCustomerName = target.dataset.name || 'Consumidor Final';
       posCustomerCi = target.dataset.ci || '';
-      posClientIdentified = true;
       activeAdminView = 'pos';
       await renderAdminPOS();
     });

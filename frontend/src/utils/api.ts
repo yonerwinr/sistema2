@@ -38,12 +38,14 @@ export interface User {
   role: 'admin' | 'customer' | 'seller';
   phone?: string;
   ci?: string;
-  permissions?: string | string[];
+  address?: string | null;
   client_type?: 'natural' | 'juridico' | 'gubernamental';
-  representative_name?: string;
-  representative_ci?: string;
-  representative_phone?: string;
-  representative_position?: string;
+  representative_name?: string | null;
+  representative_ci?: string | null;
+  representative_phone?: string | null;
+  representative_position?: string | null;
+  permissions?: string;
+  created_at?: string;
 }
 
 export interface Product {
@@ -94,7 +96,7 @@ export interface Expense {
   amount: number;
   amount_ves?: number | null;
   currency: string;
-  expense_type: 'monthly' | 'unexpected';
+  expense_type: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'unexpected';
   is_active: boolean;
   start_date?: string | null;
   next_due_date?: string | null;
@@ -169,6 +171,7 @@ export const api = {
       ci: string;
       email?: string;
       phone?: string;
+      address?: string;
       client_type?: string;
       representative_name?: string;
       representative_ci?: string;

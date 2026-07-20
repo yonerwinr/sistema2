@@ -162,7 +162,7 @@ router.get('/customers', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado. Solo administradores y vendedores pueden ver la lista de clientes' });
     }
     try {
-        const [customers] = await db_1.default.query('SELECT id, name, email, phone, ci, client_type, representative_name, representative_ci, representative_phone, representative_position, created_at FROM users WHERE role = "customer" ORDER BY name ASC');
+        const [customers] = await db_1.default.query('SELECT id, name, email, phone, ci, address, client_type, representative_name, representative_ci, representative_phone, representative_position, created_at FROM users WHERE role = "customer" ORDER BY name ASC');
         res.json(customers);
     }
     catch (error) {
@@ -175,13 +175,14 @@ router.post('/register-customer', auth_1.authenticate, async (req, res) => {
     if (req.user?.role !== 'admin' && req.user?.role !== 'seller') {
         return res.status(403).json({ message: 'No autorizado para registrar clientes' });
     }
-    const { name, ci, email, phone, client_type, representative_name, representative_ci, representative_phone, representative_position } = req.body;
+    const { name, ci, email, phone, address, client_type, representative_name, representative_ci, representative_phone, representative_position } = req.body;
     if (!name || !ci) {
         return res.status(400).json({ message: 'El nombre/razón social y la cédula/RIF son obligatorios' });
     }
     const cleanCi = ci.trim();
     const cleanName = name.trim();
     const cleanPhone = phone ? phone.trim() : null;
+    const cleanAddress = address ? address.trim() : null;
     let cleanEmail = email ? email.trim() : null;
     const cleanType = client_type || (cleanCi.toUpperCase().startsWith('J-') ? 'juridico' : cleanCi.toUpperCase().startsWith('G-') ? 'gubernamental' : 'natural');
     const cleanRepName = representative_name ? representative_name.trim() : null;
@@ -193,10 +194,10 @@ router.post('/register-customer', auth_1.authenticate, async (req, res) => {
     }
     try {
         // Verificar si la cédula/RIF ya existe
-        const [existingCI] = await db_1.default.query('SELECT id, name, email, phone, ci, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ?', [cleanCi]);
+        const [existingCI] = await db_1.default.query('SELECT id, name, email, phone, ci, address, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ?', [cleanCi]);
         if (existingCI.length > 0) {
-            return res.status(200).json({
-                message: 'El cliente ya se encuentra registrado en el sistema',
+            return res.status(400).json({
+                message: `El cliente con Cédula / RIF (${cleanCi}) ya se encuentra registrado a nombre de: ${existingCI[0].name}`,
                 user: existingCI[0]
             });
         }
@@ -206,8 +207,8 @@ router.post('/register-customer', auth_1.authenticate, async (req, res) => {
             cleanEmail = `${cleanCi.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now()}@cliente.local`;
         }
         const [result] = await db_1.default.query(`INSERT INTO users 
-        (name, email, password, role, phone, ci, client_type, representative_name, representative_ci, representative_phone, representative_position) 
-       VALUES (?, ?, NULL, "customer", ?, ?, ?, ?, ?, ?, ?)`, [cleanName, cleanEmail, cleanPhone, cleanCi, cleanType, cleanRepName, cleanRepCi, cleanRepPhone, cleanRepPosition]);
+        (name, email, password, role, phone, ci, address, client_type, representative_name, representative_ci, representative_phone, representative_position) 
+       VALUES (?, ?, NULL, "customer", ?, ?, ?, ?, ?, ?, ?, ?)`, [cleanName, cleanEmail, cleanPhone, cleanCi, cleanAddress, cleanType, cleanRepName, cleanRepCi, cleanRepPhone, cleanRepPosition]);
         const newCustomerId = result.insertId;
         (0, audit_1.logAuditEvent)({
             userId: req.user?.id,
@@ -215,7 +216,7 @@ router.post('/register-customer', auth_1.authenticate, async (req, res) => {
             userRole: req.user?.role,
             actionType: 'user_edit',
             title: `Nuevo Cliente Registrado: ${cleanName}`,
-            details: `Cédula/RIF: ${cleanCi}, Tipo: ${cleanType}, Encargado: ${cleanRepName || 'N/A'}`
+            details: `Cédula/RIF: ${cleanCi}, Dirección: ${cleanAddress || 'N/A'}, Tipo: ${cleanType}, Encargado: ${cleanRepName || 'N/A'}`
         });
         res.status(201).json({
             message: 'Cliente registrado con éxito',
@@ -225,6 +226,7 @@ router.post('/register-customer', auth_1.authenticate, async (req, res) => {
                 email: cleanEmail,
                 phone: cleanPhone,
                 ci: cleanCi,
+                address: cleanAddress,
                 role: 'customer',
                 client_type: cleanType,
                 representative_name: cleanRepName,
@@ -246,7 +248,7 @@ router.get('/customer-by-ci', auth_1.authenticate, async (req, res) => {
         return res.status(400).json({ message: 'La cédula o RIF es requerida' });
     }
     try {
-        const [users] = await db_1.default.query('SELECT id, name, email, phone, ci, role, permissions, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ? LIMIT 1', [ci]);
+        const [users] = await db_1.default.query('SELECT id, name, email, phone, ci, address, role, permissions, client_type, representative_name, representative_ci, representative_phone, representative_position FROM users WHERE ci = ? LIMIT 1', [ci]);
         if (users.length === 0) {
             return res.status(404).json({ message: 'Cliente no encontrado' });
         }

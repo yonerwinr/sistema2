@@ -204,6 +204,18 @@ async function runMigrations() {
         catch (err) {
             console.error('Error al crear tabla coupons:', err.message);
         }
+        // Verificar y agregar columna address a la tabla users
+        try {
+            const [userCols] = await conn.query('SHOW COLUMNS FROM users');
+            const userColNames = userCols.map((c) => c.Field);
+            if (!userColNames.includes('address')) {
+                await conn.query('ALTER TABLE users ADD COLUMN address TEXT NULL');
+                console.log('Columna "address" agregada a la tabla users.');
+            }
+        }
+        catch (err) {
+            console.error('Error al agregar columna address a la tabla users:', err.message);
+        }
         // Verificar y agregar columna code a la tabla products
         try {
             const [prodCols] = await conn.query('SHOW COLUMNS FROM products');

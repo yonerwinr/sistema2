@@ -37,6 +37,28 @@ function calculateAmountVes(amount: number, currency: string, rates: ExchangeRat
   return Number(amount.toFixed(2));
 }
 
+function computeNextDueDate(startDateStr: string, type: string): string | null {
+  if (!startDateStr || type === 'unexpected') return null;
+  const start = new Date(startDateStr);
+  if (isNaN(start.getTime())) return null;
+
+  const d = new Date(start);
+  if (type === 'daily') {
+    d.setDate(d.getDate() + 1);
+  } else if (type === 'weekly') {
+    d.setDate(d.getDate() + 7);
+  } else if (type === 'biweekly') {
+    d.setDate(d.getDate() + 15);
+  } else if (type === 'monthly') {
+    d.setMonth(d.getMonth() + 1);
+  } else if (type === 'yearly') {
+    d.setFullYear(d.getFullYear() + 1);
+  } else {
+    return startDateStr;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
 router.get('/', authenticate, isAdmin, async (_req: AuthRequest, res: Response) => {
   try {
     const [expenses]: any = await pool.query(
@@ -80,7 +102,7 @@ router.post('/', authenticate, isAdmin, async (req: AuthRequest, res: Response) 
     const normalizedActive = Number(Boolean(is_active));
     const today = new Date().toISOString().slice(0, 10);
     const effectiveStartDate = start_date || today;
-    const effectiveNextDueDate = next_due_date || (normalizedType === 'monthly' ? effectiveStartDate : null);
+    const effectiveNextDueDate = next_due_date || computeNextDueDate(effectiveStartDate, normalizedType);
 
     const [result]: any = await pool.query(
       'INSERT INTO expenses (name, description, amount, amount_ves, currency, expense_type, is_active, start_date, next_due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -133,7 +155,7 @@ router.put('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Response
     const normalizedType = (expense_type || current.expense_type || 'unexpected').toLowerCase();
     const normalizedActive = is_active === undefined ? Number(Boolean(current.is_active)) : Number(Boolean(is_active));
     const effectiveStartDate = start_date || current.start_date || new Date().toISOString().slice(0, 10);
-    const effectiveNextDueDate = next_due_date !== undefined ? next_due_date : (current.next_due_date || (normalizedType === 'monthly' ? effectiveStartDate : null));
+    const effectiveNextDueDate = next_due_date !== undefined ? next_due_date : (current.next_due_date || computeNextDueDate(effectiveStartDate, normalizedType));
 
     await pool.query(
       'UPDATE expenses SET name = ?, description = ?, amount = ?, amount_ves = ?, currency = ?, expense_type = ?, is_active = ?, start_date = ?, next_due_date = ? WHERE id = ?',
