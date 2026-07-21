@@ -284,6 +284,10 @@ async function runMigrations() {
     // Añadir columnas para cupones personales y de un solo uso
     const [couponColumns]: any = await conn.query('SHOW COLUMNS FROM coupons');
     const couponColumnNames = couponColumns.map((col: any) => col.Field);
+    if (!couponColumnNames.includes('code')) {
+      await conn.query('ALTER TABLE coupons ADD COLUMN code VARCHAR(50) NOT NULL UNIQUE AFTER id');
+      console.log('Columna "code" agregada a la tabla coupons.');
+    }
     if (!couponColumnNames.includes('user_id')) {
       await conn.query('ALTER TABLE coupons ADD COLUMN user_id INT NULL');
       console.log('Columna "user_id" agregada a la tabla coupons.');
