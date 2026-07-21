@@ -111,6 +111,7 @@ let posConfirmedUnregisteredWarning = false;
 let showFreeSaleModal = false;
 let showExpenseModal = false;
 let showRegisterCustomerModal = false;
+let showIdentifyCustomerModal = false;
 let adminCustomerSearchQuery = '';
 let editingCustomer: User | null = null;
 let showEditCustomerModal = false;
@@ -2727,6 +2728,43 @@ async function renderAdminPOS() {
         </div>
       ` : ''}
 
+      ${showIdentifyCustomerModal ? `
+        <div class="modal-overlay open" id="identify-customer-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 480px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827;">
+            <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">🆔</div>
+            <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Identificar / Buscar Cliente</h3>
+            <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
+              Ingrese el tipo y número de documento (Cédula / RIF / Pasaporte) para asociar el cliente a la venta.
+            </p>
+
+            <form id="pos-id-search-form">
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Documento de Identidad / RIF *</label>
+                <div style="display: flex; gap: 8px;">
+                  <select class="form-control" id="pos-id-prefix" style="width: 130px; font-weight: 700; flex-shrink: 0; font-size: 13px;">
+                    <option value="V-">V- Natural (Ven)</option>
+                    <option value="E-">E- Natural (Ext)</option>
+                    <option value="J-">J- Jurídico (RIF)</option>
+                    <option value="G-">G- Gubernamental</option>
+                    <option value="P-">P- Pasaporte</option>
+                  </select>
+                  <input type="text" class="form-control" id="pos-id-num" placeholder="Ej. 12345678" required style="flex-grow: 1; font-size: 14px; font-weight: 600;">
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; flex-direction: column; margin-top: 16px;">
+                <button type="submit" class="btn btn-primary" id="pos-id-submit-btn" style="padding: 10px; font-size: 13px; font-weight: 800;">
+                  🔍 Buscar / Identificar Cliente
+                </button>
+                <button type="button" class="btn btn-secondary" id="pos-id-skip-btn" style="padding: 8px; font-size: 12px; background: rgba(255,255,255,0.05);">
+                  ⚠️ Continuar sin registrar (Consumidor Final)
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ` : ''}
+
       ${showFreeSaleModal ? `
         <div class="modal-overlay open" id="free-sale-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
           <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 440px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid var(--border-glass); background: #111827;">
@@ -2951,8 +2989,10 @@ function bindPOSEvents() {
     const num = (document.getElementById('pos-id-num') as HTMLInputElement).value.trim();
     const fullCi = `${prefix}${num}`;
     const btn = document.getElementById('pos-id-submit-btn') as HTMLButtonElement;
-    btn.disabled = true;
-    btn.innerText = 'Buscando...';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Buscando...';
+    }
 
     try {
       const customer = await api.auth.getCustomerByCi(fullCi);
@@ -2961,11 +3001,13 @@ function bindPOSEvents() {
       posCustomerEmail = customer.email || '';
       posCustomerPhone = customer.phone || '';
       posCustomerCi = customer.ci || fullCi;
+      showIdentifyCustomerModal = false;
 
-      alert(`¡Cliente Identificado Con Éxito!\n\nNombre: ${customer.name}\nCédula: ${customer.ci}\nCorreo: ${customer.email || 'N/D'}`);
+      alert(`¡Cliente Identificado Con Éxito!\n\nNombre: ${customer.name}\nCédula/RIF: ${customer.ci}`);
       await renderAdminPOS();
     } catch (err: any) {
-      if (confirm(`No se encontró ningún cliente registrado con la Cédula/RIF "${fullCi}".\n\n¿Desea registrarlo como nuevo cliente ahora?`)) {
+      if (confirm(`No se encontró ningún cliente registrado con el Documento "${fullCi}".\n\n¿Desea registrarlo como NUEVO CLIENTE ahora?\n\n- Aceptar: Abrir formulario de registro completo.\n- Cancelar: Continuar venta a Consumidor Final sin registrar.`)) {
+        showIdentifyCustomerModal = false;
         showRegisterCustomerModal = true;
         await renderAdminPOS();
         setTimeout(() => {
@@ -2975,6 +3017,7 @@ function bindPOSEvents() {
           if (ciNumIn) ciNumIn.value = num;
         }, 100);
       } else {
+        showIdentifyCustomerModal = false;
         posCustomerName = 'Consumidor Final';
         posCustomerCi = fullCi;
         posSelectedCustomerId = null;
@@ -2984,6 +3027,7 @@ function bindPOSEvents() {
   });
 
   document.getElementById('pos-id-skip-btn')?.addEventListener('click', async () => {
+    showIdentifyCustomerModal = false;
     posSelectedCustomerId = null;
     posCustomerName = 'Consumidor Final';
     posCustomerCi = '';
@@ -3607,9 +3651,9 @@ async function addToPOSCart(product: Product) {
     posCart.push({ product, quantity: 1 });
   }
 
-  // Obligatoriamente al seleccionar un producto dar la opción para registrar al cliente si no está seleccionado
-  if (!posSelectedCustomerId) {
-    showRegisterCustomerModal = true;
+  // Obligatoriamente al seleccionar un producto dar la opción para identificar / registrar al cliente si no está seleccionado
+  if (!posSelectedCustomerId && posCustomerName === 'Consumidor Final') {
+    showIdentifyCustomerModal = true;
   }
 
   await renderAdminPOS();
@@ -3798,16 +3842,16 @@ async function renderAdminProducts() {
 
             <div class="grid-3 gap-2 mb-3">
               <div class="form-group">
-                <label class="form-label" style="font-size: 10px; font-weight: 700;">Costo en Dólar Negro ($)</label>
-                <input type="number" step="0.01" min="0" class="form-control" id="calc-black-cost" style="font-size: 12px; padding: 6px 10px;" placeholder="Ej. 10.00">
+                <label class="form-label" style="font-size: 10px; font-weight: 700; color: var(--primary);">Costo en Dólar BCV ($)</label>
+                <input type="number" step="0.01" min="0" class="form-control" id="calc-bcv-cost" style="font-size: 12px; padding: 6px 10px; border-color: rgba(99,102,241,0.4);" placeholder="Ej. 10.00">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 10px; font-weight: 700; color: #f59e0b;">Costo Dólar Negro / Binance ($)</label>
+                <input type="number" step="0.01" min="0" class="form-control" id="calc-black-cost" style="font-size: 12px; padding: 6px 10px; border-color: rgba(245,158,11,0.4);" placeholder="Ej. 10.00">
               </div>
               <div class="form-group">
                 <label class="form-label" style="font-size: 10px; font-weight: 700;">Margen Ganancia (%)</label>
                 <input type="number" step="1" min="0" class="form-control" id="calc-profit-margin" style="font-size: 12px; padding: 6px 10px;" placeholder="0" value="0">
-              </div>
-              <div class="form-group">
-                <label class="form-label" style="font-size: 10px; font-weight: 700; color: var(--success);">Diferencial Recargo (%)</label>
-                <input type="text" readonly class="form-control" id="calc-markup-percent" style="font-size: 12px; padding: 6px 10px; font-weight: 700; color: var(--success);" value="0.00%">
               </div>
             </div>
 
@@ -3893,42 +3937,60 @@ function bindProductCRUDEvents() {
   const form = document.getElementById('product-form') as HTMLFormElement;
   const formTitle = document.getElementById('product-form-title');
 
-  // Función para re-calcular precio en Dólar BCV según Tasa Dólar Negro vs BCV
-  function updateProductPriceCalc() {
-    const bcvInput = document.getElementById('calc-bcv-rate') as HTMLInputElement;
-    const binanceInput = document.getElementById('calc-binance-rate') as HTMLInputElement;
+  // Función para re-calcular precio en Dólar BCV según Costo Dólar BCV o Dólar Negro
+  function updateProductPriceCalc(triggeredBy?: string) {
+    const bcvRateInput = document.getElementById('calc-bcv-rate') as HTMLInputElement;
+    const binanceRateInput = document.getElementById('calc-binance-rate') as HTMLInputElement;
+    const bcvCostInput = document.getElementById('calc-bcv-cost') as HTMLInputElement;
     const blackCostInput = document.getElementById('calc-black-cost') as HTMLInputElement;
     const profitMarginInput = document.getElementById('calc-profit-margin') as HTMLInputElement;
 
-    const bcvRate = parseFloat(bcvInput?.value || '0') || rateUsdToVes;
-    const binanceRate = parseFloat(binanceInput?.value || '0') || rateBinanceToVes;
-    const blackCost = parseFloat(blackCostInput?.value || '0') || 0;
+    // Exclusividad Mutua: Escribir en un campo de costo limpia el otro
+    if (triggeredBy === 'calc-bcv-cost' && bcvCostInput?.value) {
+      if (blackCostInput) blackCostInput.value = '';
+    } else if (triggeredBy === 'calc-black-cost' && blackCostInput?.value) {
+      if (bcvCostInput) bcvCostInput.value = '';
+    }
+
+    const bcvRate = parseFloat(bcvRateInput?.value || '0') || rateUsdToVes;
+    const binanceRate = parseFloat(binanceRateInput?.value || '0') || rateBinanceToVes;
+    const bcvCost = parseFloat(bcvCostInput?.value || '');
+    const blackCost = parseFloat(blackCostInput?.value || '');
     const profitMargin = parseFloat(profitMarginInput?.value || '0') || 0;
+
+    let finalPriceBcv = 0;
+    let markupPercent = 0;
 
     if (bcvRate > 0 && binanceRate > 0) {
       const markupDiffRatio = (binanceRate - bcvRate) / bcvRate;
-      const markupPercent = markupDiffRatio * 100;
-      
-      const markupDisplay = document.getElementById('calc-markup-percent') as HTMLInputElement;
-      if (markupDisplay) {
-        markupDisplay.value = `${markupPercent >= 0 ? '+' : ''}${markupPercent.toFixed(2)}%`;
+      markupPercent = markupDiffRatio * 100;
+    }
+
+    if (!isNaN(bcvCost) && bcvCost > 0) {
+      // Usar costo en Dólar BCV directamente
+      finalPriceBcv = bcvCost * (1 + profitMargin / 100);
+      markupPercent = 0; // Sin recargo adicional
+    } else if (!isNaN(blackCost) && blackCost > 0 && bcvRate > 0 && binanceRate > 0) {
+      // Usar costo en Dólar Negro con recargo diferencial
+      const costUsdBcv = blackCost * (binanceRate / bcvRate);
+      finalPriceBcv = costUsdBcv * (1 + profitMargin / 100);
+    }
+
+    const markupDisplay = document.getElementById('calc-markup-percent') as HTMLInputElement;
+    if (markupDisplay) {
+      markupDisplay.value = `${markupPercent >= 0 ? '+' : ''}${markupPercent.toFixed(2)}%`;
+    }
+
+    if (finalPriceBcv > 0) {
+      const priceDisplay = document.getElementById('calc-result-price-display');
+      if (priceDisplay) {
+        priceDisplay.innerText = `$${finalPriceBcv.toFixed(2)}`;
       }
 
-      if (blackCost > 0) {
-        // Costo equivalente en dólar BCV
-        const costUsdBcv = blackCost * (binanceRate / bcvRate);
-        const finalPriceBcv = costUsdBcv * (1 + profitMargin / 100);
-
-        const priceDisplay = document.getElementById('calc-result-price-display');
-        if (priceDisplay) {
-          priceDisplay.innerText = `$${finalPriceBcv.toFixed(2)}`;
-        }
-
-        // Auto-llenar el input de precio final del producto
-        const prodPriceInput = document.getElementById('prod-price') as HTMLInputElement;
-        if (prodPriceInput) {
-          prodPriceInput.value = finalPriceBcv.toFixed(2);
-        }
+      // Auto-llenar el input de precio final del producto
+      const prodPriceInput = document.getElementById('prod-price') as HTMLInputElement;
+      if (prodPriceInput) {
+        prodPriceInput.value = finalPriceBcv.toFixed(2);
       }
     }
   }
@@ -3974,9 +4036,10 @@ function bindProductCRUDEvents() {
     }
   });
 
-  ['calc-purchase-date', 'calc-bcv-rate', 'calc-binance-rate', 'calc-black-cost', 'calc-profit-margin'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', updateProductPriceCalc);
-    document.getElementById(id)?.addEventListener('change', updateProductPriceCalc);
+  ['calc-purchase-date', 'calc-bcv-rate', 'calc-binance-rate', 'calc-bcv-cost', 'calc-black-cost', 'calc-profit-margin'].forEach(id => {
+    const el = document.getElementById(id);
+    el?.addEventListener('input', () => updateProductPriceCalc(id));
+    el?.addEventListener('change', () => updateProductPriceCalc(id));
   });
 
   document.getElementById('apply-calc-price-btn')?.addEventListener('click', () => {
