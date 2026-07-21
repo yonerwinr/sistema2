@@ -38,9 +38,8 @@ let activeAdminView: AdminSubView = 'stats';
 let posCustomersList: User[] = [];
 let posSelectedCustomerId: number | null = null;
 let posDiscount = 0;
-let posApplyTax = true;
+let posApplyTax = false;
 let posApplyCurrencyDiscount = false;
-let posCurrencyDiscountPercent = 0;
 let posCouponCode = '';
 let posCouponDiscountPercent = 0;
 let posIsPending = false;
@@ -2230,6 +2229,10 @@ async function renderAdminPOS() {
       posProducts = [];
     }
     
+    if (currentUser?.role !== 'admin') {
+      posDiscount = 0;
+    }
+
     // Cálculos de totales del POS
     const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
@@ -2286,9 +2289,6 @@ async function renderAdminPOS() {
               ➕ Nueva Venta Libre
             </button>
           ` : ''}
-          <button type="button" class="btn btn-danger" id="open-expense-btn" style="background:#ef4444; border:none; color:white; font-size:12px; font-weight:700; padding:8px 14px; border-radius:8px;">
-            🔴 Nuevo Gasto
-          </button>
         </div>
 
         <div style="font-size:12px; color:var(--text-secondary);">
@@ -2375,15 +2375,6 @@ async function renderAdminPOS() {
               <button type="button" id="pos-type-credit-btn" class="btn" style="padding:8px; font-size:12px; font-weight:700; border-radius:8px; ${posIsPending ? 'background:#ef4444; color:white;' : 'background:transparent; color:var(--text-muted);'}">
                 A crédito
               </button>
-            </div>
-
-            <!-- Tasa Oficial del Día -->
-            <div style="background:rgba(16,185,129,0.05); border:1px solid rgba(16,185,129,0.25); border-radius:10px; padding:8px 12px; display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:11px; font-weight:700; color:#10b981;">Tasa Oficial BCV:</span>
-              <div style="display:flex; align-items:center; gap:4px;">
-                <span style="font-size:11px; font-weight:700; color:white;">Bs. ${rateUsdToVes.toFixed(2)}</span>
-                <span style="font-size:10px; color:var(--text-muted);">= $1 USD</span>
-              </div>
             </div>
 
             <!-- Cliente Seleccionado -->
@@ -2505,15 +2496,25 @@ async function renderAdminPOS() {
               ` : ''}
             </div>
 
-            <!-- Descuento Dual (% y $) -->
-            <div style="display:flex; flex-direction:column; gap:4px;">
-              <label class="form-label" style="font-size:10px; font-weight:700;">Descuento</label>
-              <div style="display:flex; align-items:center; gap:6px;">
-                <input type="number" step="0.1" min="0" max="100" class="form-control" id="pos-discount-percent" placeholder="0%" style="font-size:12px; padding:6px; text-align:right;">
-                <span>=</span>
-                <input type="number" step="0.01" min="0" class="form-control" id="pos-discount-input" placeholder="$ 0.00" value="${posDiscount > 0 ? posDiscount : ''}" style="font-size:12px; padding:6px; text-align:right;">
-              </div>
+            <!-- Casilla Impuesto IVA (16%) -->
+            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:10px; padding:8px 12px;">
+              <label style="font-size:11px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                <input type="checkbox" id="pos-apply-tax" ${posApplyTax ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px; accent-color:var(--primary);">
+                <span>Aplica IVA (16%)</span>
+              </label>
             </div>
+
+            ${currentUser?.role === 'admin' ? `
+              <!-- Descuento Dual (% y $) - Solo Admin -->
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label class="form-label" style="font-size:10px; font-weight:700;">Descuento General (Admin)</label>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <input type="number" step="0.1" min="0" max="100" class="form-control" id="pos-discount-percent" placeholder="0%" style="font-size:12px; padding:6px; text-align:right;">
+                  <span>=</span>
+                  <input type="number" step="0.01" min="0" class="form-control" id="pos-discount-input" placeholder="$ 0.00" value="${posDiscount > 0 ? posDiscount : ''}" style="font-size:12px; padding:6px; text-align:right;">
+                </div>
+              </div>
+            ` : ''}
 
             <!-- Sección Desplegable: Detalles del Comprobante -->
             <div style="border:1px solid var(--border-glass); border-radius:10px; padding:8px 12px; background:rgba(255,255,255,0.01);">
@@ -2927,11 +2928,11 @@ function bindPOSEvents() {
 
   // Agregar al POS Cart
   document.querySelectorAll('.add-to-pos-cart').forEach(card => {
-    card.addEventListener('click', (e) => {
+    card.addEventListener('click', async (e) => {
       const id = parseInt((e.currentTarget as HTMLDivElement).dataset.id || '0');
       const prod = productsList.find(p => p.id === id);
       if (prod) {
-        addToPOSCart(prod);
+        await addToPOSCart(prod);
       }
     });
   });
@@ -3254,10 +3255,13 @@ function bindPOSEvents() {
     btn.addEventListener('click', async (e) => {
       const idx = parseInt((e.currentTarget as HTMLButtonElement).dataset.index || '0');
       const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+      const autoCurrencyDiscountPct = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
+        ? (((rateBinanceToVes - rateUsdToVes) / rateBinanceToVes) * 100)
+        : 0;
       const totalPaidInDivisasUsd = posPaymentLines
         .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
         .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
-      const currencyDiscountAmount = posApplyCurrencyDiscount ? (totalPaidInDivisasUsd * (posCurrencyDiscountPercent / 100)) : 0;
+      const currencyDiscountAmount = posApplyCurrencyDiscount ? (totalPaidInDivisasUsd * (autoCurrencyDiscountPct / 100)) : 0;
       const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
       const totalDiscount = couponDiscountAmount + posDiscount + currencyDiscountAmount;
       const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
@@ -3277,15 +3281,6 @@ function bindPOSEvents() {
   const currencyDiscountCb = document.getElementById('pos-apply-currency-discount-cb') as HTMLInputElement;
   currencyDiscountCb?.addEventListener('change', async (e) => {
     posApplyCurrencyDiscount = (e.target as HTMLInputElement).checked;
-    await renderAdminPOS();
-  });
-
-  const currencyDiscountPercentIn = document.getElementById('pos-currency-discount-percent-input') as HTMLInputElement;
-  currencyDiscountPercentIn?.addEventListener('input', (e) => {
-    const val = parseFloat((e.target as HTMLInputElement).value);
-    posCurrencyDiscountPercent = isNaN(val) ? 0 : val;
-  });
-  currencyDiscountPercentIn?.addEventListener('change', async () => {
     await renderAdminPOS();
   });
 
@@ -3455,9 +3450,8 @@ function bindPOSEvents() {
       posSearchQuery = '';
       posSelectedCustomerId = null;
       posDiscount = 0;
-      posApplyTax = true;
+      posApplyTax = false;
       posApplyCurrencyDiscount = false;
-      posCurrencyDiscountPercent = 0;
       posPaymentLines = [{ id: 1, method: 'efectivo_usd', amountUsd: 0, amountVes: 0 }];
       posCouponCode = '';
       posCouponDiscountPercent = 0;
@@ -3494,11 +3488,11 @@ function bindPOSEvents() {
   });
 }
 
-function addToPOSCart(product: Product) {
+async function addToPOSCart(product: Product) {
   const existing = posCart.find(item => item.product.id === product.id);
   if (existing) {
     if (existing.quantity >= product.stock) {
-      alert('Stock maximo alcanzado');
+      alert('Stock máximo alcanzado');
       return;
     }
     existing.quantity++;
@@ -3509,7 +3503,13 @@ function addToPOSCart(product: Product) {
     }
     posCart.push({ product, quantity: 1 });
   }
-  renderAdminPOS();
+
+  // Obligatoriamente al seleccionar un producto dar la opción para registrar al cliente si no está seleccionado
+  if (!posSelectedCustomerId) {
+    showRegisterCustomerModal = true;
+  }
+
+  await renderAdminPOS();
 }
 
 // ==========================================================================
