@@ -2377,8 +2377,13 @@ async function renderAdminPOS() {
       <div class="pos-responsive-layout animate-on-scroll animate-fade-up visible">
         <!-- Columna de Productos (Izquierda) -->
         <div class="pos-products-column">
-          <div class="flex justify-between align-center mb-3">
-            <h3 style="font-size:18px; font-weight:800; margin:0;">Catálogo de Productos</h3>
+          <div class="flex justify-between align-center mb-3" style="flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <h3 style="font-size:18px; font-weight:800; margin:0;">Catálogo de Productos</h3>
+              <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:12px; font-weight:700; padding:6px 12px; border-radius:8px;">
+                ➕ Nueva Venta Libre
+              </button>
+            </div>
             <div style="font-size:13px; color:var(--text-secondary);">
               Vendedor: <strong style="color:white; font-size:14px;">${currentUser?.name || 'Admin'}</strong>
             </div>
@@ -2404,22 +2409,6 @@ async function renderAdminPOS() {
         <!-- Columna de Carrito & Datos de Pago (Derecha - Sección de Ventas) -->
         <div class="pos-cart-column" style="background:#111827; border:1px solid var(--border-glass); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:14px;">
           
-          <!-- Acciones de Ventas (Ubicadas en la Columna de Ventas) -->
-          <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:12px; border:1px solid var(--border-glass); display:flex; flex-direction:column; gap:8px;">
-            <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Acciones de Venta:</div>
-            <div style="display:flex; flex-wrap:wrap; gap:6px;">
-              <button type="button" class="btn btn-primary" id="open-register-customer-btn" style="background:#6366f1; border:none; color:white; font-size:12px; font-weight:700; padding:8px 12px; border-radius:8px; flex:1; white-space:nowrap;">
-                👤 Registrar Cliente
-              </button>
-              <button type="button" class="btn btn-secondary" id="open-id-customer-btn" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-size:12px; font-weight:700; padding:8px 12px; border-radius:8px; flex:1; white-space:nowrap;">
-                🆔 Buscar / Identificar
-              </button>
-              <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:12px; font-weight:700; padding:8px 12px; border-radius:8px; flex:1; white-space:nowrap;">
-                ➕ Venta Libre
-              </button>
-            </div>
-          </div>
-
           <!-- Canasta Dinámica (Solo se muestra cuando hay productos en la canasta) -->
           ${posCart.length > 0 ? `
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:8px;">
@@ -2477,16 +2466,16 @@ async function renderAdminPOS() {
               </button>
             </div>
 
-            <!-- Cliente Seleccionado -->
-            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:12px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
+            <!-- Cliente Seleccionado & Botón para Validar / Registrar Cliente -->
+            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:12px; padding:12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
               <div>
                 <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cliente Factura:</div>
                 <div style="font-size:14px; font-weight:800; color:var(--primary);">
                   👤 ${posCustomerName || 'Cliente No Registrado'} ${posCustomerCi ? `(${posCustomerCi})` : ''}
                 </div>
               </div>
-              <button type="button" class="btn btn-secondary" id="change-pos-client-btn" style="padding:6px 12px; font-size:11px; font-weight:700;">
-                🆔 Cambiar
+              <button type="button" class="btn btn-primary" id="open-id-customer-btn" style="padding:8px 14px; font-size:12px; font-weight:800; background:#6366f1; border:none; color:white; border-radius:8px; white-space:nowrap;">
+                👤 Validar / Seleccionar Cliente
               </button>
             </div>
 
@@ -2743,16 +2732,16 @@ async function renderAdminPOS() {
 
       ${showIdentifyCustomerModal ? `
         <div class="modal-overlay open" id="identify-customer-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
-          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 480px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827;">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 490px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827;">
             <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">🆔</div>
-            <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Identificar / Buscar Cliente</h3>
+            <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Validar / Identificar Cliente</h3>
             <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
-              Ingrese el tipo y número de documento (Cédula / RIF / Pasaporte) para asociar el cliente a la venta.
+              Ingrese la Cédula / RIF para buscar un cliente existente, regístrelo nuevo o continúe sin registrar.
             </p>
 
             <form id="pos-id-search-form">
               <div class="form-group mb-3">
-                <label class="form-label" style="font-size: 11px; font-weight: 700;">Documento de Identidad / RIF *</label>
+                <label class="form-label" style="font-size: 11px; font-weight: 700;">Buscar por Documento de Identidad / RIF *</label>
                 <div style="display: flex; gap: 8px;">
                   <select class="form-control" id="pos-id-prefix" style="width: 130px; font-weight: 700; flex-shrink: 0; font-size: 13px;">
                     <option value="V-">V- Natural (Ven)</option>
@@ -2761,16 +2750,19 @@ async function renderAdminPOS() {
                     <option value="G-">G- Gubernamental</option>
                     <option value="P-">P- Pasaporte</option>
                   </select>
-                  <input type="text" class="form-control" id="pos-id-num" placeholder="Ej. 12345678" required style="flex-grow: 1; font-size: 14px; font-weight: 600;">
+                  <input type="text" class="form-control" id="pos-id-num" placeholder="Ej. 12345678" style="flex-grow: 1; font-size: 14px; font-weight: 600;">
                 </div>
               </div>
 
               <div style="display: flex; gap: 8px; flex-direction: column; margin-top: 16px;">
                 <button type="submit" class="btn btn-primary" id="pos-id-submit-btn" style="padding: 10px; font-size: 13px; font-weight: 800;">
-                  🔍 Buscar / Identificar Cliente
+                  🆔 Buscar / Identificar por Cédula o RIF
                 </button>
-                <button type="button" class="btn btn-secondary" id="pos-id-skip-btn" style="padding: 8px; font-size: 12px; background: rgba(255,255,255,0.05);">
-                  ⚠️ Continuar sin registrar (Consumidor Final)
+                <button type="button" class="btn btn-secondary" id="pos-id-register-btn" style="padding: 10px; font-size: 13px; font-weight: 800; background: #6366f1; color: white; border: none;">
+                  👤 Registrar Nuevo Cliente
+                </button>
+                <button type="button" class="btn btn-secondary" id="pos-id-skip-btn" style="padding: 8px; font-size: 12px; background: rgba(255,255,255,0.05); color: var(--text-secondary);">
+                  ⚠️ Continuar como Cliente No Registrado
                 </button>
               </div>
             </form>
