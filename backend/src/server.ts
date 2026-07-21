@@ -363,17 +363,22 @@ async function runMigrations() {
 }
 
 // Arrancar Servidor
-runMigrations().then(() => {
-  app.listen(PORT, () => {
-    console.log(`==========================================================`);
-    console.log(`🚀 Servidor backend FacilitoApp corriendo en puerto ${PORT} 🐒`);
-    console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
-    console.log(`==========================================================`);
-    
+app.listen(PORT, () => {
+  console.log(`==========================================================`);
+  console.log(`🚀 Servidor backend FacilitoApp corriendo en puerto ${PORT} 🐒`);
+  console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
+  console.log(`==========================================================`);
+});
+
+// Ejecutar migraciones y cron jobs en segundo plano para no bloquear el primer arranque
+void runMigrations()
+  .then(() => {
     // Iniciar cron de recordatorio de deudas en segundo plano
     startReminderCron();
-    
+
     // Iniciar cron de actualización automática de tasas BCV en segundo plano
     startRatesCron();
+  })
+  .catch((error) => {
+    console.error('Error al iniciar migraciones/cron del backend:', error);
   });
-});
