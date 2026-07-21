@@ -2361,29 +2361,29 @@ async function renderAdminPOS() {
     }
 
     panel.innerHTML = `
-      <!-- Barra Superior de Acciones POS -->
-      <div class="flex justify-between align-center mb-3" style="flex-wrap:wrap; gap:10px; background:rgba(255,255,255,0.02); padding:10px 14px; border-radius:12px; border:1px solid var(--border-glass);">
-        <div class="flex gap-2" style="flex-wrap:wrap; align-items:center;">
-          <button type="button" class="btn btn-primary" id="open-register-customer-btn" style="background:#6366f1; border:none; color:white; font-size:13px; font-weight:700; padding:8px 14px; border-radius:8px;">
-            👤 Registrar Cliente
-          </button>
-          <button type="button" class="btn btn-secondary" id="open-id-customer-btn" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-size:13px; font-weight:700; padding:8px 14px; border-radius:8px;">
-            🆔 Buscar / Identificar Cliente
-          </button>
-          <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:13px; font-weight:700; padding:8px 14px; border-radius:8px;">
-            ➕ Nueva Venta Libre
-          </button>
-        </div>
+      <style>
+        .pos-responsive-layout {
+          display: grid;
+          grid-template-columns: 1fr minmax(460px, 500px);
+          gap: 20px;
+        }
+        @media (max-width: 1024px) {
+          .pos-responsive-layout {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      </style>
 
-        <div style="font-size:13px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
-          <span>Vendedor:</span>
-          <strong style="color:white; font-size:14px;">${currentUser?.name || 'Admin'}</strong>
-        </div>
-      </div>
-
-      <div class="pos-layout animate-on-scroll animate-fade-up visible" style="display:grid; grid-template-columns: 1fr 420px; gap:20px;">
+      <div class="pos-responsive-layout animate-on-scroll animate-fade-up visible">
         <!-- Columna de Productos (Izquierda) -->
         <div class="pos-products-column">
+          <div class="flex justify-between align-center mb-3">
+            <h3 style="font-size:18px; font-weight:800; margin:0;">Catálogo de Productos</h3>
+            <div style="font-size:13px; color:var(--text-secondary);">
+              Vendedor: <strong style="color:white; font-size:14px;">${currentUser?.name || 'Admin'}</strong>
+            </div>
+          </div>
+
           <div class="pos-search-bar mb-3">
             <input type="text" class="form-control" id="pos-search-input" placeholder="🔍 Buscar por nombre o código de producto..." value="${posSearchQuery}" style="font-size:14px; padding:10px 14px;">
           </div>
@@ -2401,53 +2401,68 @@ async function renderAdminPOS() {
           </div>
         </div>
 
-        <!-- Columna de Carrito & Datos de Pago (Derecha) -->
+        <!-- Columna de Carrito & Datos de Pago (Derecha - Sección de Ventas) -->
         <div class="pos-cart-column" style="background:#111827; border:1px solid var(--border-glass); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:14px;">
           
-          <!-- Encabezado de Productos & Vaciar Canasta -->
-          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:8px;">
-            <span style="font-size:15px; font-weight:800; color:white;">Productos (${posCart.reduce((sum, i) => sum + i.quantity, 0)})</span>
-            ${posCart.length > 0 ? `
+          <!-- Acciones de Ventas (Ubicadas en la Columna de Ventas) -->
+          <div style="background:rgba(255,255,255,0.02); padding:10px; border-radius:12px; border:1px solid var(--border-glass); display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">Acciones de Venta:</div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <button type="button" class="btn btn-primary" id="open-register-customer-btn" style="background:#6366f1; border:none; color:white; font-size:12px; font-weight:700; padding:8px 12px; border-radius:8px; flex:1; white-space:nowrap;">
+                👤 Registrar Cliente
+              </button>
+              <button type="button" class="btn btn-secondary" id="open-id-customer-btn" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-size:12px; font-weight:700; padding:8px 12px; border-radius:8px; flex:1; white-space:nowrap;">
+                🆔 Buscar / Identificar
+              </button>
+              <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:12px; font-weight:700; padding:8px 12px; border-radius:8px; flex:1; white-space:nowrap;">
+                ➕ Venta Libre
+              </button>
+            </div>
+          </div>
+
+          <!-- Canasta Dinámica (Solo se muestra cuando hay productos en la canasta) -->
+          ${posCart.length > 0 ? `
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:8px;">
+              <span style="font-size:15px; font-weight:800; color:white;">Productos en canasta (${posCart.reduce((sum, i) => sum + i.quantity, 0)})</span>
               <button type="button" id="clear-pos-cart-btn" style="background:none; border:none; color:#f87171; font-size:12px; text-decoration:underline; cursor:pointer; font-weight:600;">
                 Vaciar canasta
               </button>
-            ` : ''}
-          </div>
+            </div>
 
-          <!-- Items en Canasta -->
-          <div class="pos-cart-items" style="max-height:260px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
-            ${posCart.map(item => `
-              <div class="pos-cart-item" style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:10px; border-radius:10px; display:flex; flex-direction:column; gap:6px;">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                  <div style="display:flex; gap:8px; align-items:center;">
-                    <img src="${item.product.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" style="width:36px; height:36px; object-fit:cover; border-radius:6px;">
-                    <div style="font-size:12px; font-weight:700; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.product.name}</div>
-                  </div>
-                  <button type="button" class="btn btn-danger remove-pos-item" data-id="${item.product.id}" style="padding:2px 6px; font-size:10px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;" title="Eliminar del carrito">
-                    🗑️
-                  </button>
-                </div>
-
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:4px;">
-                  <div class="flex align-center gap-1" style="border:1px solid var(--border-glass); border-radius:6px; padding:2px 4px;">
-                    <button type="button" class="qty-btn dec-pos-qty" data-id="${item.product.id}" style="width:24px; height:24px; font-weight:800; border:none; background:none; color:white; cursor:pointer;">-</button>
-                    <span style="font-size:12px; font-weight:700; min-width:20px; text-align:center;">${item.quantity}</span>
-                    <button type="button" class="qty-btn inc-pos-qty" data-id="${item.product.id}" style="width:24px; height:24px; font-weight:800; border:none; background:none; color:white; cursor:pointer;">+</button>
+            <!-- Items en Canasta -->
+            <div class="pos-cart-items" style="max-height:260px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
+              ${posCart.map(item => `
+                <div class="pos-cart-item" style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:10px; border-radius:10px; display:flex; flex-direction:column; gap:6px;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                      <img src="${item.product.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" style="width:36px; height:36px; object-fit:cover; border-radius:6px;">
+                      <div style="font-size:13px; font-weight:700; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.product.name}</div>
+                    </div>
+                    <button type="button" class="btn btn-danger remove-pos-item" data-id="${item.product.id}" style="padding:2px 6px; font-size:10px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;" title="Eliminar del carrito">
+                      🗑️
+                    </button>
                   </div>
 
-                  <div style="display:flex; align-items:center; gap:4px;">
-                    <span style="font-size:11px; color:var(--text-muted);">$</span>
-                    <input type="number" step="0.01" min="0.01" class="form-control change-pos-price" data-id="${item.product.id}" value="${Number(item.product.price).toFixed(2)}" style="width:70px; padding:2px 6px; font-size:12px; text-align:right; font-weight:700;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:4px;">
+                    <div class="flex align-center gap-1" style="border:1px solid var(--border-glass); border-radius:6px; padding:2px 4px;">
+                      <button type="button" class="qty-btn dec-pos-qty" data-id="${item.product.id}" style="width:24px; height:24px; font-weight:800; border:none; background:none; color:white; cursor:pointer;">-</button>
+                      <span style="font-size:13px; font-weight:700; min-width:20px; text-align:center;">${item.quantity}</span>
+                      <button type="button" class="qty-btn inc-pos-qty" data-id="${item.product.id}" style="width:24px; height:24px; font-weight:800; border:none; background:none; color:white; cursor:pointer;">+</button>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:4px;">
+                      <span style="font-size:12px; color:var(--text-muted);">$</span>
+                      <input type="number" step="0.01" min="0.01" class="form-control change-pos-price" data-id="${item.product.id}" value="${Number(item.product.price).toFixed(2)}" style="width:75px; padding:4px 6px; font-size:13px; text-align:right; font-weight:700;">
+                    </div>
+                  </div>
+
+                  <div style="font-size:11px; color:var(--text-muted); text-align:left;">
+                    Subtotal por ${item.quantity} und: <strong>$${(item.product.price * item.quantity).toFixed(2)}</strong>
                   </div>
                 </div>
-
-                <div style="font-size:10px; color:var(--text-muted); text-align:left;">
-                  Precio por ${item.quantity} unidades: <strong>$${(item.product.price * item.quantity).toFixed(2)}</strong>
-                </div>
-              </div>
-            `).join('')}
-            ${posCart.length === 0 ? `<div style="text-align:center; padding:30px 0; color:var(--text-secondary); font-size:13px;">La canasta está vacía. Selecciona productos.</div>` : ''}
-          </div>
+              `).join('')}
+            </div>
+          ` : ''}
 
           <!-- Checkout POS Form -->
           <form id="pos-checkout-form" style="display:flex; flex-direction:column; gap:12px;">
@@ -3045,6 +3060,7 @@ function bindPOSEvents() {
   });
 
   document.getElementById('change-pos-client-btn')?.addEventListener('click', async () => {
+    showIdentifyCustomerModal = true;
     await renderAdminPOS();
   });
 
