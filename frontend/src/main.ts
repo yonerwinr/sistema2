@@ -4183,198 +4183,206 @@ function bindProductCRUDEvents() {
 // ==========================================================================
 let historyFilterType = 'all';
 let historySearchQuery = '';
+let historyEventsCache: any[] = [];
 
-async function renderAdminSales() {
+async function renderAdminSales(forceFetch = false) {
   const panel = document.getElementById('dashboard-content-panel');
   if (!panel) return;
 
-  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando histórico del sistema y registro de auditoría...</div>`;
+  if (forceFetch || historyEventsCache.length === 0) {
+    panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando histórico del sistema y registro de auditoría...</div>`;
 
-  try {
-    const { logs, sales } = await api.sales.getAuditLogs();
+    try {
+      const { logs, sales } = await api.sales.getAuditLogs();
 
-    // Combinar ventas y logs de auditoría en un único listado cronológico
-    const combinedEvents: any[] = [];
+      // Combinar ventas y logs de auditoría en un único listado cronológico
+      const combinedEvents: any[] = [];
 
-    // 1. Agregar logs de auditoría (Acciones del sistema, staff, productos, cupones, tasas)
-    if (Array.isArray(logs)) {
-      logs.forEach((log: AuditLog) => {
-        combinedEvents.push({
-          id: `log-${log.id}`,
-          rawId: log.id,
-          isSale: false,
-          actionType: log.action_type,
-          title: log.title,
-          userName: log.user_name || 'Sistema',
-          userRole: log.user_role || 'sistema',
-          details: log.details || '',
-          createdAt: new Date(log.created_at),
-          createdAtStr: new Date(log.created_at).toLocaleString('es-ES')
+      // 1. Agregar logs de auditoría (Acciones del sistema, staff, productos, cupones, tasas)
+      if (Array.isArray(logs)) {
+        logs.forEach((log: AuditLog) => {
+          combinedEvents.push({
+            id: `log-${log.id}`,
+            rawId: log.id,
+            isSale: false,
+            actionType: log.action_type,
+            title: log.title,
+            userName: log.user_name || 'Sistema',
+            userRole: log.user_role || 'sistema',
+            details: log.details || '',
+            createdAt: new Date(log.created_at),
+            createdAtStr: new Date(log.created_at).toLocaleString('es-ES')
+          });
         });
-      });
-    }
+      }
 
-    // 2. Agregar ventas históricas (POS, Online y Cotizaciones)
-    if (Array.isArray(sales)) {
-      sales.forEach((sale: Sale) => {
-        const isQuotation = sale.is_quotation === 1;
-        const typeKey = isQuotation ? 'quotation' : (sale.type === 'pos' ? 'sale_pos' : 'sale_online');
-        
-        combinedEvents.push({
-          id: `sale-${sale.id}`,
-          rawId: sale.id,
-          isSale: true,
-          saleData: sale,
-          actionType: typeKey,
-          title: isQuotation ? `Cotización #${sale.id} ($${Number(sale.total).toFixed(2)})` : `Venta ${sale.type.toUpperCase()} #${sale.id} ($${Number(sale.total).toFixed(2)})`,
-          userName: sale.seller_name || sale.customer_name || 'Cliente',
-          userRole: sale.seller_name ? 'vendedor' : 'cliente',
-          details: `Cliente: ${sale.customer_name}${sale.customer_ci ? ' (' + sale.customer_ci + ')' : ''} | Pago: ${sale.payment_method.toUpperCase()} | Total: $${Number(sale.total).toFixed(2)}${sale.customer_phone ? ' | Tel: ' + sale.customer_phone : ''}`,
-          createdAt: new Date(sale.created_at),
-          createdAtStr: new Date(sale.created_at).toLocaleString('es-ES')
+      // 2. Agregar ventas históricas (POS, Online y Cotizaciones)
+      if (Array.isArray(sales)) {
+        sales.forEach((sale: Sale) => {
+          const isQuotation = sale.is_quotation === 1;
+          const typeKey = isQuotation ? 'quotation' : (sale.type === 'pos' ? 'sale_pos' : 'sale_online');
+          
+          combinedEvents.push({
+            id: `sale-${sale.id}`,
+            rawId: sale.id,
+            isSale: true,
+            saleData: sale,
+            actionType: typeKey,
+            title: isQuotation ? `Cotización #${sale.id} ($${Number(sale.total).toFixed(2)})` : `Venta ${sale.type.toUpperCase()} #${sale.id} ($${Number(sale.total).toFixed(2)})`,
+            userName: sale.seller_name || sale.customer_name || 'Cliente',
+            userRole: sale.seller_name ? 'vendedor' : 'cliente',
+            details: `Cliente: ${sale.customer_name}${sale.customer_ci ? ' (' + sale.customer_ci + ')' : ''} | Pago: ${sale.payment_method.toUpperCase()} | Total: $${Number(sale.total).toFixed(2)}${sale.customer_phone ? ' | Tel: ' + sale.customer_phone : ''}`,
+            createdAt: new Date(sale.created_at),
+            createdAtStr: new Date(sale.created_at).toLocaleString('es-ES')
+          });
         });
-      });
+      }
+
+      // Ordenar cronológicamente por fecha más reciente
+      combinedEvents.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      historyEventsCache = combinedEvents;
+    } catch (error) {
+      console.error(error);
+      panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar el histórico de auditoría del servidor.</div>`;
+      return;
     }
+  }
 
-    // Ordenar cronológicamente por fecha más reciente
-    combinedEvents.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  // Filtrar según el tipo seleccionado y la búsqueda inteligente (smartMatch)
+  const filteredEvents = historyEventsCache.filter(ev => {
+    if (historyFilterType !== 'all' && ev.actionType !== historyFilterType) {
+      return false;
+    }
+    if (historySearchQuery) {
+      const fullText = `${ev.title} ${ev.userName} ${ev.userRole || ''} ${ev.details} ${ev.createdAtStr} ${ev.actionType}`;
+      return smartMatch(fullText, historySearchQuery);
+    }
+    return true;
+  });
 
-    // Filtrar según el tipo seleccionado y la búsqueda de texto
-    const filteredEvents = combinedEvents.filter(ev => {
-      if (historyFilterType !== 'all' && ev.actionType !== historyFilterType) {
-        return false;
-      }
-      if (historySearchQuery) {
-        const q = historySearchQuery.toLowerCase();
-        const matchesTitle = ev.title.toLowerCase().includes(q);
-        const matchesUser = ev.userName.toLowerCase().includes(q);
-        const matchesDetails = ev.details.toLowerCase().includes(q);
-        return matchesTitle || matchesUser || matchesDetails;
-      }
-      return true;
-    });
-
-    const getBadgeStyle = (type: string) => {
-      switch (type) {
-        case 'sale_pos': return { bg: 'rgba(255,122,0,0.15)', color: '#ff7a00', label: '🛒 Venta POS' };
-        case 'sale_online': return { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', label: '🌐 Venta Online' };
-        case 'quotation': return { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6', label: '📝 Cotización' };
-        case 'staff_crud': return { bg: 'rgba(16,185,129,0.15)', color: '#10b981', label: '👥 Personal / Vendedor' };
-        case 'product_crud': return { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', label: '📦 Inventario / Producto' };
-        case 'coupon_crud': return { bg: 'rgba(236,72,153,0.15)', color: '#ec4899', label: '🎟️ Cupón' };
-        case 'settings': return { bg: 'rgba(6,182,212,0.15)', color: '#06b6d4', label: '💱 Tasa BCV / Ajustes' };
-        default: return { bg: 'rgba(255,255,255,0.05)', color: '#ffffff', label: '📋 Registro' };
-      }
-    };
-
-    panel.innerHTML = `
-      <div class="animate-on-scroll animate-fade-up visible">
-        <div class="flex justify-between align-center mb-2" style="flex-wrap:wrap; gap:12px;">
-          <div>
-            <h2 style="font-size:26px; font-weight:800; margin:0;">Histórico del Sistema & Auditoría 📋</h2>
-            <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Registro de todas las operaciones, ventas, cotizaciones, cambios de inventario y personal.</p>
-          </div>
-        </div>
-
-        <!-- Barra de Filtros por Categoría y Buscador -->
-        <div class="card mb-4" style="padding:16px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
-          <div class="flex justify-between align-center mb-3" style="flex-wrap:wrap; gap:12px;">
-            <!-- Buscador general -->
-            <div style="flex-grow:1; max-width:400px;">
-              <input type="text" class="form-control" id="history-search-input" placeholder="🔍 Buscar por cliente, vendedor, producto o acción..." value="${historySearchQuery}">
-            </div>
-          </div>
-
-          <!-- Botones de Filtro por Categoría -->
-          <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch;">
-            <button class="btn ${historyFilterType === 'all' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="all" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
-              🌐 Todos (${combinedEvents.length})
-            </button>
-            <button class="btn ${historyFilterType === 'sale_pos' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="sale_pos" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
-              🛒 Ventas POS
-            </button>
-            <button class="btn ${historyFilterType === 'sale_online' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="sale_online" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
-              🌐 Ventas Online
-            </button>
-            <button class="btn ${historyFilterType === 'quotation' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="quotation" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
-              📝 Cotizaciones
-            </button>
-            <button class="btn ${historyFilterType === 'staff_crud' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="staff_crud" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
-              👥 Vendedores / Personal
-            </button>
-            <button class="btn ${historyFilterType === 'product_crud' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="product_crud" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
-              📦 Productos / Inventario
-            </button>
-            <button class="btn ${historyFilterType === 'coupon_crud' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="coupon_crud" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
-              🎟️ Cupones
-            </button>
-            <button class="btn ${historyFilterType === 'settings' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="settings" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
-              💱 Tasas BCV / Ajustes
-            </button>
-          </div>
-        </div>
-
-        <!-- Tabla de Eventos e Histórico -->
-        <div class="card">
-          <div class="table-responsive">
-            <table class="table-custom">
-              <thead>
-                <tr>
-                  <th>Fecha / Hora</th>
-                  <th>Categoría</th>
-                  <th>Responsable / Usuario</th>
-                  <th>Acción / Operación</th>
-                  <th>Detalle de la Modificación</th>
-                  <th class="text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${filteredEvents.map(ev => {
-                  const badge = getBadgeStyle(ev.actionType);
-                  return `
-                    <tr>
-                      <td style="font-size:12px; white-space:nowrap; color:var(--text-secondary);">${ev.createdAtStr}</td>
-                      <td>
-                        <span class="badge-status" style="background:${badge.bg}; color:${badge.color}; font-size:11px; font-weight:700; text-transform:uppercase;">
-                          ${badge.label}
-                        </span>
-                      </td>
-                      <td>
-                        <strong>👤 ${ev.userName}</strong>
-                        ${ev.userRole ? `<br><small style="color:var(--text-muted); font-size:10px; text-transform:uppercase;">(${ev.userRole})</small>` : ''}
-                      </td>
-                      <td><strong>${ev.title}</strong></td>
-                      <td style="font-size:12px; color:var(--text-secondary); max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${ev.details}">
-                        ${ev.details || 'Sin detalles'}
-                      </td>
-                      <td class="text-right">
-                        ${ev.isSale ? `
-                          <button class="btn btn-secondary btn-icon view-sale-details" style="padding:6px 12px; font-size:12px;" data-id="${ev.rawId}">
-                            🔍 Ver Factura
-                          </button>
-                        ` : `
-                          <button class="btn btn-secondary btn-icon view-log-details" style="padding:6px 12px; font-size:12px;" data-title="${ev.title}" data-details="${encodeURIComponent(ev.details)}" data-user="${ev.userName}" data-date="${ev.createdAtStr}">
-                            ℹ️ Detalle
-                          </button>
-                        `}
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-                ${filteredEvents.length === 0 ? '<tr><td colspan="6" class="text-center">No hay registros de auditoría o eventos en esta categoría.</td></tr>' : ''}
-              </tbody>
-            </table>
-          </div>
+  panel.innerHTML = `
+    <div class="animate-on-scroll animate-fade-up visible">
+      <div class="flex justify-between align-center mb-2" style="flex-wrap:wrap; gap:12px;">
+        <div>
+          <h2 style="font-size:26px; font-weight:800; margin:0;">Histórico del Sistema & Auditoría 📋</h2>
+          <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Registro de todas las operaciones, ventas, cotizaciones, cambios de inventario y personal.</p>
         </div>
       </div>
-    `;
 
-    bindSalesHistoryEvents();
+      <!-- Barra de Filtros por Categoría y Buscador -->
+      <div class="card mb-4" style="padding:16px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
+        <div class="flex justify-between align-center mb-3" style="flex-wrap:wrap; gap:12px;">
+          <!-- Buscador general -->
+          <div style="flex-grow:1; max-width:400px;">
+            <input type="text" class="form-control" id="history-search-input" placeholder="🔍 Buscar por cliente, vendedor, producto o acción..." value="${historySearchQuery}">
+          </div>
+        </div>
 
-  } catch (error) {
-    console.error(error);
-    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar el histórico de auditoría del servidor.</div>`;
+        <!-- Botones de Filtro por Categoría -->
+        <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch;">
+          <button class="btn ${historyFilterType === 'all' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="all" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+            🌐 Todos (${historyEventsCache.length})
+          </button>
+          <button class="btn ${historyFilterType === 'sale_pos' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="sale_pos" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+            🛒 Ventas POS
+          </button>
+          <button class="btn ${historyFilterType === 'sale_online' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="sale_online" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+            🌐 Ventas Online
+          </button>
+          <button class="btn ${historyFilterType === 'quotation' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="quotation" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+            📝 Cotizaciones
+          </button>
+          <button class="btn ${historyFilterType === 'staff_crud' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="staff_crud" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+            👥 Vendedores / Personal
+          </button>
+          <button class="btn ${historyFilterType === 'product_crud' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="product_crud" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+            📦 Productos / Inventario
+          </button>
+          <button class="btn ${historyFilterType === 'coupon_crud' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="coupon_crud" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+            🎟️ Cupones
+          </button>
+          <button class="btn ${historyFilterType === 'settings' ? 'btn-primary' : 'btn-secondary'} history-filter-btn" data-type="settings" style="padding:6px 14px; font-size:12px; white-space:nowrap;">
+            💱 Tasas BCV / Ajustes
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabla de Eventos e Histórico -->
+      <div class="card">
+        <div class="table-responsive">
+          <table class="table-custom">
+            <thead>
+              <tr>
+                <th>Fecha / Hora</th>
+                <th>Categoría</th>
+                <th>Responsable / Usuario</th>
+                <th>Acción / Operación</th>
+                <th>Detalle de la Modificación</th>
+                <th class="text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="history-events-tbody">
+              ${renderHistoryTableRows(filteredEvents)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  bindSalesHistoryEvents();
+}
+
+function renderHistoryTableRows(events: any[]): string {
+  const getBadgeStyle = (type: string) => {
+    switch (type) {
+      case 'sale_pos': return { bg: 'rgba(255,122,0,0.15)', color: '#ff7a00', label: '🛒 Venta POS' };
+      case 'sale_online': return { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', label: '🌐 Venta Online' };
+      case 'quotation': return { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6', label: '📝 Cotización' };
+      case 'staff_crud': return { bg: 'rgba(16,185,129,0.15)', color: '#10b981', label: '👥 Personal / Vendedor' };
+      case 'product_crud': return { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', label: '📦 Inventario / Producto' };
+      case 'coupon_crud': return { bg: 'rgba(236,72,153,0.15)', color: '#ec4899', label: '🎟️ Cupón' };
+      case 'settings': return { bg: 'rgba(6,182,212,0.15)', color: '#06b6d4', label: '💱 Tasa BCV / Ajustes' };
+      default: return { bg: 'rgba(255,255,255,0.05)', color: '#ffffff', label: '📋 Registro' };
+    }
+  };
+
+  if (events.length === 0) {
+    return '<tr><td colspan="6" class="text-center" style="padding:30px;">No hay registros de auditoría o eventos que coincidan con la búsqueda.</td></tr>';
   }
+
+  return events.map(ev => {
+    const badge = getBadgeStyle(ev.actionType);
+    return `
+      <tr>
+        <td style="font-size:12px; white-space:nowrap; color:var(--text-secondary);">${ev.createdAtStr}</td>
+        <td>
+          <span class="badge-status" style="background:${badge.bg}; color:${badge.color}; font-size:11px; font-weight:700; text-transform:uppercase;">
+            ${badge.label}
+          </span>
+        </td>
+        <td>
+          <strong>👤 ${ev.userName}</strong>
+          ${ev.userRole ? `<br><small style="color:var(--text-muted); font-size:10px; text-transform:uppercase;">(${ev.userRole})</small>` : ''}
+        </td>
+        <td><strong>${ev.title}</strong></td>
+        <td style="font-size:12px; color:var(--text-secondary); max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${ev.details}">
+          ${ev.details || 'Sin detalles'}
+        </td>
+        <td class="text-right">
+          ${ev.isSale ? `
+            <button class="btn btn-secondary btn-icon view-sale-details" style="padding:6px 12px; font-size:12px;" data-id="${ev.rawId}">
+              🔍 Ver Factura
+            </button>
+          ` : `
+            <button class="btn btn-secondary btn-icon view-log-details" style="padding:6px 12px; font-size:12px;" data-title="${ev.title}" data-details="${encodeURIComponent(ev.details)}" data-user="${ev.userName}" data-date="${ev.createdAtStr}">
+              ℹ️ Detalle
+            </button>
+          `}
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function bindSalesHistoryEvents() {
@@ -4382,17 +4390,38 @@ function bindSalesHistoryEvents() {
   document.querySelectorAll('.history-filter-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       historyFilterType = (e.currentTarget as HTMLButtonElement).dataset.type || 'all';
-      await renderAdminSales();
+      await renderAdminSales(false);
     });
   });
 
-  // Evento de búsqueda por texto
+  // Buscador Ultra Rápido e Inteligente (smartMatch en tiempo real a 60 FPS)
   const searchIn = document.getElementById('history-search-input') as HTMLInputElement;
   searchIn?.addEventListener('input', (e) => {
-    historySearchQuery = (e.target as HTMLInputElement).value;
-    renderAdminSales();
+    const val = (e.target as HTMLInputElement).value;
+    historySearchQuery = val;
+
+    const tbody = document.getElementById('history-events-tbody');
+    if (tbody) {
+      const filteredEvents = historyEventsCache.filter(ev => {
+        if (historyFilterType !== 'all' && ev.actionType !== historyFilterType) {
+          return false;
+        }
+        if (val) {
+          const fullText = `${ev.title} ${ev.userName} ${ev.userRole || ''} ${ev.details} ${ev.createdAtStr} ${ev.actionType}`;
+          return smartMatch(fullText, val);
+        }
+        return true;
+      });
+
+      tbody.innerHTML = renderHistoryTableRows(filteredEvents);
+      bindHistoryRowActionButtons();
+    }
   });
 
+  bindHistoryRowActionButtons();
+}
+
+function bindHistoryRowActionButtons() {
   // Evento ver factura
   document.querySelectorAll('.view-sale-details').forEach(btn => {
     btn.addEventListener('click', async (e) => {
@@ -5466,7 +5495,7 @@ async function renderAdminStaff() {
                     <option value="V-">V-</option>
                     <option value="E-">E-</option>
                   </select>
-                  <input type="text" class="form-control" id="staff-ci-num" placeholder="12345678" pattern="\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" style="flex-grow: 1;">
+                  <input type="text" class="form-control" id="staff-ci-num" placeholder="Ej. 12345678" style="flex-grow: 1;">
                 </div>
               </div>
             </div>
@@ -5614,8 +5643,9 @@ function bindStaffEvents() {
     const email = (document.getElementById('staff-email') as HTMLInputElement).value;
     const phone = (document.getElementById('staff-phone') as HTMLInputElement).value;
     const ciPrefix = (document.getElementById('staff-ci-prefix') as HTMLSelectElement).value;
-    const ciNum = (document.getElementById('staff-ci-num') as HTMLInputElement).value.trim();
-    const ci = ciNum ? `${ciPrefix}${ciNum}` : null;
+    const ciNumRaw = (document.getElementById('staff-ci-num') as HTMLInputElement).value.trim();
+    const ciNumClean = ciNumRaw.replace(/^[VEJGP]-/i, '').replace(/\D/g, '');
+    const ci = ciNumClean ? `${ciPrefix}${ciNumClean}` : null;
     const role = (document.getElementById('staff-role') as HTMLSelectElement).value;
     const password = passInput.value;
 
@@ -5657,12 +5687,12 @@ function bindStaffEvents() {
         (document.getElementById('staff-role') as HTMLSelectElement).value = member.role;
 
         if (member.ci) {
-          const parts = member.ci.split('-');
-          if (parts.length === 2) {
-            (document.getElementById('staff-ci-prefix') as HTMLSelectElement).value = `${parts[0]}-`;
-            (document.getElementById('staff-ci-num') as HTMLInputElement).value = parts[1];
+          const matchPrefix = member.ci.match(/^([VEJGP])-(.*)$/i);
+          if (matchPrefix) {
+            (document.getElementById('staff-ci-prefix') as HTMLSelectElement).value = `${matchPrefix[1].toUpperCase()}-`;
+            (document.getElementById('staff-ci-num') as HTMLInputElement).value = matchPrefix[2].replace(/\D/g, '');
           } else {
-            (document.getElementById('staff-ci-num') as HTMLInputElement).value = member.ci;
+            (document.getElementById('staff-ci-num') as HTMLInputElement).value = member.ci.replace(/\D/g, '');
           }
         } else {
           (document.getElementById('staff-ci-num') as HTMLInputElement).value = '';
