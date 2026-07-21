@@ -3902,26 +3902,26 @@ async function renderAdminProducts() {
               </div>
               <div class="form-group">
                 <label class="form-label" style="font-size: 10px; font-weight: 700;">Tasa BCV (Bs.)</label>
-                <input type="number" step="0.01" min="0.01" class="form-control" id="calc-bcv-rate" style="font-size: 12px; padding: 6px 10px;" value="${rateUsdToVes}">
+                <input type="number" step="any" min="0.0001" class="form-control" id="calc-bcv-rate" style="font-size: 12px; padding: 6px 10px;" value="${rateUsdToVes}">
               </div>
               <div class="form-group">
                 <label class="form-label" style="font-size: 10px; font-weight: 700; color: #f59e0b;">Tasa Compra Binance (Bs.)</label>
-                <input type="number" step="0.01" min="0.01" class="form-control" id="calc-binance-rate" style="font-size: 12px; padding: 6px 10px; border-color: rgba(245,158,11,0.4); color: #f59e0b; font-weight: 700;" value="${rateBinanceToVes}">
+                <input type="number" step="any" min="0.0001" class="form-control" id="calc-binance-rate" style="font-size: 12px; padding: 6px 10px; border-color: rgba(245,158,11,0.4); color: #f59e0b; font-weight: 700;" value="${rateBinanceToVes}">
               </div>
             </div>
 
             <div class="grid-3 gap-2 mb-3">
               <div class="form-group">
                 <label class="form-label" style="font-size: 10px; font-weight: 700; color: var(--primary);">Costo en Dólar BCV ($)</label>
-                <input type="number" step="0.01" min="0" class="form-control" id="calc-bcv-cost" style="font-size: 12px; padding: 6px 10px; border-color: rgba(99,102,241,0.4);" placeholder="Ej. 10.00">
+                <input type="number" step="any" min="0" class="form-control" id="calc-bcv-cost" style="font-size: 12px; padding: 6px 10px; border-color: rgba(99,102,241,0.4);" placeholder="Ej. 10.00">
               </div>
               <div class="form-group">
                 <label class="form-label" style="font-size: 10px; font-weight: 700; color: #f59e0b;">Costo Dólar Negro / Binance ($)</label>
-                <input type="number" step="0.01" min="0" class="form-control" id="calc-black-cost" style="font-size: 12px; padding: 6px 10px; border-color: rgba(245,158,11,0.4);" placeholder="Ej. 10.00">
+                <input type="number" step="any" min="0" class="form-control" id="calc-black-cost" style="font-size: 12px; padding: 6px 10px; border-color: rgba(245,158,11,0.4);" placeholder="Ej. 10.00">
               </div>
               <div class="form-group">
                 <label class="form-label" style="font-size: 10px; font-weight: 700;">Margen Ganancia (%)</label>
-                <input type="number" step="1" min="0" class="form-control" id="calc-profit-margin" style="font-size: 12px; padding: 6px 10px;" placeholder="0" value="0">
+                <input type="number" step="any" min="0" class="form-control" id="calc-profit-margin" style="font-size: 12px; padding: 6px 10px;" placeholder="0" value="0">
               </div>
             </div>
 
@@ -3939,7 +3939,7 @@ async function renderAdminProducts() {
           <div class="grid-2">
             <div class="form-group">
               <label class="form-label" for="prod-price">Precio Final en Dólar BCV ($)</label>
-              <input type="number" class="form-control" id="prod-price" required step="0.01" min="0" placeholder="Ej. 11.00">
+              <input type="number" class="form-control" id="prod-price" required step="any" min="0" placeholder="Ej. 11.00">
             </div>
             <div class="form-group">
               <label class="form-label" for="prod-stock">Stock Inicial</label>
