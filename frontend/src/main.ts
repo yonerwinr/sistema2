@@ -116,6 +116,7 @@ let posCustomerPhone = '';
 let rateUsdToVes = 40.00;
 let rateEurToVes = 43.50;
 let rateBinanceToVes = 44.50;
+let productsLoading = false;
 let posConfirmedUnregisteredWarning = false;
 let showFreeSaleModal = false;
 let showExpenseModal = false;
@@ -164,15 +165,29 @@ const icons = {
 // INICIALIZACIÓN
 // ==========================================================================
 window.addEventListener('DOMContentLoaded', async () => {
+  renderApp();
+
   // Cargar sesión del almacenamiento local si existe
   const token = localStorage.getItem('token');
   if (token) {
-    try {
-      currentUser = await api.auth.me();
-    } catch (e) {
-      // Token corrupto o expirado
-      localStorage.removeItem('token');
-    }
+    void (async () => {
+      try {
+        currentUser = await api.auth.me();
+
+        // Si el usuario es administrador o vendedor, cambiar al panel cuando la sesión esté lista.
+        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller')) {
+          activeAdminView = 'pos';
+          navigate('admin');
+        } else {
+          renderApp();
+        }
+      } catch (e) {
+        // Token corrupto o expirado
+        localStorage.removeItem('token');
+        currentUser = null;
+        renderApp();
+      }
+    })();
   }
 
   // Cargar carrito del almacenamiento local
@@ -185,33 +200,41 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Cargar productos iniciales
-  await loadProducts();
+  void loadProducts();
+  void loadExchangeRates();
 
-  // Cargar tasas de cambio
-  try {
-    const rates = await api.sales.getExchangeRates();
-    rateUsdToVes = rates.usdToVes;
-    rateEurToVes = rates.eurToVes;
-    rateBinanceToVes = rates.binanceUsdToVes || (rates.usdToVes * 1.08);
-  } catch (e) {
-    console.error('Error al cargar tasas de cambio en el arranque:', e);
-  }
-
-  // Si hay un usuario logueado que sea administrador o vendedor, ir directamente al panel de control
-  if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller')) {
-    activeAdminView = 'pos';
-    navigate('admin');
-  } else {
+  // Si no hay sesión válida, mostrar la tienda inmediatamente mientras los datos llegan.
+  if (!token) {
     navigate('store');
   }
 });
 
 async function loadProducts() {
+  productsLoading = true;
   try {
     productsList = await api.products.getAll(selectedCategory || undefined, searchQuery || undefined);
   } catch (error) {
     console.error('Error al cargar productos:', error);
+  } finally {
+    productsLoading = false;
+    if (currentView === 'store' || currentView === 'admin') {
+      renderApp();
+    }
+  }
+}
+
+async function loadExchangeRates() {
+  try {
+    const rates = await api.sales.getExchangeRates();
+    rateUsdToVes = rates.usdToVes;
+    rateEurToVes = rates.eurToVes;
+    rateBinanceToVes = rates.binanceUsdToVes || (rates.usdToVes * 1.08);
+
+    if (currentView === 'store' || currentView === 'admin') {
+      renderApp();
+    }
+  } catch (e) {
+    console.error('Error al cargar tasas de cambio en el arranque:', e);
   }
 }
 
