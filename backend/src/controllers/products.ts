@@ -17,6 +17,26 @@ const canManageProducts = (req: AuthRequest, res: Response, next: any) => {
   return res.status(403).json({ message: 'Acceso denegado, se requieren privilegios de administración o vendedor' });
 };
 
+let productsCodeColumnReady: Promise<void> | null = null;
+
+async function ensureProductsCodeColumn() {
+  if (!productsCodeColumnReady) {
+    productsCodeColumnReady = (async () => {
+      const [productCols]: any = await pool.query('SHOW COLUMNS FROM products');
+      const productColumnNames = productCols.map((col: any) => col.Field);
+
+      if (!productColumnNames.includes('code')) {
+        await pool.query('ALTER TABLE products ADD COLUMN code VARCHAR(50) NULL UNIQUE');
+      }
+    })().catch((error) => {
+      productsCodeColumnReady = null;
+      throw error;
+    });
+  }
+
+  await productsCodeColumnReady;
+}
+
 // Configuración de almacenamiento para Multer (Imágenes Locales)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -43,6 +63,8 @@ router.post('/upload', authenticate, isAdmin, upload.single('image'), (req: any,
 router.get('/', async (req, res) => {
   const { category, search } = req.query;
   try {
+    await ensureProductsCodeColumn();
+
     let query = 'SELECT * FROM products';
     const params: any[] = [];
 
@@ -146,6 +168,8 @@ router.post('/', authenticate, canManageProducts, async (req: AuthRequest, res: 
   const cleanPrice = Math.round((parseFloat(price) + Number.EPSILON) * 10000) / 10000;
 
   try {
+    await ensureProductsCodeColumn();
+
     // Validar código duplicado si se proporciona
     if (cleanCode) {
       const [existing]: any = await pool.query('SELECT id FROM products WHERE code = ?', [cleanCode]);
@@ -197,6 +221,8 @@ router.put('/:id', authenticate, canManageProducts, async (req: AuthRequest, res
   const cleanPrice = Math.round((parseFloat(price) + Number.EPSILON) * 10000) / 10000;
 
   try {
+    await ensureProductsCodeColumn();
+
     // Validar código duplicado si se proporciona y no es del mismo producto
     if (cleanCode) {
       const [existing]: any = await pool.query('SELECT id FROM products WHERE code = ? AND id != ?', [cleanCode, id]);

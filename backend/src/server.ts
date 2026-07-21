@@ -284,6 +284,10 @@ async function runMigrations() {
     // Añadir columnas para cupones personales y de un solo uso
     const [couponColumns]: any = await conn.query('SHOW COLUMNS FROM coupons');
     const couponColumnNames = couponColumns.map((col: any) => col.Field);
+    if (!couponColumnNames.includes('code')) {
+      await conn.query('ALTER TABLE coupons ADD COLUMN code VARCHAR(50) NOT NULL UNIQUE AFTER id');
+      console.log('Columna "code" agregada a la tabla coupons.');
+    }
     if (!couponColumnNames.includes('user_id')) {
       await conn.query('ALTER TABLE coupons ADD COLUMN user_id INT NULL');
       console.log('Columna "user_id" agregada a la tabla coupons.');
@@ -359,17 +363,22 @@ async function runMigrations() {
 }
 
 // Arrancar Servidor
-runMigrations().then(() => {
-  app.listen(PORT, () => {
-    console.log(`==========================================================`);
-    console.log(`🚀 Servidor backend FacilitoApp corriendo en puerto ${PORT} 🐒`);
-    console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
-    console.log(`==========================================================`);
-    
+app.listen(PORT, () => {
+  console.log(`==========================================================`);
+  console.log(`🚀 Servidor backend FacilitoApp corriendo en puerto ${PORT} 🐒`);
+  console.log(`🔗 API Health: http://localhost:${PORT}/api/health`);
+  console.log(`==========================================================`);
+});
+
+// Ejecutar migraciones y cron jobs en segundo plano para no bloquear el primer arranque
+void runMigrations()
+  .then(() => {
     // Iniciar cron de recordatorio de deudas en segundo plano
     startReminderCron();
-    
+
     // Iniciar cron de actualización automática de tasas BCV en segundo plano
     startRatesCron();
+  })
+  .catch((error) => {
+    console.error('Error al iniciar migraciones/cron del backend:', error);
   });
-});
