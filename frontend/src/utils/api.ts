@@ -252,6 +252,12 @@ export const api = {
     delete: (id: number) => request<{ message: string }>(`/products/${id}`, {
       method: 'DELETE',
     }),
+    getNextSku: (category?: string, brand?: string) => {
+      const params = new URLSearchParams();
+      if (category) params.append('category', category);
+      if (brand) params.append('brand', brand);
+      return request<{ sku: string; seq: number; cc: string; sss: string; nnnn: string }>(`/products/next-sku?${params.toString()}`);
+    },
     uploadImage: async (formData: FormData) => {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE}/products/upload`, {

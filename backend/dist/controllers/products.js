@@ -10,6 +10,15 @@ const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
 const audit_1 = require("../services/audit");
 const router = (0, express_1.Router)();
+const canManageProducts = (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({ message: 'No autorizado, token no provisto' });
+    }
+    if (req.user.role === 'admin' || req.user.role === 'seller') {
+        return next();
+    }
+    return res.status(403).json({ message: 'Acceso denegado, se requieren privilegios de administración o vendedor' });
+};
 // Configuración de almacenamiento para Multer (Imágenes Locales)
 const storage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
@@ -57,6 +66,63 @@ router.get('/', async (req, res) => {
         res.status(500).json({ message: 'Error al obtener los productos' });
     }
 });
+// Obtener el siguiente correlativo y SKU sugerido CC-SSS-NNNN (Admin o Vendedor)
+router.get('/next-sku', auth_1.authenticate, canManageProducts, async (req, res) => {
+    const { category, brand } = req.query;
+    try {
+        const [rows] = await db_1.default.query('SELECT COUNT(*) as total, MAX(id) as maxId FROM products');
+        const nextSeq = ((rows[0]?.maxId || 0) + 1);
+        // Mapeo de categoría (CC: 2 dígitos)
+        const catStr = (category || 'General').trim();
+        let cc = '10';
+        if (catStr.match(/laptop|computad/i))
+            cc = '10';
+        else if (catStr.match(/phone|celular|smartphone|móvil|movil/i))
+            cc = '20';
+        else if (catStr.match(/accesor|cable|cargador|funda/i))
+            cc = '30';
+        else if (catStr.match(/tablet|ipad/i))
+            cc = '40';
+        else if (catStr.match(/audio|corneta|audífono|audifono|sonido/i))
+            cc = '50';
+        else if (catStr.match(/tv|televis|pantalla|monitor/i))
+            cc = '60';
+        else {
+            let hash = 0;
+            for (let i = 0; i < catStr.length; i++)
+                hash = (hash << 5) - hash + catStr.charCodeAt(i);
+            cc = Math.abs((hash % 80) + 10).toString().padStart(2, '0');
+        }
+        // Mapeo de marca / subcategoría (SSS: 3 dígitos)
+        const brandStr = (brand || 'General').trim();
+        let sss = '100';
+        if (brandStr.match(/apple|macbook|iphone|ipad/i))
+            sss = '101';
+        else if (brandStr.match(/samsung/i))
+            sss = '102';
+        else if (brandStr.match(/xiaomi|redmi|poco/i))
+            sss = '103';
+        else if (brandStr.match(/sony/i))
+            sss = '104';
+        else if (brandStr.match(/lg/i))
+            sss = '105';
+        else if (brandStr.match(/hp|dell|lenovo|asus|acer/i))
+            sss = '106';
+        else {
+            let hash = 0;
+            for (let i = 0; i < brandStr.length; i++)
+                hash = (hash << 5) - hash + brandStr.charCodeAt(i);
+            sss = Math.abs((hash % 800) + 100).toString().padStart(3, '0');
+        }
+        const nnnn = nextSeq.toString().padStart(4, '0');
+        const sku = `${cc}-${sss}-${nnnn}`;
+        res.json({ sku, seq: nextSeq, cc, sss, nnnn });
+    }
+    catch (error) {
+        console.error('Error al generar siguiente SKU:', error);
+        res.status(500).json({ message: 'Error al generar SKU' });
+    }
+});
 // Obtener un producto por ID (Público)
 router.get('/:id', async (req, res) => {
     const { id } = req.params;
@@ -72,15 +138,6 @@ router.get('/:id', async (req, res) => {
         res.status(500).json({ message: 'Error al obtener el producto' });
     }
 });
-const canManageProducts = (req, res, next) => {
-    if (!req.user) {
-        return res.status(401).json({ message: 'No autorizado, token no provisto' });
-    }
-    if (req.user.role === 'admin' || req.user.role === 'seller') {
-        return next();
-    }
-    return res.status(403).json({ message: 'Acceso denegado, se requieren privilegios de administración o vendedor' });
-};
 // Crear producto (Admin o Vendedor)
 router.post('/', auth_1.authenticate, canManageProducts, async (req, res) => {
     const { code, name, description, price, stock, image_url, category } = req.body;

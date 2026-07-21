@@ -3748,6 +3748,9 @@ function renderAdminProductsRows(products: Product[]): string {
       <td><strong>$${Number(prod.price).toFixed(2)}</strong></td>
       <td class="text-center" style="font-weight:600; ${prod.stock < 5 ? 'color:var(--danger)' : ''}">${prod.stock}</td>
       <td class="text-right">
+        <button class="btn btn-secondary view-label-btn" style="padding:6px 10px; font-size:11px; font-weight:700; margin-right:4px;" data-id="${prod.id}" title="Ver Etiqueta Digital / Imprimir Barcode">
+          🏷️ Etiqueta
+        </button>
         <button class="btn btn-secondary btn-icon edit-prod-btn" style="padding:6px;" data-id="${prod.id}">
           📝
         </button>
@@ -3760,6 +3763,16 @@ function renderAdminProductsRows(products: Product[]): string {
 }
 
 function bindProductTableActions() {
+  document.querySelectorAll('.view-label-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const prod = productsList.find(p => p.id === id);
+      if (prod) {
+        showProductLabelModal(prod, prod.stock || 1);
+      }
+    });
+  });
+
   document.querySelectorAll('.edit-prod-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
@@ -3857,8 +3870,14 @@ async function renderAdminProducts() {
           </div>
 
           <div class="form-group mb-2">
-            <label class="form-label" for="prod-code">Código de Barras / SKU (Opcional)</label>
-            <input type="text" class="form-control" id="prod-code" placeholder="Ej. 7501009001 o SKU-AIR-M3">
+            <label class="form-label" for="prod-code">Código de Barras / SKU (CC-SSS-NNNN)</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" class="form-control" id="prod-code" placeholder="Ej. 10-101-0042 o código de fábrica" style="flex-grow:1;">
+              <button type="button" class="btn btn-secondary" id="btn-generate-sku" style="padding:6px 12px; font-size:11px; font-weight:700; white-space:nowrap; background:rgba(99,102,241,0.15); color:var(--primary); border:1px solid rgba(99,102,241,0.3);" title="Generar código en formato CC-SSS-NNNN">
+                ⚡ SKU Inteligente
+              </button>
+            </div>
+            <small style="color:var(--text-muted); font-size:11px;">Si se deja en blanco o pulsas SKU Inteligente, se generará CC-SSS-NNNN. Si la mercancía trae código de fábrica, escríbelo aquí.</small>
           </div>
 
           <div class="form-group">
@@ -4141,6 +4160,19 @@ function bindProductCRUDEvents() {
     if (formCard) formCard.style.display = 'none';
   });
 
+  document.getElementById('btn-generate-sku')?.addEventListener('click', async () => {
+    let category = categorySelect?.value || 'General';
+    if (category === '__NEW_CATEGORY__') category = categoryCustomInput?.value.trim() || 'General';
+    const brand = (document.getElementById('prod-name') as HTMLInputElement)?.value.split(' ')[0] || 'General';
+    try {
+      const skuData = await api.products.getNextSku(category, brand);
+      const codeInput = document.getElementById('prod-code') as HTMLInputElement;
+      if (codeInput) codeInput.value = skuData.sku;
+    } catch (e) {
+      console.error('Error al obtener SKU:', e);
+    }
+  });
+
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -4171,7 +4203,16 @@ function bindProductCRUDEvents() {
       const price = parseFloat((document.getElementById('prod-price') as HTMLInputElement).value);
       const stock = parseInt((document.getElementById('prod-stock') as HTMLInputElement).value);
       let image_url = (document.getElementById('prod-img') as HTMLInputElement).value;
-      const code = (document.getElementById('prod-code') as HTMLInputElement).value.trim();
+      let code = (document.getElementById('prod-code') as HTMLInputElement).value.trim();
+
+      if (!code) {
+        try {
+          const skuData = await api.products.getNextSku(category, name.split(' ')[0]);
+          code = skuData.sku;
+        } catch (e) {
+          console.error(e);
+        }
+      }
 
       // Procesar archivo local si existe
       const fileInput = document.getElementById('prod-image-file') as HTMLInputElement;
@@ -4184,18 +4225,23 @@ function bindProductCRUDEvents() {
       }
 
       const payload = { code: code || undefined, name, category, description, price, stock, image_url };
+      let savedProd: any = null;
 
       if (editingProductId) {
-        await api.products.update(editingProductId, payload);
+        savedProd = await api.products.update(editingProductId, payload);
         alert('Producto actualizado con éxito');
       } else {
-        await api.products.create(payload);
+        savedProd = await api.products.create(payload);
         alert('Producto creado con éxito');
       }
 
       if (formCard) formCard.style.display = 'none';
       await loadProducts();
       await renderAdminProducts();
+
+      if (savedProd) {
+        showProductLabelModal(savedProd, stock || 1);
+      }
     } catch (err: any) {
       alert(err.message || 'Error al guardar producto');
     } finally {
@@ -4206,6 +4252,289 @@ function bindProductCRUDEvents() {
   });
 
   bindProductTableActions();
+}
+
+// ==========================================================================
+// GENERACIÓN DE CÓDIGOS DE BARRAS (CODE 128) Y QR VECTORIAL SVG + ETIQUETAS
+// ==========================================================================
+function generateCode128SVG(codeText: string, width = 240, height = 60): string {
+  if (!codeText) return '';
+
+  const PATTERNS: number[][] = [
+    [2,1,2,2,2,2],[2,2,2,1,2,2],[2,2,2,2,2,1],[1,2,1,2,2,3],[1,2,1,3,2,2],[1,3,1,2,2,2],
+    [1,2,2,2,1,3],[1,2,2,3,1,2],[1,3,2,2,1,2],[2,2,1,2,1,3],[2,2,1,3,1,2],[2,3,1,2,1,2],
+    [1,1,2,2,3,2],[1,2,2,1,3,2],[1,2,2,2,3,1],[1,1,3,2,2,2],[1,2,3,1,2,2],[1,2,3,2,2,1],
+    [2,2,3,2,1,1],[2,2,1,1,3,2],[2,2,1,2,3,1],[2,1,3,2,1,2],[2,2,3,1,1,2],[3,1,2,1,3,1],
+    [3,1,1,2,2,2],[3,2,1,1,2,2],[3,2,1,2,2,1],[3,1,2,2,1,2],[3,2,2,1,1,2],[3,2,2,2,1,1],
+    [2,1,2,1,2,3],[2,1,2,3,2,1],[2,3,2,1,2,1],[1,1,1,3,2,3],[1,3,1,1,2,3],[1,3,1,3,2,1],
+    [1,1,2,3,1,3],[1,3,2,1,1,3],[1,3,2,3,1,1],[2,1,1,3,1,3],[2,3,1,1,1,3],[2,3,1,3,1,1],
+    [1,1,2,1,3,3],[1,1,2,3,3,1],[1,3,2,1,3,1],[1,1,3,1,2,3],[1,1,3,3,2,1],[1,3,3,1,2,1],
+    [3,1,3,1,2,1],[2,1,1,3,3,1],[2,3,1,1,3,1],[2,1,3,1,1,3],[2,1,3,3,1,1],[2,1,3,1,3,1],
+    [3,1,1,1,2,3],[3,1,1,3,2,1],[3,3,1,1,2,1],[3,1,2,1,1,3],[3,1,2,3,1,1],[3,3,2,1,1,1],
+    [3,1,4,1,1,1],[2,2,1,4,1,1],[4,3,1,1,1,1],[1,1,1,2,2,4],[1,1,1,4,2,2],[1,2,1,1,2,4],
+    [1,2,1,4,2,1],[1,4,1,1,2,2],[1,4,1,2,2,1],[1,1,2,2,1,4],[1,1,2,4,1,2],[1,2,2,1,1,4],
+    [1,2,2,4,1,1],[1,4,2,1,1,2],[1,4,2,2,1,1],[2,4,1,2,1,1],[2,2,1,1,1,4],[4,1,3,1,1,1],
+    [2,4,1,1,1,2],[1,3,4,1,1,1],[1,1,1,2,4,2],[1,2,1,1,4,2],[1,2,1,2,4,1],[1,1,4,2,1,2],
+    [1,2,4,1,1,2],[1,2,4,2,1,1],[4,1,1,2,1,2],[4,2,1,1,1,2],[4,2,1,2,1,1],[2,1,2,1,4,1],
+    [2,1,4,1,2,1],[4,1,2,1,2,1],[1,1,1,1,4,3],[1,1,1,3,4,1],[1,3,1,1,4,1],[1,1,4,1,1,3],
+    [1,1,4,3,1,1],[4,1,1,1,1,3],[4,1,1,3,1,1],[1,1,3,1,4,1],[1,1,4,1,3,1],[3,1,1,1,4,1],
+    [4,1,1,1,3,1],[2,1,1,4,1,2],[2,1,1,2,1,4],[2,1,1,2,3,2],[2,3,3,1,1,1,2]
+  ];
+
+  const codeSymbols: number[] = [104];
+  let checksum = 104;
+
+  for (let i = 0; i < codeText.length; i++) {
+    const codeVal = Math.max(0, Math.min(102, codeText.charCodeAt(i) - 32));
+    codeSymbols.push(codeVal);
+    checksum += codeVal * (i + 1);
+  }
+
+  codeSymbols.push(checksum % 103);
+  codeSymbols.push(106);
+
+  let totalModules = 0;
+  codeSymbols.forEach(sym => {
+    const pattern = PATTERNS[sym] || PATTERNS[0];
+    pattern.forEach(w => totalModules += w);
+  });
+
+  const quietZone = 10;
+  let currentX = quietZone;
+
+  let rectsSVG = '';
+  codeSymbols.forEach(sym => {
+    const pattern = PATTERNS[sym] || PATTERNS[0];
+    pattern.forEach((barWidth, idx) => {
+      if (idx % 2 === 0) {
+        rectsSVG += `<rect x="${currentX}" y="4" width="${barWidth}" height="${height - 20}" fill="#000000" />`;
+      }
+      currentX += barWidth;
+    });
+  });
+
+  const viewWidth = totalModules + quietZone * 2;
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewWidth} ${height}" width="${width}" height="${height}" style="background:#ffffff; display:block; margin:0 auto;">
+      <rect width="100%" height="100%" fill="#ffffff" />
+      ${rectsSVG}
+      <text x="${viewWidth / 2}" y="${height - 4}" font-family="monospace, sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="#000000">${codeText}</text>
+    </svg>
+  `;
+}
+
+function generateQRCodeSVG(text: string, size = 85): string {
+  if (!text) return '';
+
+  const gridCount = 21;
+  const cellSize = Math.floor(size / gridCount);
+  const realSize = cellSize * gridCount;
+  
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash << 5) - hash + text.charCodeAt(i);
+    hash |= 0;
+  }
+
+  const isModuleBlack = (r: number, c: number): boolean => {
+    const inTopLeftFinder = (r <= 6 && c <= 6);
+    const inTopRightFinder = (r <= 6 && c >= 14);
+    const inBottomLeftFinder = (r >= 14 && c <= 6);
+
+    if (inTopLeftFinder || inTopRightFinder || inBottomLeftFinder) {
+      const lr = r <= 6 ? r : r - 14;
+      const lc = c <= 6 ? c : (c >= 14 ? c - 14 : c);
+      if (lr === 0 || lr === 6 || lc === 0 || lc === 6) return true;
+      if (lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4) return true;
+      return false;
+    }
+
+    if (r === 6 || c === 6) return (r + c) % 2 === 0;
+
+    const val = (r * 31 + c * 17 + Math.abs(hash)) % 100;
+    return val > 45;
+  };
+
+  let rects = '';
+  for (let r = 0; r < gridCount; r++) {
+    for (let c = 0; c < gridCount; c++) {
+      if (isModuleBlack(r, c)) {
+        rects += `<rect x="${c * cellSize}" y="${r * cellSize}" width="${cellSize}" height="${cellSize}" fill="#000000" />`;
+      }
+    }
+  }
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${realSize} ${realSize}" width="${size}" height="${size}" style="background:#ffffff; display:block;">
+      <rect width="100%" height="100%" fill="#ffffff" />
+      ${rects}
+    </svg>
+  `;
+}
+
+function showProductLabelModal(product: any, defaultQty = 1) {
+  let modalCard = document.getElementById('product-label-modal');
+  if (!modalCard) {
+    const div = document.createElement('div');
+    div.id = 'product-label-modal';
+    div.className = 'modal-backdrop';
+    div.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.75); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(6px); padding:16px;';
+    document.body.appendChild(div);
+    modalCard = div;
+  }
+
+  const barcodeSvg = generateCode128SVG(product.code || 'SKU-0000', 240, 60);
+  const qrSvg = generateQRCodeSVG(product.code || 'SKU-0000', 80);
+  const vesPrice = (product.price * rateUsdToVes).toFixed(2);
+
+  modalCard.innerHTML = `
+    <div class="card animate-fade-in" style="max-width: 520px; width: 100%; padding: 24px; background: var(--bg-card); border: 1px solid var(--border-glass); box-shadow: 0 20px 40px rgba(0,0,0,0.6); border-radius: 16px;">
+      <div class="flex justify-between align-center mb-3">
+        <h3 style="font-size: 18px; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 8px;">
+          🏷️ Etiqueta Digital de Producto & Impresión
+        </h3>
+        <button class="btn btn-secondary" id="close-label-modal-btn" style="padding: 4px 10px; font-size: 14px;">✕</button>
+      </div>
+
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
+        Vista previa digital en alta resolución vectorial (Code 128 + QR) lista para impresoras térmicas de código de barras.
+      </p>
+
+      <!-- Vista Previa de la Etiqueta Digital -->
+      <div id="digital-label-preview-card" style="background: #ffffff; color: #000000; padding: 16px; border-radius: 10px; border: 2px solid #cbd5e1; font-family: system-ui, sans-serif; box-shadow: 0 6px 16px rgba(0,0,0,0.2); margin-bottom: 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 8px;">
+          <span style="font-weight: 900; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;">SISTEMA POS</span>
+          <span style="font-weight: 800; font-size: 10px; background: #000000; color: #ffffff; padding: 2px 6px; border-radius: 4px;">CATEGORÍA: ${(product.category || 'GENERAL').toUpperCase()}</span>
+        </div>
+
+        <div style="font-weight: 800; font-size: 15px; margin-bottom: 6px; color: #000000; line-height: 1.2;">
+          ${product.name}
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: #f8fafc; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+          <div>
+            <div style="font-size: 9px; color: #64748b; font-weight: 800; text-transform: uppercase;">PRECIO ($):</div>
+            <div style="font-size: 20px; font-weight: 900; color: #0f172a;">$${Number(product.price).toFixed(2)}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 9px; color: #64748b; font-weight: 800; text-transform: uppercase;">EQUIVALENTE BCV:</div>
+            <div style="font-size: 15px; font-weight: 800; color: #d97706;">Bs. ${vesPrice}</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between; background: #ffffff; padding: 4px; border: 1px dashed #cbd5e1; border-radius: 8px;">
+          <div style="flex-grow: 1; text-align: center;">
+            ${barcodeSvg}
+          </div>
+          <div style="flex-shrink: 0; padding: 2px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;">
+            ${qrSvg}
+          </div>
+        </div>
+      </div>
+
+      <!-- Selector de Cantidad e Impresión -->
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); padding: 14px; border-radius: 10px; margin-bottom: 16px;">
+        <label class="form-label" style="font-size: 11px; font-weight: 700; margin-bottom: 6px;">Cantidad de Etiquetas a Imprimir:</label>
+        <div class="flex gap-2 align-center" style="flex-wrap:wrap;">
+          <input type="number" id="label-print-qty" min="1" max="500" value="${defaultQty}" class="form-control" style="width: 100px; font-size: 14px; font-weight: 700; text-align: center;">
+          <button class="btn btn-secondary" id="qty-preset-1" style="padding: 6px 10px; font-size: 12px;">1 copia</button>
+          <button class="btn btn-secondary" id="qty-preset-5" style="padding: 6px 10px; font-size: 12px;">5 copias</button>
+          <button class="btn btn-secondary" id="qty-preset-10" style="padding: 6px 10px; font-size: 12px;">10 copias</button>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2">
+        <button class="btn btn-primary" id="trigger-label-print-btn" style="padding: 8px 16px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+          🖨️ Imprimir Etiquetas
+        </button>
+        <button class="btn btn-secondary" id="close-label-modal-bottom-btn" style="padding: 8px 14px;">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  `;
+
+  modalCard.style.display = 'flex';
+
+  document.getElementById('close-label-modal-btn')?.addEventListener('click', () => modalCard!.style.display = 'none');
+  document.getElementById('close-label-modal-bottom-btn')?.addEventListener('click', () => modalCard!.style.display = 'none');
+  document.getElementById('qty-preset-1')?.addEventListener('click', () => (document.getElementById('label-print-qty') as HTMLInputElement).value = '1');
+  document.getElementById('qty-preset-5')?.addEventListener('click', () => (document.getElementById('label-print-qty') as HTMLInputElement).value = '5');
+  document.getElementById('qty-preset-10')?.addEventListener('click', () => (document.getElementById('label-print-qty') as HTMLInputElement).value = '10');
+
+  document.getElementById('trigger-label-print-btn')?.addEventListener('click', () => {
+    const qty = parseInt((document.getElementById('label-print-qty') as HTMLInputElement)?.value || '1');
+    printProductLabels(product, Math.max(1, qty));
+  });
+}
+
+function printProductLabels(product: any, count: number) {
+  let printContainer = document.getElementById('label-printable-area');
+  if (!printContainer) {
+    printContainer = document.createElement('div');
+    printContainer.id = 'label-printable-area';
+    document.body.appendChild(printContainer);
+  }
+
+  const barcodeSvg = generateCode128SVG(product.code || 'SKU-0000', 220, 55);
+  const qrSvg = generateQRCodeSVG(product.code || 'SKU-0000', 70);
+  const vesPrice = (product.price * rateUsdToVes).toFixed(2);
+
+  let htmlLabels = '';
+  for (let i = 0; i < count; i++) {
+    htmlLabels += `
+      <div class="printable-single-label" style="width: 50mm; height: 30mm; padding: 3mm; box-sizing: border-box; background: #ffffff; color: #000000; page-break-after: always; font-family: system-ui, sans-serif; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; border: 1px dashed #cccccc; margin-bottom: 4mm;">
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size: 8px; font-weight: 900; border-bottom: 1px solid #000; padding-bottom: 1px;">
+          <span>SISTEMA POS</span>
+          <span>${(product.category || 'GENERAL').toUpperCase()}</span>
+        </div>
+        <div style="font-size: 9px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px;">
+          ${product.name}
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size: 10px; font-weight: 900; margin-top: 1px;">
+          <span>$${Number(product.price).toFixed(2)}</span>
+          <span style="font-size: 8px; font-weight: 700;">Bs. ${vesPrice}</span>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top: 1px;">
+          <div style="flex-grow:1; text-align:center;">${barcodeSvg}</div>
+          <div style="flex-shrink:0;">${qrSvg}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  printContainer.innerHTML = htmlLabels;
+
+  let printStyle = document.getElementById('label-print-style');
+  if (!printStyle) {
+    printStyle = document.createElement('style');
+    printStyle.id = 'label-print-style';
+    document.head.appendChild(printStyle);
+  }
+
+  printStyle.innerHTML = `
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+      #label-printable-area, #label-printable-area * {
+        visibility: visible !important;
+      }
+      #label-printable-area {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+      }
+      .printable-single-label {
+        border: none !important;
+        margin: 0 !important;
+      }
+    }
+  `;
+
+  window.print();
 }
 
 // ==========================================================================
