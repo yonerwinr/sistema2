@@ -403,19 +403,6 @@ function renderStoreView(): string {
   // Categorías estáticas
   const categories = ['Todas', 'Smartphones', 'Laptops', 'Accesorios', 'Tablets', 'Smartwatches'];
 
-  if (productsLoading && productsList.length === 0) {
-    return `
-      <section class="hero-section animate-on-scroll animate-zoom-in" style="position:relative; overflow:hidden; padding: 60px 0; background: linear-gradient(135deg, rgba(255,122,0,0.1) 0%, rgba(139,92,246,0.1) 100%); border-radius: var(--radius-lg); border: 1px solid var(--border-glass); margin-bottom: 30px;">
-        <div class="container" style="min-height:240px; display:flex; flex-direction:column; justify-content:center; gap:14px;">
-          <div style="width: 220px; height: 20px; border-radius: 999px; background: rgba(255,255,255,0.08);"></div>
-          <div style="width: min(100%, 520px); height: 18px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
-          <div style="width: min(100%, 340px); height: 18px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
-          <div style="margin-top: 8px; font-size: 14px; color: var(--text-secondary); font-weight: 600;">Cargando productos y tasas...</div>
-        </div>
-      </section>
-    `;
-  }
-
   // Agrupar HTML de tarjetas de producto
   const productsHtml = productsList.map(prod => {
     const isLowStock = prod.stock < 5;
@@ -1867,15 +1854,15 @@ function renderAdminDashboard(): string {
             <div style="display:flex; flex-direction:column; gap:6px;">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
                 <span>$ BCV:</span>
-                <input type="number" step="any" inputmode="decimal" id="rate-usd-input" value="${rateUsdToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
+                <input type="number" step="0.01" id="rate-usd-input" value="${rateUsdToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
                 <span>€ BCV:</span>
-                <input type="number" step="any" inputmode="decimal" id="rate-eur-input" value="${rateEurToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
+                <input type="number" step="0.01" id="rate-eur-input" value="${rateEurToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; color:#f59e0b;">
                 <span>🟡 Binance:</span>
-                <input type="number" step="any" inputmode="decimal" id="rate-binance-input" value="${rateBinanceToVes}" style="width:70px; padding:2px 6px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:4px; color:#f59e0b; text-align:right; font-size:11px; font-weight:700;">
+                <input type="number" step="0.01" id="rate-binance-input" value="${rateBinanceToVes}" style="width:70px; padding:2px 6px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:4px; color:#f59e0b; text-align:right; font-size:11px; font-weight:700;">
               </div>
               <div style="display:flex; gap:4px;">
                 <button type="button" class="btn btn-secondary" id="sync-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:45%; background:rgba(255,255,255,0.05); color:white; border-color:var(--border-glass);" title="Sincronizar automáticamente con el BCV y Binance P2P">
