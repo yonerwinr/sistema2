@@ -2547,8 +2547,8 @@ async function renderAdminPOS() {
                           </div>
                         `}
 
-                        <button type="button" class="btn btn-secondary fill-pos-payment-balance" data-index="${idx}" style="padding:4px 8px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.06);" title="Llenar saldo pendiente">
-                          ⚡ Rellenar
+                        <button type="button" class="btn btn-secondary fill-pos-payment-balance" data-index="${idx}" style="padding:4px 8px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.06);" title="Completar el saldo restante faltante">
+                          ⚡ Completar Restante
                         </button>
                       </div>
                     </div>
@@ -3417,27 +3417,51 @@ function bindPOSEvents() {
   document.querySelectorAll('.fill-pos-payment-balance').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const idx = parseInt((e.currentTarget as HTMLButtonElement).dataset.index || '0');
+      const targetLine = posPaymentLines[idx];
+      if (!targetLine) return;
+
+      const isTargetDivisas = ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(targetLine.method);
       const posSubtotal = posCart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+      const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
+      const baseDiscount = couponDiscountAmount + posDiscount;
+
       const autoCurrencyDiscountPct = (rateBinanceToVes > rateUsdToVes && rateBinanceToVes > 0)
         ? (((rateBinanceToVes - rateUsdToVes) / rateBinanceToVes) * 100)
         : 0;
-      const totalPaidInDivisasUsd = posPaymentLines
-        .filter(l => ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
-        .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
-      const currencyDiscountAmount = posApplyCurrencyDiscount ? (totalPaidInDivisasUsd * (autoCurrencyDiscountPct / 100)) : 0;
-      const couponDiscountAmount = posSubtotal * (posCouponDiscountPercent / 100);
-      const totalDiscount = couponDiscountAmount + posDiscount + currencyDiscountAmount;
-      const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
-      const taxAmount = posApplyTax ? taxableSubtotal * 0.16 : 0;
-      const posTotal = taxableSubtotal + taxAmount;
 
-      const otherPaid = posPaymentLines.reduce((sum, line, i) => i === idx ? sum : sum + (line.amountUsd || 0), 0);
-      const remainingUsd = Math.max(0, posTotal - otherPaid);
-      if (posPaymentLines[idx]) {
-        posPaymentLines[idx].amountUsd = remainingUsd;
-        posPaymentLines[idx].amountVes = remainingUsd * rateUsdToVes;
-        await renderAdminPOS();
+      const d = posApplyCurrencyDiscount ? (autoCurrencyDiscountPct / 100) : 0;
+      const taxRate = posApplyTax ? 0.16 : 0;
+
+      // Suma pagada en OTRAS líneas en USD
+      const otherPaidUsd = posPaymentLines.reduce((sum, line, i) => i === idx ? sum : sum + (line.amountUsd || 0), 0);
+
+      // Suma pagada en OTRAS líneas en Divisas (USD)
+      const otherDivisasPaidUsd = posPaymentLines
+        .filter((l, i) => i !== idx && ['efectivo_usd', 'zelle', 'binance', 'paypal'].includes(l.method))
+        .reduce((sum, l) => sum + (l.amountUsd || 0), 0);
+
+      let requiredUsd = 0;
+
+      if (isTargetDivisas && d > 0) {
+        // La línea a completar es en Divisas ($) y aplica descuento por divisas
+        // Fórmula algebraica para saldo final = 0: X * [ 1 + d * (1 + taxRate) ] = (posSubtotal - baseDiscount - otherDivisasPaidUsd * d) * (1 + taxRate) - otherPaidUsd
+        const numerator = (posSubtotal - baseDiscount - (otherDivisasPaidUsd * d)) * (1 + taxRate) - otherPaidUsd;
+        const denominator = 1 + (d * (1 + taxRate));
+        requiredUsd = Math.max(0, numerator / denominator);
+      } else {
+        // La línea a completar es en Bolívares (Bs) o no aplica descuento por divisas
+        const currencyDiscountAmount = otherDivisasPaidUsd * d;
+        const totalDiscount = baseDiscount + currencyDiscountAmount;
+        const taxableSubtotal = Math.max(0, posSubtotal - totalDiscount);
+        const taxAmount = taxableSubtotal * taxRate;
+        const posTotal = taxableSubtotal + taxAmount;
+        requiredUsd = Math.max(0, posTotal - otherPaidUsd);
       }
+
+      targetLine.amountUsd = parseFloat(requiredUsd.toFixed(2));
+      targetLine.amountVes = parseFloat((requiredUsd * rateUsdToVes).toFixed(2));
+
+      await renderAdminPOS();
     });
   });
 
