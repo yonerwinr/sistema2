@@ -152,6 +152,9 @@ export interface StatsData {
   metrics: {
     totalOrders: number;
     totalRevenue: number;
+    totalExpenses?: number;
+    totalProfit?: number;
+    profitMargin?: number;
     averageOrderValue: number;
     lowStockCount: number;
   };

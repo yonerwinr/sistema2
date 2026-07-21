@@ -24,6 +24,14 @@ router.get('/', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
       SELECT COUNT(*) as low_stock_count FROM products WHERE stock < 5
     `);
         const lowStockCount = lowStockResult[0].low_stock_count;
+        // Gastos Totales y Ganancias Netas
+        const [expensesResult] = await db_1.default.query(`
+      SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses
+    `);
+        const totalExpenses = Number(expensesResult[0]?.total_expenses || 0);
+        const totalRevenue = Number(summary.total_revenue || 0);
+        const totalProfit = totalRevenue - totalExpenses;
+        const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0;
         // 2. Ventas por los últimos 7 días
         const [dailySales] = await db_1.default.query(`
       SELECT 
@@ -76,7 +84,10 @@ router.get('/', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
         res.json({
             metrics: {
                 totalOrders: summary.total_orders,
-                totalRevenue: Number(summary.total_revenue),
+                totalRevenue,
+                totalExpenses,
+                totalProfit,
+                profitMargin,
                 averageOrderValue: Number(summary.average_order_value),
                 lowStockCount
             },

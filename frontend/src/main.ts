@@ -30,12 +30,67 @@ interface POSCartItem {
 let posCart: POSCartItem[] = [];
 let posSearchQuery: string = '';
 
+// Helper de Búsqueda Inteligente (Fuzzy Search + Insensible a Mayúsculas y Acentos)
+function normalizeText(str: string): string {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[a.length][b.length];
+}
+
+function isFuzzyTokenMatch(qToken: string, tToken: string): boolean {
+  if (tToken.includes(qToken) || qToken.includes(tToken)) return true;
+  const maxDistance = qToken.length <= 4 ? 1 : qToken.length <= 8 ? 2 : 3;
+  return levenshteinDistance(qToken, tToken) <= maxDistance;
+}
+
+function smartMatch(target: string | undefined | null, query: string | undefined | null): boolean {
+  if (!query || !query.trim()) return true;
+  if (!target) return false;
+
+  const normTarget = normalizeText(target);
+  const normQuery = normalizeText(query);
+
+  if (normTarget.includes(normQuery)) return true;
+
+  const queryTokens = normQuery.split(/\s+/).filter(Boolean);
+  const targetTokens = normTarget.split(/\s+/).filter(Boolean);
+
+  return queryTokens.every(qToken =>
+    targetTokens.some(tToken => isFuzzyTokenMatch(qToken, tToken))
+  );
+}
+
 // Vista activa dentro de Administración
 type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers';
-let activeAdminView: AdminSubView = 'stats';
+let activeAdminView: AdminSubView = 'pos';
 
 // Nuevas variables de estado para el control en POS
 let posCustomersList: User[] = [];
+let posProductsCache: Product[] = [];
 let posSelectedCustomerId: number | null = null;
 let posDiscount = 0;
 let posApplyTax = false;
@@ -135,7 +190,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Si hay un usuario logueado que sea administrador o vendedor, ir directamente al panel de control
   if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller')) {
-    activeAdminView = 'stats';
+    activeAdminView = 'pos';
     navigate('admin');
   } else {
     navigate('store');
@@ -1730,11 +1785,6 @@ function renderAdminDashboard(): string {
       <!-- Sidebar de Administracion -->
       <aside class="dashboard-sidebar" style="display:flex; flex-direction:column; justify-content:space-between; min-height: 500px;">
         <div>
-          ${currentUser.role === 'admin' ? `
-            <button class="sidebar-nav-btn ${activeAdminView === 'stats' ? 'active' : ''}" id="admin-tab-stats">
-              ${icons.dashboard} Estadisticas
-            </button>
-          ` : ''}
           ${hasPermission('pos') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'pos' ? 'active' : ''}" id="admin-tab-pos">
               ${icons.pos} Punto de Venta (POS)
@@ -1776,6 +1826,11 @@ function renderAdminDashboard(): string {
           ${hasPermission('staff') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'staff' ? 'active' : ''}" id="admin-tab-staff">
               👥 Vendedores
+            </button>
+          ` : ''}
+          ${currentUser.role === 'admin' ? `
+            <button class="sidebar-nav-btn ${activeAdminView === 'stats' ? 'active' : ''}" id="admin-tab-stats">
+              ${icons.dashboard} Estadísticas
             </button>
           ` : ''}
         </div>
@@ -2030,15 +2085,37 @@ async function renderAdminStats() {
         <h2 class="mb-4" style="font-size:26px; font-weight:800;">Estadisticas de Ventas</h2>
 
         <!-- Cards Metricas -->
-        <div class="metrics-grid stagger-container">
+        <div class="metrics-grid stagger-container" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
           <div class="card metric-card">
             <div class="metric-header">
               <span>Ingresos Totales</span>
               <span>💰</span>
             </div>
-            <div class="metric-value">$${data.metrics.totalRevenue.toFixed(2)}</div>
-            <div class="metric-footer">Facturado en total</div>
+            <div class="metric-value">$${Number(data.metrics.totalRevenue || 0).toFixed(2)}</div>
+            <div class="metric-footer">Facturado en ventas completadas</div>
           </div>
+
+          <div class="card metric-card" style="border-color: rgba(16, 185, 129, 0.4);">
+            <div class="metric-header">
+              <span style="color:#10b981;">Ganancia Neta Est.</span>
+              <span>📈</span>
+            </div>
+            <div class="metric-value" style="color:#10b981;">$${Number(data.metrics.totalProfit || 0).toFixed(2)}</div>
+            <div class="metric-footer" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Ingresos - Gastos</span>
+              <span class="badge" style="background:rgba(16, 185, 129, 0.15); color:#34d399; font-weight:800; font-size:10px;">${Number(data.metrics.profitMargin || 0).toFixed(1)}% Margen</span>
+            </div>
+          </div>
+
+          <div class="card metric-card" style="border-color: rgba(239, 68, 68, 0.3);">
+            <div class="metric-header">
+              <span style="color:#f87171;">Gastos Totales</span>
+              <span>💼</span>
+            </div>
+            <div class="metric-value" style="color:#f87171;">$${Number(data.metrics.totalExpenses || 0).toFixed(2)}</div>
+            <div class="metric-footer">Egresos operativos registrados</div>
+          </div>
+
           <div class="card metric-card">
             <div class="metric-header">
               <span>Transacciones</span>
@@ -2047,14 +2124,16 @@ async function renderAdminStats() {
             <div class="metric-value">${data.metrics.totalOrders}</div>
             <div class="metric-footer">Ventas exitosas registradas</div>
           </div>
+
           <div class="card metric-card">
             <div class="metric-header">
               <span>Ticket Promedio</span>
               <span>📊</span>
             </div>
-            <div class="metric-value">$${data.metrics.averageOrderValue.toFixed(2)}</div>
+            <div class="metric-value">$${Number(data.metrics.averageOrderValue || 0).toFixed(2)}</div>
             <div class="metric-footer">Promedio por cliente</div>
           </div>
+
           <div class="card metric-card" style="${data.metrics.lowStockCount > 0 ? 'border-color: rgba(239, 68, 68, 0.4);' : ''}">
             <div class="metric-header">
               <span>Alertas Stock Bajo</span>
@@ -2220,14 +2299,17 @@ async function renderAdminPOS() {
       }
     }
     
-    let posProducts: Product[] = [];
     try {
-      const prods = await api.products.getAll(undefined, posSearchQuery || undefined);
-      posProducts = Array.isArray(prods) ? prods : [];
+      const prods = await api.products.getAll();
+      posProductsCache = Array.isArray(prods) ? prods : [];
     } catch (err) {
       console.error('Error al cargar lista de productos para POS:', err);
-      posProducts = [];
+      posProductsCache = [];
     }
+
+    const posProducts = posProductsCache.filter(prod =>
+      smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, posSearchQuery)
+    );
     
     if (currentUser?.role !== 'admin') {
       posDiscount = 0;
@@ -2914,16 +2996,37 @@ function bindPOSEvents() {
     await renderAdminPOS();
   });
 
-  // Buscador de productos POS
-  let posSearchTimeout: any;
+  // Buscador de productos POS (Ultra Rápido e Inteligente sin congelar pantalla)
   const searchInput = document.getElementById('pos-search-input') as HTMLInputElement;
   searchInput?.addEventListener('input', (e) => {
     const val = (e.target as HTMLInputElement).value;
     posSearchQuery = val;
-    clearTimeout(posSearchTimeout);
-    posSearchTimeout = setTimeout(async () => {
-      await renderAdminPOS();
-    }, 450);
+    const grid = document.querySelector('.pos-products-grid');
+    if (grid) {
+      const filtered = posProductsCache.filter(prod =>
+        smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, val)
+      );
+
+      grid.innerHTML = filtered.map(prod => `
+        <div class="card pos-product-card add-to-pos-cart" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease;">
+          <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:90px; object-fit:cover; border-radius:8px; margin-bottom:6px;">
+          <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.name}</div>
+          <div style="font-weight:800; color:var(--primary); font-size:13px; margin-top:2px;">$${Number(prod.price).toFixed(2)}</div>
+          <div style="font-size:10px; color:var(--text-muted);">Stock: ${prod.stock}</div>
+        </div>
+      `).join('') || '<p style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-secondary);">No se encontraron productos.</p>';
+
+      // Re-vincular eventos de clic para añadir a la canasta
+      grid.querySelectorAll('.add-to-pos-cart').forEach(card => {
+        card.addEventListener('click', async (evt) => {
+          const id = parseInt((evt.currentTarget as HTMLDivElement).dataset.id || '0');
+          const prod = posProductsCache.find(p => p.id === id) || productsList.find(p => p.id === id);
+          if (prod) {
+            await addToPOSCart(prod);
+          }
+        });
+      });
+    }
   });
 
   // Agregar al POS Cart
@@ -3521,8 +3624,7 @@ let adminProductsSearchQuery = '';
 let adminProductsSearchDebounceTimer: number | undefined;
 
 function getAdminFilteredProducts(): Product[] {
-  const normalizedQuery = adminProductsSearchQuery.trim().toLowerCase();
-  if (!normalizedQuery) return productsList;
+  if (!adminProductsSearchQuery || !adminProductsSearchQuery.trim()) return productsList;
 
   return productsList.filter(prod => {
     const haystack = [
@@ -3531,8 +3633,8 @@ function getAdminFilteredProducts(): Product[] {
       prod.category,
       prod.code,
       prod.id?.toString()
-    ].filter(Boolean).join(' ').toLowerCase();
-    return haystack.includes(normalizedQuery);
+    ].filter(Boolean).join(' ');
+    return smartMatch(haystack, adminProductsSearchQuery);
   });
 }
 
@@ -5535,12 +5637,9 @@ async function renderAdminCustomers() {
 
   try {
     const customers = await api.auth.getCustomers();
-    const query = (adminCustomerSearchQuery || '').toLowerCase().trim();
+    const query = (adminCustomerSearchQuery || '').trim();
     const filteredCustomers = query ? customers.filter(c => 
-      (c.name && c.name.toLowerCase().includes(query)) ||
-      (c.ci && c.ci.toLowerCase().includes(query)) ||
-      (c.phone && c.phone.toLowerCase().includes(query)) ||
-      (c.email && c.email.toLowerCase().includes(query))
+      smartMatch(`${c.name || ''} ${c.ci || ''} ${c.phone || ''} ${c.email || ''} ${c.representative_name || ''}`, query)
     ) : customers;
 
     panel.innerHTML = `
