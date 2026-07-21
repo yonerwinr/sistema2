@@ -77,26 +77,38 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Crear producto (Solo Admin)
-router.post('/', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+const canManageProducts = (req: AuthRequest, res: Response, next: any) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'No autorizado, token no provisto' });
+  }
+  if (req.user.role === 'admin' || req.user.role === 'seller') {
+    return next();
+  }
+  return res.status(403).json({ message: 'Acceso denegado, se requieren privilegios de administración o vendedor' });
+};
+
+// Crear producto (Admin o Vendedor)
+router.post('/', authenticate, canManageProducts, async (req: AuthRequest, res: Response) => {
   const { code, name, description, price, stock, image_url, category } = req.body;
 
   if (!name || price === undefined || stock === undefined) {
     return res.status(400).json({ message: 'Nombre, precio e inventario son obligatorios' });
   }
 
+  const cleanCode = (code && typeof code === 'string' && code.trim()) ? code.trim() : null;
+
   try {
     // Validar código duplicado si se proporciona
-    if (code) {
-      const [existing]: any = await pool.query('SELECT id FROM products WHERE code = ?', [code]);
+    if (cleanCode) {
+      const [existing]: any = await pool.query('SELECT id FROM products WHERE code = ?', [cleanCode]);
       if (existing.length > 0) {
-        return res.status(400).json({ message: `El código "${code}" ya está registrado por otro producto` });
+        return res.status(400).json({ message: `El código "${cleanCode}" ya está registrado por otro producto` });
       }
     }
 
     const [result]: any = await pool.query(
       'INSERT INTO products (code, name, description, price, stock, image_url, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [code || null, name, description || null, price, stock, image_url || null, category || null]
+      [cleanCode, name, description || null, price, stock, image_url || null, category || null]
     );
 
     logAuditEvent({
@@ -110,7 +122,7 @@ router.post('/', authenticate, isAdmin, async (req: AuthRequest, res: Response) 
 
     res.status(201).json({
       id: result.insertId,
-      code,
+      code: cleanCode,
       name,
       description,
       price,
@@ -118,14 +130,14 @@ router.post('/', authenticate, isAdmin, async (req: AuthRequest, res: Response) 
       image_url,
       category
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al crear producto:', error);
-    res.status(500).json({ message: 'Error al crear el producto' });
+    res.status(500).json({ message: error.message || 'Error al crear el producto' });
   }
 });
 
-// Actualizar producto (Solo Admin)
-router.put('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+// Actualizar producto (Admin o Vendedor)
+router.put('/:id', authenticate, canManageProducts, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const { code, name, description, price, stock, image_url, category } = req.body;
 
@@ -133,18 +145,20 @@ router.put('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Response
     return res.status(400).json({ message: 'Nombre, precio e inventario son obligatorios' });
   }
 
+  const cleanCode = (code && typeof code === 'string' && code.trim()) ? code.trim() : null;
+
   try {
     // Validar código duplicado si se proporciona y no es del mismo producto
-    if (code) {
-      const [existing]: any = await pool.query('SELECT id FROM products WHERE code = ? AND id != ?', [code, id]);
+    if (cleanCode) {
+      const [existing]: any = await pool.query('SELECT id FROM products WHERE code = ? AND id != ?', [cleanCode, id]);
       if (existing.length > 0) {
-        return res.status(400).json({ message: `El código "${code}" ya está registrado por otro producto` });
+        return res.status(400).json({ message: `El código "${cleanCode}" ya está registrado por otro producto` });
       }
     }
 
     const [result]: any = await pool.query(
       'UPDATE products SET code = ?, name = ?, description = ?, price = ?, stock = ?, image_url = ?, category = ? WHERE id = ?',
-      [code || null, name, description || null, price, stock, image_url || null, category || null, id]
+      [cleanCode, name, description || null, price, stock, image_url || null, category || null, id]
     );
 
     if (result.affectedRows === 0) {
@@ -162,7 +176,7 @@ router.put('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Response
 
     res.json({
       id: parseInt(id),
-      code,
+      code: cleanCode,
       name,
       description,
       price,
@@ -170,14 +184,14 @@ router.put('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Response
       image_url,
       category
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al actualizar producto:', error);
-    res.status(500).json({ message: 'Error al actualizar el producto' });
+    res.status(500).json({ message: error.message || 'Error al actualizar el producto' });
   }
 });
 
-// Eliminar producto (Solo Admin)
-router.delete('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+// Eliminar producto (Admin o Vendedor)
+router.delete('/:id', authenticate, canManageProducts, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   try {
     const [result]: any = await pool.query('DELETE FROM products WHERE id = ?', [id]);
@@ -191,13 +205,13 @@ router.delete('/:id', authenticate, isAdmin, async (req: AuthRequest, res: Respo
       userRole: req.user?.role,
       actionType: 'product_crud',
       title: `Producto Eliminado (ID #${id})`,
-      details: `Eliminado por el Administrador ${req.user?.name}`
+      details: `Eliminado por ${req.user?.name}`
     });
 
     res.json({ message: 'Producto eliminado exitosamente' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error al eliminar producto:', error);
-    res.status(500).json({ message: 'Error al eliminar el producto' });
+    res.status(500).json({ message: error.message || 'Error al eliminar el producto' });
   }
 });
 

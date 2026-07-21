@@ -72,21 +72,31 @@ router.get('/:id', async (req, res) => {
         res.status(500).json({ message: 'Error al obtener el producto' });
     }
 });
-// Crear producto (Solo Admin)
-router.post('/', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
+const canManageProducts = (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({ message: 'No autorizado, token no provisto' });
+    }
+    if (req.user.role === 'admin' || req.user.role === 'seller') {
+        return next();
+    }
+    return res.status(403).json({ message: 'Acceso denegado, se requieren privilegios de administración o vendedor' });
+};
+// Crear producto (Admin o Vendedor)
+router.post('/', auth_1.authenticate, canManageProducts, async (req, res) => {
     const { code, name, description, price, stock, image_url, category } = req.body;
     if (!name || price === undefined || stock === undefined) {
         return res.status(400).json({ message: 'Nombre, precio e inventario son obligatorios' });
     }
+    const cleanCode = (code && typeof code === 'string' && code.trim()) ? code.trim() : null;
     try {
         // Validar código duplicado si se proporciona
-        if (code) {
-            const [existing] = await db_1.default.query('SELECT id FROM products WHERE code = ?', [code]);
+        if (cleanCode) {
+            const [existing] = await db_1.default.query('SELECT id FROM products WHERE code = ?', [cleanCode]);
             if (existing.length > 0) {
-                return res.status(400).json({ message: `El código "${code}" ya está registrado por otro producto` });
+                return res.status(400).json({ message: `El código "${cleanCode}" ya está registrado por otro producto` });
             }
         }
-        const [result] = await db_1.default.query('INSERT INTO products (code, name, description, price, stock, image_url, category) VALUES (?, ?, ?, ?, ?, ?, ?)', [code || null, name, description || null, price, stock, image_url || null, category || null]);
+        const [result] = await db_1.default.query('INSERT INTO products (code, name, description, price, stock, image_url, category) VALUES (?, ?, ?, ?, ?, ?, ?)', [cleanCode, name, description || null, price, stock, image_url || null, category || null]);
         (0, audit_1.logAuditEvent)({
             userId: req.user?.id,
             userName: req.user?.name,
@@ -97,7 +107,7 @@ router.post('/', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
         });
         res.status(201).json({
             id: result.insertId,
-            code,
+            code: cleanCode,
             name,
             description,
             price,
@@ -108,25 +118,26 @@ router.post('/', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
     }
     catch (error) {
         console.error('Error al crear producto:', error);
-        res.status(500).json({ message: 'Error al crear el producto' });
+        res.status(500).json({ message: error.message || 'Error al crear el producto' });
     }
 });
-// Actualizar producto (Solo Admin)
-router.put('/:id', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
+// Actualizar producto (Admin o Vendedor)
+router.put('/:id', auth_1.authenticate, canManageProducts, async (req, res) => {
     const { id } = req.params;
     const { code, name, description, price, stock, image_url, category } = req.body;
     if (!name || price === undefined || stock === undefined) {
         return res.status(400).json({ message: 'Nombre, precio e inventario son obligatorios' });
     }
+    const cleanCode = (code && typeof code === 'string' && code.trim()) ? code.trim() : null;
     try {
         // Validar código duplicado si se proporciona y no es del mismo producto
-        if (code) {
-            const [existing] = await db_1.default.query('SELECT id FROM products WHERE code = ? AND id != ?', [code, id]);
+        if (cleanCode) {
+            const [existing] = await db_1.default.query('SELECT id FROM products WHERE code = ? AND id != ?', [cleanCode, id]);
             if (existing.length > 0) {
-                return res.status(400).json({ message: `El código "${code}" ya está registrado por otro producto` });
+                return res.status(400).json({ message: `El código "${cleanCode}" ya está registrado por otro producto` });
             }
         }
-        const [result] = await db_1.default.query('UPDATE products SET code = ?, name = ?, description = ?, price = ?, stock = ?, image_url = ?, category = ? WHERE id = ?', [code || null, name, description || null, price, stock, image_url || null, category || null, id]);
+        const [result] = await db_1.default.query('UPDATE products SET code = ?, name = ?, description = ?, price = ?, stock = ?, image_url = ?, category = ? WHERE id = ?', [cleanCode, name, description || null, price, stock, image_url || null, category || null, id]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Producto no encontrado' });
         }
@@ -140,7 +151,7 @@ router.put('/:id', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
         });
         res.json({
             id: parseInt(id),
-            code,
+            code: cleanCode,
             name,
             description,
             price,
@@ -151,11 +162,11 @@ router.put('/:id', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
     }
     catch (error) {
         console.error('Error al actualizar producto:', error);
-        res.status(500).json({ message: 'Error al actualizar el producto' });
+        res.status(500).json({ message: error.message || 'Error al actualizar el producto' });
     }
 });
-// Eliminar producto (Solo Admin)
-router.delete('/:id', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
+// Eliminar producto (Admin o Vendedor)
+router.delete('/:id', auth_1.authenticate, canManageProducts, async (req, res) => {
     const { id } = req.params;
     try {
         const [result] = await db_1.default.query('DELETE FROM products WHERE id = ?', [id]);
@@ -168,13 +179,13 @@ router.delete('/:id', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
             userRole: req.user?.role,
             actionType: 'product_crud',
             title: `Producto Eliminado (ID #${id})`,
-            details: `Eliminado por el Administrador ${req.user?.name}`
+            details: `Eliminado por ${req.user?.name}`
         });
         res.json({ message: 'Producto eliminado exitosamente' });
     }
     catch (error) {
         console.error('Error al eliminar producto:', error);
-        res.status(500).json({ message: 'Error al eliminar el producto' });
+        res.status(500).json({ message: error.message || 'Error al eliminar el producto' });
     }
 });
 exports.default = router;

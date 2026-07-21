@@ -100,7 +100,7 @@ let posCouponDiscountPercent = 0;
 let posIsPending = false;
 let posInitialPayment = 0;
 let posLoadedQuotationId: number | null = null;
-let posCustomerName = 'Consumidor Final';
+let posCustomerName = 'Cliente No Registrado';
 let posCustomerCi = '';
 let posCustomerEmail = '';
 let posCustomerPhone = '';
@@ -2362,20 +2362,22 @@ async function renderAdminPOS() {
 
     panel.innerHTML = `
       <!-- Barra Superior de Acciones POS -->
-      <div class="flex justify-between align-center mb-3">
-        <div class="flex gap-2">
-          <button type="button" class="btn btn-secondary" id="open-register-customer-btn" style="background:#6366f1; border:none; color:white; font-size:12px; font-weight:700; padding:8px 14px; border-radius:8px;">
+      <div class="flex justify-between align-center mb-3" style="flex-wrap:wrap; gap:10px; background:rgba(255,255,255,0.02); padding:10px 14px; border-radius:12px; border:1px solid var(--border-glass);">
+        <div class="flex gap-2" style="flex-wrap:wrap; align-items:center;">
+          <button type="button" class="btn btn-primary" id="open-register-customer-btn" style="background:#6366f1; border:none; color:white; font-size:13px; font-weight:700; padding:8px 14px; border-radius:8px;">
             👤 Registrar Cliente
           </button>
-          ${currentUser?.role === 'admin' ? `
-            <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:12px; font-weight:700; padding:8px 14px; border-radius:8px;">
-              ➕ Nueva Venta Libre
-            </button>
-          ` : ''}
+          <button type="button" class="btn btn-secondary" id="open-id-customer-btn" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-size:13px; font-weight:700; padding:8px 14px; border-radius:8px;">
+            🆔 Buscar / Identificar Cliente
+          </button>
+          <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:13px; font-weight:700; padding:8px 14px; border-radius:8px;">
+            ➕ Nueva Venta Libre
+          </button>
         </div>
 
-        <div style="font-size:12px; color:var(--text-secondary);">
-          Vendedor: <strong>${currentUser?.name || 'Admin'}</strong>
+        <div style="font-size:13px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
+          <span>Vendedor:</span>
+          <strong style="color:white; font-size:14px;">${currentUser?.name || 'Admin'}</strong>
         </div>
       </div>
 
@@ -2461,14 +2463,14 @@ async function renderAdminPOS() {
             </div>
 
             <!-- Cliente Seleccionado -->
-            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:10px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:12px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
               <div>
-                <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cliente Factura:</div>
-                <div style="font-size:12px; font-weight:700; color:var(--primary);">
-                  👑 ${posCustomerName || 'Consumidor Final'} ${posCustomerCi ? `(${posCustomerCi})` : ''}
+                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cliente Factura:</div>
+                <div style="font-size:14px; font-weight:800; color:var(--primary);">
+                  👤 ${posCustomerName || 'Cliente No Registrado'} ${posCustomerCi ? `(${posCustomerCi})` : ''}
                 </div>
               </div>
-              <button type="button" class="btn btn-secondary" id="change-pos-client-btn" style="padding:4px 8px; font-size:10px;">
+              <button type="button" class="btn btn-secondary" id="change-pos-client-btn" style="padding:6px 12px; font-size:11px; font-weight:700;">
                 🆔 Cambiar
               </button>
             </div>
@@ -2483,10 +2485,10 @@ async function renderAdminPOS() {
             <!-- Módulo de Métodos de Pago Combinados / Mixtos (Dólares & Bolívares) -->
             <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <label class="form-label" style="font-size:10px; text-transform:uppercase; font-weight:700; margin:0; color:var(--text-muted);">
+                <label class="form-label" style="font-size:11px; text-transform:uppercase; font-weight:700; margin:0; color:var(--text-muted);">
                   💳 Métodos de Pago (Bs. & $) *
                 </label>
-                <button type="button" class="btn btn-secondary" id="add-pos-payment-line-btn" style="padding:3px 8px; font-size:10px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-weight:700;">
+                <button type="button" class="btn btn-secondary" id="add-pos-payment-line-btn" style="padding:4px 10px; font-size:11px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-weight:700;">
                   ➕ Añadir Otro Método
                 </button>
               </div>
@@ -2500,7 +2502,7 @@ async function renderAdminPOS() {
                   return `
                     <div class="pos-payment-row" data-index="${idx}" style="display:flex; flex-direction:column; gap:6px; background:rgba(0,0,0,0.25); padding:8px 10px; border-radius:8px; border:1px solid var(--border-glass);">
                       <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                        <select class="form-control pos-pay-method-select" data-index="${idx}" style="padding:4px 6px; font-size:11px; font-weight:700; flex-grow:1;">
+                        <select class="form-control pos-pay-method-select" data-index="${idx}" style="padding:6px 8px; font-size:12px; font-weight:700; flex-grow:1;">
                           <optgroup label="💵 En Dólares ($)">
                             <option value="efectivo_usd" ${line.method === 'efectivo_usd' ? 'selected' : ''}>💵 Efectivo USD ($)</option>
                             <option value="zelle" ${line.method === 'zelle' ? 'selected' : ''}>💸 Zelle ($)</option>
@@ -2516,7 +2518,7 @@ async function renderAdminPOS() {
                         </select>
 
                         ${posPaymentLines.length > 1 ? `
-                          <button type="button" class="btn btn-danger remove-pos-payment-line" data-index="${idx}" style="padding:2px 6px; font-size:10px; background:rgba(239,68,68,0.2); color:#f87171; border:none;" title="Quitar método">✕</button>
+                          <button type="button" class="btn btn-danger remove-pos-payment-line" data-index="${idx}" style="padding:4px 8px; font-size:11px; background:rgba(239,68,68,0.2); color:#f87171; border:none;" title="Quitar método">✕</button>
                         ` : ''}
                       </div>
 
@@ -2524,24 +2526,24 @@ async function renderAdminPOS() {
                         ${isVes ? `
                           <!-- Input para Bolívares -->
                           <div style="display:flex; align-items:center; gap:4px; flex-grow:1;">
-                            <span style="font-size:11px; color:#f59e0b; font-weight:800;">Bs.</span>
-                            <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-ves" data-index="${idx}" value="${line.amountVes ? line.amountVes : (line.amountUsd ? (line.amountUsd * rateUsdToVes).toFixed(2) : '')}" placeholder="0.00" style="padding:4px 6px; font-size:12px; text-align:right; font-weight:700; color:#f59e0b;">
+                            <span style="font-size:12px; color:#f59e0b; font-weight:800;">Bs.</span>
+                            <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-ves" data-index="${idx}" value="${line.amountVes ? line.amountVes : (line.amountUsd ? (line.amountUsd * rateUsdToVes).toFixed(2) : '')}" placeholder="0.00" style="padding:6px 8px; font-size:13px; text-align:right; font-weight:700; color:#f59e0b;">
                           </div>
-                          <div style="font-size:11px; color:var(--text-muted); font-weight:700; white-space:nowrap;">
-                            = <strong style="color:var(--primary);">$ ${usdEquivalent.toFixed(2)}</strong>
+                          <div style="font-size:12px; color:var(--text-muted); font-weight:700; white-space:nowrap;">
+                            = <strong style="color:var(--primary); font-size:13px;">$ ${usdEquivalent.toFixed(2)}</strong>
                           </div>
                         ` : `
                           <!-- Input para Dólares -->
                           <div style="display:flex; align-items:center; gap:4px; flex-grow:1;">
-                            <span style="font-size:11px; color:var(--primary); font-weight:800;">$</span>
-                            <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-usd" data-index="${idx}" value="${line.amountUsd ? line.amountUsd : ''}" placeholder="0.00" style="padding:4px 6px; font-size:12px; text-align:right; font-weight:700; color:var(--primary);">
+                            <span style="font-size:12px; color:var(--primary); font-weight:800;">$</span>
+                            <input type="number" step="0.01" min="0" class="form-control pos-pay-amount-usd" data-index="${idx}" value="${line.amountUsd ? line.amountUsd : ''}" placeholder="0.00" style="padding:6px 8px; font-size:13px; text-align:right; font-weight:700; color:var(--primary);">
                           </div>
-                          <div style="font-size:11px; color:var(--text-muted); font-weight:700; white-space:nowrap;">
-                            = <strong style="color:#f59e0b;">Bs. ${vesEquivalent.toFixed(2)}</strong>
+                          <div style="font-size:12px; color:var(--text-muted); font-weight:700; white-space:nowrap;">
+                            = <strong style="color:#f59e0b; font-size:13px;">Bs. ${vesEquivalent.toFixed(2)}</strong>
                           </div>
                         `}
 
-                        <button type="button" class="btn btn-secondary fill-pos-payment-balance" data-index="${idx}" style="padding:2px 6px; font-size:10px; font-weight:700; background:rgba(255,255,255,0.06);" title="Llenar saldo pendiente">
+                        <button type="button" class="btn btn-secondary fill-pos-payment-balance" data-index="${idx}" style="padding:4px 8px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.06);" title="Llenar saldo pendiente">
                           ⚡ Rellenar
                         </button>
                       </div>
@@ -2554,35 +2556,32 @@ async function renderAdminPOS() {
             <!-- Descuento Especial por Pago en Divisas ($) -->
             <div style="background:rgba(99,102,241,0.04); border:1px solid rgba(99,102,241,0.25); border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <label style="font-size:11px; font-weight:700; color:#818cf8; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                <label style="font-size:12px; font-weight:700; color:#818cf8; display:flex; align-items:center; gap:6px; cursor:pointer;">
                   <input type="checkbox" id="pos-apply-currency-discount-cb" ${posApplyCurrencyDiscount ? 'checked' : ''} style="cursor:pointer;">
                   <span>💵 Descuento Fijo por Pago en Divisas ($)</span>
                 </label>
-                <span style="font-size:9px; color:var(--text-muted); font-weight:600;">Binance: Bs. ${rateBinanceToVes.toFixed(2)} | BCV: Bs. ${rateUsdToVes.toFixed(2)}</span>
+                <span style="font-size:10px; color:var(--text-muted); font-weight:600;">Binance: Bs. ${rateBinanceToVes.toFixed(2)} | BCV: Bs. ${rateUsdToVes.toFixed(2)}</span>
               </div>
 
               ${posApplyCurrencyDiscount ? `
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:4px;">
                   <div style="display:flex; align-items:center; gap:6px;">
-                    <span style="font-size:10px; color:var(--text-muted);">% Descuento Automático:</span>
+                    <span style="font-size:11px; color:var(--text-muted);">% Descuento Automático:</span>
                     <span class="badge" style="background:rgba(99,102,241,0.15); color:#818cf8; font-weight:800; font-size:12px; padding:4px 8px; border:1px solid rgba(99,102,241,0.3);">
                       ${autoCurrencyDiscountPct.toFixed(2)}%
                     </span>
                   </div>
-                  <div style="font-size:12px; color:var(--success); font-weight:800;">
+                  <div style="font-size:13px; color:var(--success); font-weight:800;">
                     -$ ${currencyDiscountAmount.toFixed(2)}
                   </div>
-                </div>
-                <div style="font-size:9px; color:var(--text-muted); font-style:italic;">
-                  * Descuento Fijo del ${autoCurrencyDiscountPct.toFixed(2)}% (calculado por sistema) aplicado únicamente sobre $ ${totalPaidInDivisasUsd.toFixed(2)} pagados en divisas.
                 </div>
               ` : ''}
             </div>
 
             <!-- Casilla Impuesto IVA (16%) -->
-            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:10px; padding:8px 12px;">
-              <label style="font-size:11px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
-                <input type="checkbox" id="pos-apply-tax" ${posApplyTax ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px; accent-color:var(--primary);">
+            <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:10px; padding:10px 12px;">
+              <label style="font-size:12px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                <input type="checkbox" id="pos-apply-tax" ${posApplyTax ? 'checked' : ''} style="cursor:pointer; width:18px; height:18px; accent-color:var(--primary);">
                 <span>Aplica IVA (16%)</span>
               </label>
             </div>
@@ -2590,50 +2589,49 @@ async function renderAdminPOS() {
             ${currentUser?.role === 'admin' ? `
               <!-- Descuento Dual (% y $) - Solo Admin -->
               <div style="display:flex; flex-direction:column; gap:4px;">
-                <label class="form-label" style="font-size:10px; font-weight:700;">Descuento General (Admin)</label>
+                <label class="form-label" style="font-size:11px; font-weight:700;">Descuento General (Admin)</label>
                 <div style="display:flex; align-items:center; gap:6px;">
-                  <input type="number" step="0.1" min="0" max="100" class="form-control" id="pos-discount-percent" placeholder="0%" style="font-size:12px; padding:6px; text-align:right;">
+                  <input type="number" step="0.1" min="0" max="100" class="form-control" id="pos-discount-percent" placeholder="0%" style="font-size:13px; padding:6px; text-align:right;">
                   <span>=</span>
-                  <input type="number" step="0.01" min="0" class="form-control" id="pos-discount-input" placeholder="$ 0.00" value="${posDiscount > 0 ? posDiscount : ''}" style="font-size:12px; padding:6px; text-align:right;">
+                  <input type="number" step="0.01" min="0" class="form-control" id="pos-discount-input" placeholder="$ 0.00" value="${posDiscount > 0 ? posDiscount : ''}" style="font-size:13px; padding:6px; text-align:right;">
                 </div>
               </div>
             ` : ''}
 
             <!-- Sección Desplegable: Detalles del Comprobante -->
-            <div style="border:1px solid var(--border-glass); border-radius:10px; padding:8px 12px; background:rgba(255,255,255,0.01);">
-              <div id="toggle-receipt-details-btn" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:11px; font-weight:700; color:var(--text-secondary);">
+            <div style="border:1px solid var(--border-glass); border-radius:10px; padding:10px 12px; background:rgba(255,255,255,0.01);">
+              <div id="toggle-receipt-details-btn" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:12px; font-weight:700; color:var(--text-secondary);">
                 <span>Detalles del comprobante</span>
                 <span id="receipt-details-arrow">▼</span>
               </div>
 
               <div id="receipt-details-body" style="display:none; margin-top:10px; display:flex; flex-direction:column; gap:8px;">
                 <div class="form-group">
-                  <label class="form-label" style="font-size:10px;">Concepto del comprobante (Opcional)</label>
+                  <label class="form-label" style="font-size:11px;">Concepto del comprobante (Opcional)</label>
                   <input type="text" class="form-control" id="pos-concept-input" placeholder="Ej. Venta de productos / Servicios" style="font-size:12px; padding:6px 10px;">
                 </div>
                 <div class="form-group">
-                  <label class="form-label" style="font-size:10px;">Nota del comprobante (Opcional)</label>
+                  <label class="form-label" style="font-size:11px;">Nota del comprobante (Opcional)</label>
                   <textarea class="form-control" id="pos-note-input" rows="2" placeholder="Ej. Entregado en tienda..." style="font-size:12px; padding:6px 10px;"></textarea>
                 </div>
               </div>
             </div>
 
-            <!-- Resumen de Pago -->
-            <div style="border-top:1px solid var(--border-glass); padding-top:10px; display:flex; flex-direction:column; gap:4px; font-size:12px;">
-              <div style="display:flex; justify-content:space-between; color:var(--text-muted);">
-                <span>Equivalente en bolívares</span>
-                <strong style="color:#f59e0b;">Bs. ${(posTotal * rateUsdToVes).toFixed(2)}</strong>
-              </div>
+            <!-- Total Resumen con Letras Grandes -->
+            <div style="background:rgba(99,102,241,0.06); border:1px solid var(--primary); border-radius:12px; padding:14px; text-align:center; display:flex; flex-direction:column; gap:2px; margin-top:4px;">
+              <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">TOTAL A PAGAR</div>
+              <div style="font-size:36px; font-weight:900; color:var(--primary); font-family:monospace; line-height:1;">$${posTotal.toFixed(2)}</div>
+              <div style="font-size:16px; font-weight:800; color:#f59e0b; margin-top:2px;">Bs. ${(posTotal * rateUsdToVes).toFixed(2)}</div>
             </div>
 
             <!-- Botón Principal de Cobro (Crear Venta) -->
-            <div style="display:flex; gap:8px; align-items:center;">
-              <button type="button" class="btn btn-secondary" id="pos-print-preview-btn" style="padding:10px 12px; font-size:14px; background:rgba(255,255,255,0.05);" title="Imprimir / Vista Previa">
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button type="button" class="btn btn-secondary" id="pos-print-preview-btn" style="padding:14px; font-size:16px; background:rgba(255,255,255,0.06);" title="Imprimir / Vista Previa">
                 🖨️
               </button>
-              <button type="submit" class="btn btn-primary" id="pos-submit-btn" ${posCart.length === 0 ? 'disabled' : ''} style="flex-grow:1; padding:12px; font-size:14px; font-weight:800; background:#111827; border:1px solid var(--primary); display:flex; justify-content:space-between; align-items:center;">
-                <span>🛒 Crear venta</span>
-                <span style="color:var(--primary); font-size:15px;">$${posTotal.toFixed(2)} ›</span>
+              <button type="submit" class="btn btn-primary" id="pos-submit-btn" ${posCart.length === 0 ? 'disabled' : ''} style="flex-grow:1; padding:14px 18px; font-size:16px; font-weight:900; background:var(--primary); color:white; border:none; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
+                <span>🛒 Registrar Venta POS</span>
+                <span style="font-size:18px;">$${posTotal.toFixed(2)} ›</span>
               </button>
             </div>
           </form>
@@ -2892,6 +2890,16 @@ function bindPOSEvents() {
     await renderAdminPOS();
   });
 
+  document.getElementById('open-id-customer-btn')?.addEventListener('click', async () => {
+    showIdentifyCustomerModal = true;
+    await renderAdminPOS();
+  });
+
+  document.getElementById('open-free-sale-btn')?.addEventListener('click', async () => {
+    showFreeSaleModal = true;
+    await renderAdminPOS();
+  });
+
   document.getElementById('pos-id-register-btn')?.addEventListener('click', async () => {
     showRegisterCustomerModal = true;
     await renderAdminPOS();
@@ -3006,7 +3014,7 @@ function bindPOSEvents() {
       alert(`¡Cliente Identificado Con Éxito!\n\nNombre: ${customer.name}\nCédula/RIF: ${customer.ci}`);
       await renderAdminPOS();
     } catch (err: any) {
-      if (confirm(`No se encontró ningún cliente registrado con el Documento "${fullCi}".\n\n¿Desea registrarlo como NUEVO CLIENTE ahora?\n\n- Aceptar: Abrir formulario de registro completo.\n- Cancelar: Continuar venta a Consumidor Final sin registrar.`)) {
+      if (confirm(`No se encontró ningún cliente registrado con el Documento "${fullCi}".\n\n¿Desea registrarlo como NUEVO CLIENTE ahora?\n\n- Aceptar: Abrir formulario de registro completo.\n- Cancelar: Continuar venta a Cliente No Registrado.`)) {
         showIdentifyCustomerModal = false;
         showRegisterCustomerModal = true;
         await renderAdminPOS();
@@ -3018,7 +3026,7 @@ function bindPOSEvents() {
         }, 100);
       } else {
         showIdentifyCustomerModal = false;
-        posCustomerName = 'Consumidor Final';
+        posCustomerName = 'Cliente No Registrado';
         posCustomerCi = fullCi;
         posSelectedCustomerId = null;
         await renderAdminPOS();
@@ -3029,7 +3037,7 @@ function bindPOSEvents() {
   document.getElementById('pos-id-skip-btn')?.addEventListener('click', async () => {
     showIdentifyCustomerModal = false;
     posSelectedCustomerId = null;
-    posCustomerName = 'Consumidor Final';
+    posCustomerName = 'Cliente No Registrado';
     posCustomerCi = '';
     posCustomerEmail = '';
     posCustomerPhone = '';
@@ -3471,7 +3479,14 @@ function bindPOSEvents() {
   document.getElementById('pos-checkout-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const name = posCustomerName || (document.getElementById('pos-client-name') as HTMLInputElement)?.value || 'Consumidor Final';
+    // Validar identificación de cliente si aún está como Cliente No Registrado y no ha confirmado omisión
+    if (!posSelectedCustomerId && (posCustomerName === 'Cliente No Registrado' || posCustomerName === 'Consumidor Final') && !posConfirmedUnregisteredWarning) {
+      showIdentifyCustomerModal = true;
+      await renderAdminPOS();
+      return;
+    }
+
+    const name = (posCustomerName && posCustomerName !== 'Consumidor Final') ? posCustomerName : 'Cliente No Registrado';
     const email = posCustomerEmail || (document.getElementById('pos-client-email') as HTMLInputElement)?.value || undefined;
     const phone = posCustomerPhone || (document.getElementById('pos-client-phone') as HTMLInputElement)?.value || undefined;
     const ciPrefix = (document.getElementById('pos-client-ci-prefix') as HTMLSelectElement)?.value || 'V-';
@@ -3605,7 +3620,7 @@ function bindPOSEvents() {
       posIsPending = false;
       posInitialPayment = 0;
       posLoadedQuotationId = null;
-      posCustomerName = 'Consumidor Final';
+      posCustomerName = 'Cliente No Registrado';
       posCustomerCi = '';
       posCustomerEmail = '';
       posCustomerPhone = '';
@@ -3649,11 +3664,6 @@ async function addToPOSCart(product: Product) {
       return;
     }
     posCart.push({ product, quantity: 1 });
-  }
-
-  // Obligatoriamente al seleccionar un producto dar la opción para identificar / registrar al cliente si no está seleccionado
-  if (!posSelectedCustomerId && posCustomerName === 'Consumidor Final') {
-    showIdentifyCustomerModal = true;
   }
 
   await renderAdminPOS();
