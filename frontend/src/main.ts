@@ -30,6 +30,15 @@ interface POSCartItem {
 let posCart: POSCartItem[] = [];
 let posSearchQuery: string = '';
 
+// Helper de Redondeo para Evitar Artefactos de Punto Flotante (Máximo 4 Decimales)
+function roundDecimal(num: number | string | null | undefined, decimals: number = 4): number {
+  if (num === null || num === undefined || num === '') return 0;
+  const n = typeof num === 'number' ? num : parseFloat(num);
+  if (isNaN(n) || !isFinite(n)) return 0;
+  const factor = Math.pow(10, decimals);
+  return Math.round((n + Number.EPSILON) * factor) / factor;
+}
+
 // Helper de Búsqueda Inteligente (Fuzzy Search + Insensible a Mayúsculas y Acentos)
 function normalizeText(str: string): string {
   return (str || '')
@@ -702,7 +711,7 @@ function renderCheckoutModal(): string {
           </div>
           <div class="form-group mb-3">
             <label class="form-label" for="checkout-phone">WhatsApp / Telefono</label>
-            <input type="tel" class="form-control" id="checkout-phone" placeholder="Ej. +5491122334455">
+            <input type="tel" class="form-control" id="checkout-phone" placeholder="Ej. +584125374589">
             <small style="color:var(--text-muted); font-size:11px;">Codigo de pais incluido (ej. +54 o +57).</small>
           </div>
           <div class="form-group">
@@ -1506,7 +1515,7 @@ function renderAuthView(): string {
             </div>
             <div class="form-group">
               <label class="form-label" for="reg-phone">WhatsApp / Telefono</label>
-              <input type="tel" class="form-control" id="reg-phone" placeholder="Ej. +5491122334455">
+              <input type="tel" class="form-control" id="reg-phone" placeholder="Ej. +584125374589">
             </div>
             <button type="submit" class="btn btn-primary w-100 mt-4" id="reg-submit-btn">Crear Cuenta</button>
           </form>
@@ -2674,7 +2683,7 @@ async function renderAdminPOS() {
               <div class="grid-2 gap-2 mb-3">
                 <div class="form-group">
                   <label class="form-label" style="font-size: 11px; font-weight: 700;">Teléfono Principal</label>
-                  <input type="text" class="form-control" id="reg-cust-phone" placeholder="Ej. 04141234567" style="font-size: 13px;">
+                  <input type="text" class="form-control" id="reg-cust-phone" placeholder="Ej. +584125374589" style="font-size: 13px;">
                 </div>
                 <div class="form-group">
                   <label class="form-label" style="font-size: 11px; font-weight: 700;">Correo Electrónico</label>
@@ -2711,7 +2720,7 @@ async function renderAdminPOS() {
                   </div>
                   <div class="form-group">
                     <label class="form-label" style="font-size: 10px; font-weight: 700;">Teléfono Encargado</label>
-                    <input type="text" class="form-control" id="reg-cust-rep-phone" placeholder="Ej. 04129876543" style="font-size: 12px;">
+                    <input type="text" class="form-control" id="reg-cust-rep-phone" placeholder="Ej. +584125374589" style="font-size: 12px;">
                   </div>
                 </div>
 
@@ -4010,29 +4019,29 @@ function bindProductCRUDEvents() {
 
     if (!isNaN(bcvCost) && bcvCost > 0) {
       // Usar costo en Dólar BCV directamente
-      finalPriceBcv = bcvCost * (1 + profitMargin / 100);
+      finalPriceBcv = roundDecimal(bcvCost * (1 + profitMargin / 100), 4);
       markupPercent = 0; // Sin recargo adicional
     } else if (!isNaN(blackCost) && blackCost > 0 && bcvRate > 0 && binanceRate > 0) {
       // Usar costo en Dólar Negro con recargo diferencial
       const costUsdBcv = blackCost * (binanceRate / bcvRate);
-      finalPriceBcv = costUsdBcv * (1 + profitMargin / 100);
+      finalPriceBcv = roundDecimal(costUsdBcv * (1 + profitMargin / 100), 4);
     }
 
     const markupDisplay = document.getElementById('calc-markup-percent') as HTMLInputElement;
     if (markupDisplay) {
-      markupDisplay.value = `${markupPercent >= 0 ? '+' : ''}${markupPercent.toFixed(2)}%`;
+      markupDisplay.value = `${markupPercent >= 0 ? '+' : ''}${roundDecimal(markupPercent, 2).toFixed(2)}%`;
     }
 
     if (finalPriceBcv > 0) {
       const priceDisplay = document.getElementById('calc-result-price-display');
       if (priceDisplay) {
-        priceDisplay.innerText = `$${finalPriceBcv.toFixed(2)}`;
+        priceDisplay.innerText = `$${roundDecimal(finalPriceBcv, 2).toFixed(2)}`;
       }
 
       // Auto-llenar el input de precio final del producto
       const prodPriceInput = document.getElementById('prod-price') as HTMLInputElement;
       if (prodPriceInput) {
-        prodPriceInput.value = finalPriceBcv.toFixed(2);
+        prodPriceInput.value = roundDecimal(finalPriceBcv, 2).toFixed(2);
       }
     }
   }
@@ -5510,7 +5519,7 @@ async function renderAdminStaff() {
             <div class="grid-2">
               <div class="form-group">
                 <label class="form-label" for="staff-phone">Teléfono / WhatsApp</label>
-                <input type="text" class="form-control" id="staff-phone" placeholder="Ej. +584120000000">
+                <input type="text" class="form-control" id="staff-phone" placeholder="Ej. +584125374589">
               </div>
               <div class="form-group">
                 <label class="form-label" for="staff-ci-num">Cédula de Identidad</label>

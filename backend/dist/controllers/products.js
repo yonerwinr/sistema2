@@ -88,6 +88,7 @@ router.post('/', auth_1.authenticate, canManageProducts, async (req, res) => {
         return res.status(400).json({ message: 'Nombre, precio e inventario son obligatorios' });
     }
     const cleanCode = (code && typeof code === 'string' && code.trim()) ? code.trim() : null;
+    const cleanPrice = Math.round((parseFloat(price) + Number.EPSILON) * 10000) / 10000;
     try {
         // Validar código duplicado si se proporciona
         if (cleanCode) {
@@ -96,21 +97,21 @@ router.post('/', auth_1.authenticate, canManageProducts, async (req, res) => {
                 return res.status(400).json({ message: `El código "${cleanCode}" ya está registrado por otro producto` });
             }
         }
-        const [result] = await db_1.default.query('INSERT INTO products (code, name, description, price, stock, image_url, category) VALUES (?, ?, ?, ?, ?, ?, ?)', [cleanCode, name, description || null, price, stock, image_url || null, category || null]);
+        const [result] = await db_1.default.query('INSERT INTO products (code, name, description, price, stock, image_url, category) VALUES (?, ?, ?, ?, ?, ?, ?)', [cleanCode, name, description || null, cleanPrice, stock, image_url || null, category || null]);
         (0, audit_1.logAuditEvent)({
             userId: req.user?.id,
             userName: req.user?.name,
             userRole: req.user?.role,
             actionType: 'product_crud',
             title: `Nuevo Producto Creado: ${name}`,
-            details: `Precio: $${price}, Stock: ${stock}, Categoría: ${category || 'General'}`
+            details: `Precio: $${cleanPrice}, Stock: ${stock}, Categoría: ${category || 'General'}`
         });
         res.status(201).json({
             id: result.insertId,
             code: cleanCode,
             name,
             description,
-            price,
+            price: cleanPrice,
             stock,
             image_url,
             category
@@ -129,6 +130,7 @@ router.put('/:id', auth_1.authenticate, canManageProducts, async (req, res) => {
         return res.status(400).json({ message: 'Nombre, precio e inventario son obligatorios' });
     }
     const cleanCode = (code && typeof code === 'string' && code.trim()) ? code.trim() : null;
+    const cleanPrice = Math.round((parseFloat(price) + Number.EPSILON) * 10000) / 10000;
     try {
         // Validar código duplicado si se proporciona y no es del mismo producto
         if (cleanCode) {
@@ -137,7 +139,7 @@ router.put('/:id', auth_1.authenticate, canManageProducts, async (req, res) => {
                 return res.status(400).json({ message: `El código "${cleanCode}" ya está registrado por otro producto` });
             }
         }
-        const [result] = await db_1.default.query('UPDATE products SET code = ?, name = ?, description = ?, price = ?, stock = ?, image_url = ?, category = ? WHERE id = ?', [cleanCode, name, description || null, price, stock, image_url || null, category || null, id]);
+        const [result] = await db_1.default.query('UPDATE products SET code = ?, name = ?, description = ?, price = ?, stock = ?, image_url = ?, category = ? WHERE id = ?', [cleanCode, name, description || null, cleanPrice, stock, image_url || null, category || null, id]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Producto no encontrado' });
         }
@@ -147,7 +149,7 @@ router.put('/:id', auth_1.authenticate, canManageProducts, async (req, res) => {
             userRole: req.user?.role,
             actionType: 'product_crud',
             title: `Producto Actualizado (ID #${id}): ${name}`,
-            details: `Nuevo precio: $${price}, Nuevo stock: ${stock}, Categoría: ${category || 'General'}`
+            details: `Nuevo precio: $${cleanPrice}, Nuevo stock: ${stock}, Categoría: ${category || 'General'}`
         });
         res.json({
             id: parseInt(id),

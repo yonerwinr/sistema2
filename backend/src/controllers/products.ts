@@ -96,6 +96,7 @@ router.post('/', authenticate, canManageProducts, async (req: AuthRequest, res: 
   }
 
   const cleanCode = (code && typeof code === 'string' && code.trim()) ? code.trim() : null;
+  const cleanPrice = Math.round((parseFloat(price) + Number.EPSILON) * 10000) / 10000;
 
   try {
     // Validar código duplicado si se proporciona
@@ -108,7 +109,7 @@ router.post('/', authenticate, canManageProducts, async (req: AuthRequest, res: 
 
     const [result]: any = await pool.query(
       'INSERT INTO products (code, name, description, price, stock, image_url, category) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [cleanCode, name, description || null, price, stock, image_url || null, category || null]
+      [cleanCode, name, description || null, cleanPrice, stock, image_url || null, category || null]
     );
 
     logAuditEvent({
@@ -117,7 +118,7 @@ router.post('/', authenticate, canManageProducts, async (req: AuthRequest, res: 
       userRole: req.user?.role,
       actionType: 'product_crud',
       title: `Nuevo Producto Creado: ${name}`,
-      details: `Precio: $${price}, Stock: ${stock}, Categoría: ${category || 'General'}`
+      details: `Precio: $${cleanPrice}, Stock: ${stock}, Categoría: ${category || 'General'}`
     });
 
     res.status(201).json({
@@ -125,7 +126,7 @@ router.post('/', authenticate, canManageProducts, async (req: AuthRequest, res: 
       code: cleanCode,
       name,
       description,
-      price,
+      price: cleanPrice,
       stock,
       image_url,
       category
@@ -146,6 +147,7 @@ router.put('/:id', authenticate, canManageProducts, async (req: AuthRequest, res
   }
 
   const cleanCode = (code && typeof code === 'string' && code.trim()) ? code.trim() : null;
+  const cleanPrice = Math.round((parseFloat(price) + Number.EPSILON) * 10000) / 10000;
 
   try {
     // Validar código duplicado si se proporciona y no es del mismo producto
@@ -158,7 +160,7 @@ router.put('/:id', authenticate, canManageProducts, async (req: AuthRequest, res
 
     const [result]: any = await pool.query(
       'UPDATE products SET code = ?, name = ?, description = ?, price = ?, stock = ?, image_url = ?, category = ? WHERE id = ?',
-      [cleanCode, name, description || null, price, stock, image_url || null, category || null, id]
+      [cleanCode, name, description || null, cleanPrice, stock, image_url || null, category || null, id]
     );
 
     if (result.affectedRows === 0) {
@@ -171,7 +173,7 @@ router.put('/:id', authenticate, canManageProducts, async (req: AuthRequest, res
       userRole: req.user?.role,
       actionType: 'product_crud',
       title: `Producto Actualizado (ID #${id}): ${name}`,
-      details: `Nuevo precio: $${price}, Nuevo stock: ${stock}, Categoría: ${category || 'General'}`
+      details: `Nuevo precio: $${cleanPrice}, Nuevo stock: ${stock}, Categoría: ${category || 'General'}`
     });
 
     res.json({
