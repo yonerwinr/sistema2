@@ -194,6 +194,11 @@ router.post('/checkout', async (req: AuthRequest, res) => {
       message: 'Venta registrada con exito',
       saleId,
       total: finalTotal,
+      discount: discount || 0,
+      tax: tax || 0,
+      coupon_code: couponCode || null,
+      concept: null,
+      note: null,
       whatsappText: encodeURIComponent(waText),
       emailPreviewUrl: ''
     });
@@ -437,6 +442,11 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
       message: isQuotation ? 'Cotización registrada con éxito' : 'Venta POS registrada con éxito',
       saleId,
       total: finalTotal,
+      discount: discount || 0,
+      tax: tax || 0,
+      coupon_code: couponCode || null,
+      concept: concept || null,
+      note: note || null,
       whatsappText: encodeURIComponent(waText),
       emailPreviewUrl: ''
     });

@@ -341,13 +341,22 @@ export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[],
                   <td style="padding: 6px 0; color: #f59e0b; font-weight: 700;">TOTAL Bs. (BCV):</td>
                   <td style="padding: 6px 0; text-align: right; font-weight: 700; color: #f59e0b;">Bs. ${(Number(sale.total) * rateUsdToVes).toFixed(2)}</td>
                 </tr>
+                ${sale.coupon_code ? `
                 <tr>
-                  <td style="padding: 4px 0; color: #64748b; font-size: 11px;">Equivalente EUR (€):</td>
-                  <td style="padding: 4px 0; text-align: right; color: #64748b; font-size: 11px;">€ ${((Number(sale.total) * rateUsdToVes) / rateEurToVes).toFixed(2)}</td>
+                  <td style="padding: 4px 0; color: #64748b; font-size: 11px;">Cupón aplicado:</td>
+                  <td style="padding: 4px 0; text-align: right; color: #64748b; font-size: 11px;">${sale.coupon_code}</td>
                 </tr>
+                ` : ''}
               </table>
               <div style="clear: both;"></div>
             </div>
+            
+            ${sale.concept || sale.note ? `
+            <div style="margin-top: 24px; padding: 16px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #edf2f7; font-size: 13px; color: #4a5568;">
+              ${sale.concept ? `<div style="margin-bottom: 8px;"><strong>Concepto / Descripción:</strong> ${sale.concept}</div>` : ''}
+              ${sale.note ? `<div><strong>Nota Adicional:</strong> ${sale.note}</div>` : ''}
+            </div>
+            ` : ''}
           </div>
           <div class="footer">
             <p>Este es un correo automático generado por FacilitoApp 🐒.</p>
@@ -374,8 +383,9 @@ ${items.map(item => `- ${item.name} x${item.quantity} ($${Number(item.price).toF
 
 -----------------------------------------
 SUBTOTAL: $${subtotal.toFixed(2)}
-${Number(sale.discount) > 0 ? `DESCUENTO: -$${Number(sale.discount).toFixed(2)}\n` : ''}${Number(sale.tax) > 0 ? `IVA (16%): $${Number(sale.tax).toFixed(2)}\n` : ''}TOTAL: $${Number(sale.total).toFixed(2)}
-=========================================
+${Number(sale.discount) > 0 ? `DESCUENTO: -$${Number(sale.discount).toFixed(2)}\n` : ''}${Number(sale.tax) > 0 ? `IVA (16%): $${Number(sale.tax).toFixed(2)}\n` : ''}${sale.coupon_code ? `CUPÓN: ${sale.coupon_code}\n` : ''}TOTAL: $${Number(sale.total).toFixed(2)}
+TOTAL Bs.: Bs. ${(Number(sale.total) * rateUsdToVes).toFixed(2)}
+${sale.concept ? `CONCEPTO: ${sale.concept}\n` : ''}${sale.note ? `NOTA: ${sale.note}\n` : ''}=========================================
 Este es un correo automático generado por FacilitoApp 🐒.
 © ${new Date().getFullYear()} FacilitoApp. Todos los derechos reservados.
     `;

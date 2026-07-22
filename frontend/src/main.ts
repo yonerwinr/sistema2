@@ -992,16 +992,20 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       const width = 450;
       const rowHeight = 30;
-      const headerHeight = loaded ? 200 : 130;
+      const headerHeight = loaded ? 220 : 130;
       const clientHeight = 110;
       const footerHeight = 100;
       const itemsHeight = items.length * rowHeight;
       
       const discountVal = Number(sale.discount || 0);
       const taxVal = Number(sale.tax || 0);
+      const couponCode = sale.coupon_code;
       let extraHeight = 0;
       if (discountVal > 0) extraHeight += 18;
       if (taxVal > 0) extraHeight += 18;
+      if (couponCode) extraHeight += 18;
+      if (sale.concept) extraHeight += 40;
+      if (sale.note) extraHeight += 40;
       
       const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight + extraHeight + 40;
 
@@ -1019,11 +1023,13 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       let textY = 45;
 
-      // Dibujar Logo si se cargó con éxito
+      // Dibujar Logo si se cargó con éxito - Con mayor tamaño y calidad
       if (loaded) {
         try {
-          ctx.drawImage(logoImg, width / 2 - 30, 20, 60, 60);
-          textY = 110;
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(logoImg, width / 2 - 40, 15, 80, 80);
+          textY = 135;
         } catch (e) {
           console.error('Error dibujando el logo en la factura:', e);
         }
@@ -1169,6 +1175,16 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
         ctx.fillStyle = '#475569';
       }
       
+      // Dibujar Cupón
+      if (couponCode) {
+        y += 18;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#0f172a';
+        ctx.fillText(`Cupón (${couponCode})`, 30, y);
+        ctx.textAlign = 'right';
+        ctx.fillText('Aplicado', width - 30, y);
+      }
+      
       // Dibujar IVA 16%
       if (taxVal > 0) {
         y += 18;
@@ -1197,7 +1213,6 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       ctx.fillText(`$${Number(sale.total).toFixed(2)}`, width - 30, y);
 
       const totalVes = Number(sale.total) * rateUsdToVes;
-      const totalEur = totalVes / rateEurToVes;
 
       y += 18;
       ctx.textAlign = 'left';
@@ -1208,14 +1223,37 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       ctx.textAlign = 'right';
       ctx.fillText(`Bs. ${totalVes.toFixed(2)}`, width - 30, y);
 
-      y += 16;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#475569';
-      ctx.font = '10px Outfit, Segoe UI';
-      ctx.fillText('Equivalente EUR (€)', 30, y);
+      // Dibujar Concepto / Descripción si existe
+      if (sale.concept) {
+        y += 22;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#475569';
+        ctx.font = 'bold 10px Outfit, Segoe UI';
+        ctx.fillText('CONCEPTO / DESCRIPCIÓN:', 30, y);
+        
+        y += 15;
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '11px Outfit, Segoe UI';
+        let conceptText = sale.concept;
+        if (conceptText.length > 55) conceptText = conceptText.substring(0, 52) + '...';
+        ctx.fillText(conceptText, 30, y);
+      }
 
-      ctx.textAlign = 'right';
-      ctx.fillText(`€ ${totalEur.toFixed(2)}`, width - 30, y);
+      // Dibujar Nota si existe
+      if (sale.note) {
+        y += 22;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#475569';
+        ctx.font = 'bold 10px Outfit, Segoe UI';
+        ctx.fillText('NOTA ADICIONAL:', 30, y);
+        
+        y += 15;
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '11px Outfit, Segoe UI';
+        let noteText = sale.note;
+        if (noteText.length > 55) noteText = noteText.substring(0, 52) + '...';
+        ctx.fillText(noteText, 30, y);
+      }
 
       // Divisor
       y += 20;
@@ -1314,11 +1352,9 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
   if (totalEl) {
     const totalUsd = Number(result.total);
     const totalVes = totalUsd * rateUsdToVes;
-    const totalEur = totalVes / rateEurToVes;
     totalEl.innerHTML = `
       <div style="font-size:24px; color:var(--primary); font-weight:700;">$${totalUsd.toFixed(2)}</div>
       <div style="font-size:15px; color:#f59e0b; font-weight:600; margin-top:2px;">Bs. ${totalVes.toFixed(2)}</div>
-      <div style="font-size:11px; color:var(--text-muted); font-weight:500;">€ ${totalEur.toFixed(2)}</div>
     `;
   }
   if (idEl) idEl.innerText = `ID de Venta: #${result.saleId}`;
@@ -1356,6 +1392,11 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
           payment_method: payMethod,
           type: saleType,
           seller_name: currentUser?.name || 'Online',
+          discount: result.discount || 0,
+          tax: result.tax || 0,
+          coupon_code: result.coupon_code || null,
+          concept: result.concept || null,
+          note: result.note || null,
           created_at: new Date()
         };
         const blob = await generateReceiptPNG(saleMock, purchaseItems || []);
@@ -1444,6 +1485,11 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
         payment_method: payMethod,
         type: saleType,
         seller_name: currentUser?.name || 'Online',
+        discount: result.discount || 0,
+        tax: result.tax || 0,
+        coupon_code: result.coupon_code || null,
+        concept: result.concept || null,
+        note: result.note || null,
         created_at: new Date()
       };
 
@@ -4977,11 +5023,9 @@ function showSaleDetails(details: SaleDetail) {
   if (totalVal) {
     const totalUsd = Number(sale.total);
     const totalVes = totalUsd * rateUsdToVes;
-    const totalEur = totalVes / rateEurToVes;
     totalVal.innerHTML = `
       <div style="font-size:22px; color:var(--primary); font-weight:700;">$${totalUsd.toFixed(2)}</div>
       <div style="font-size:14px; color:#f59e0b; font-weight:600;">Bs. ${totalVes.toFixed(2)}</div>
-      <div style="font-size:11px; color:var(--text-muted); font-weight:500;">Equiv. € ${totalEur.toFixed(2)}</div>
     `;
   }
 
