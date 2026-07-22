@@ -22,6 +22,9 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
     transporter = nodemailer.createTransport({
       ...(isGmail ? { service: 'gmail' } : { host, port, secure: port === 465 }),
       auth: { user, pass },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
       tls: {
         rejectUnauthorized: false
       }
