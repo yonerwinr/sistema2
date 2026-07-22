@@ -911,6 +911,7 @@ function renderInvoiceSuccessModal(): string {
   return `
     <div class="modal-overlay" id="success-modal">
       <div class="modal-content text-center animate-on-scroll animate-zoom-in visible" style="max-width: 450px;">
+        <button class="modal-close" id="success-close-x">&times;</button>
         <div class="success-icon">✓</div>
         <h2 class="mb-2" style="font-size:24px; font-weight:700;">¡Compra Realizada!</h2>
         <p style="color:var(--text-secondary); font-size:14px;" class="mb-4">
@@ -1540,10 +1541,12 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
 }
 
 function bindSuccessEvents() {
-  document.getElementById('success-close-btn')?.addEventListener('click', () => {
+  const closeModal = () => {
     document.getElementById('success-modal')?.classList.remove('open');
     navigate('store');
-  });
+  };
+  document.getElementById('success-close-btn')?.addEventListener('click', closeModal);
+  document.getElementById('success-close-x')?.addEventListener('click', closeModal);
 
   // Copiar al Portapapeles
   document.getElementById('success-copy-btn')?.addEventListener('click', () => {
@@ -2771,6 +2774,7 @@ async function renderAdminPOS() {
       ${showRegisterCustomerModal ? `
         <div class="modal-overlay open" id="register-customer-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
           <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 520px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827; max-height:90vh; overflow-y:auto;">
+            <button class="modal-close" id="close-register-customer-x">&times;</button>
             <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">👤</div>
             <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Registrar Nuevo Cliente</h3>
             <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
@@ -2859,6 +2863,7 @@ async function renderAdminPOS() {
       ${showIdentifyCustomerModal ? `
         <div class="modal-overlay open" id="identify-customer-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
           <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 490px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827;">
+            <button class="modal-close" id="pos-id-close-x">&times;</button>
             <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">🆔</div>
             <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Validar / Identificar Cliente</h3>
             <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
@@ -2899,6 +2904,7 @@ async function renderAdminPOS() {
       ${showFreeSaleModal ? `
         <div class="modal-overlay open" id="free-sale-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
           <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 440px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid var(--border-glass); background: #111827;">
+            <button class="modal-close" id="close-free-sale-x">&times;</button>
             <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">➕</div>
             <h3 style="font-size: 18px; font-weight: 800; text-align: center; margin-bottom: 4px; color: #f59e0b;">Agregar Venta Libre</h3>
             <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
@@ -2934,6 +2940,7 @@ async function renderAdminPOS() {
       <!-- Modal de Advertencia por Cliente No Registrado -->
       <div class="modal-overlay" id="unregistered-warning-modal" style="display: none; z-index: 999999; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
         <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 480px; width: 90%; padding: 28px; border-radius: 16px; border: 1px solid rgba(239, 68, 68, 0.5); background: #111827;">
+          <button class="modal-close" id="cancel-unregistered-sale-x">&times;</button>
           <div style="font-size: 42px; text-align: center; margin-bottom: 6px;">⚠️</div>
           <h3 style="font-size: 20px; font-weight: 800; text-align: center; color: var(--danger); margin-bottom: 6px;">Advertencia de Cliente No Registrado</h3>
           <p style="font-size: 12px; color: var(--text-secondary); text-align: center; line-height: 1.5; margin-bottom: 18px;">
@@ -2958,6 +2965,7 @@ async function renderAdminPOS() {
       ${showExpenseModal ? `
         <div class="modal-overlay open" id="expense-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
           <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 440px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid rgba(239, 68, 68, 0.4); background: #111827;">
+            <button class="modal-close" id="close-expense-x">&times;</button>
             <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">🔴</div>
             <h3 style="font-size: 18px; font-weight: 800; text-align: center; margin-bottom: 4px; color: #f87171;">Registrar Nuevo Gasto de Caja</h3>
             <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
@@ -3038,10 +3046,12 @@ function bindPOSEvents() {
     await renderAdminPOS();
   });
 
-  document.getElementById('close-register-customer-btn')?.addEventListener('click', async () => {
+  const closeRegCustomer = async () => {
     showRegisterCustomerModal = false;
     await renderAdminPOS();
-  });
+  };
+  document.getElementById('close-register-customer-btn')?.addEventListener('click', closeRegCustomer);
+  document.getElementById('close-register-customer-x')?.addEventListener('click', closeRegCustomer);
 
   // Mostrar / ocultar datos del encargado al cambiar tipo de documento (J- o G-)
   const ciPrefixSelect = document.getElementById('reg-cust-ci-prefix') as HTMLSelectElement;
@@ -3167,7 +3177,7 @@ function bindPOSEvents() {
     }
   });
 
-  document.getElementById('pos-id-skip-btn')?.addEventListener('click', async () => {
+  const skipIdentifyCustomer = async () => {
     showIdentifyCustomerModal = false;
     posSelectedCustomerId = null;
     posCustomerName = 'Cliente No Registrado';
@@ -3175,7 +3185,9 @@ function bindPOSEvents() {
     posCustomerEmail = '';
     posCustomerPhone = '';
     await renderAdminPOS();
-  });
+  };
+  document.getElementById('pos-id-skip-btn')?.addEventListener('click', skipIdentifyCustomer);
+  document.getElementById('pos-id-close-x')?.addEventListener('click', skipIdentifyCustomer);
 
   document.getElementById('change-pos-client-btn')?.addEventListener('click', async () => {
     showIdentifyCustomerModal = true;
@@ -3360,10 +3372,12 @@ function bindPOSEvents() {
     await renderAdminPOS();
   });
 
-  document.getElementById('close-expense-btn')?.addEventListener('click', async () => {
+  const closeExpense = async () => {
     showExpenseModal = false;
     await renderAdminPOS();
-  });
+  };
+  document.getElementById('close-expense-btn')?.addEventListener('click', closeExpense);
+  document.getElementById('close-expense-x')?.addEventListener('click', closeExpense);
 
   document.getElementById('expense-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -3400,10 +3414,12 @@ function bindPOSEvents() {
     await renderAdminPOS();
   });
 
-  document.getElementById('close-free-sale-btn')?.addEventListener('click', async () => {
+  const closeFreeSale = async () => {
     showFreeSaleModal = false;
     await renderAdminPOS();
-  });
+  };
+  document.getElementById('close-free-sale-btn')?.addEventListener('click', closeFreeSale);
+  document.getElementById('close-free-sale-x')?.addEventListener('click', closeFreeSale);
 
   document.getElementById('free-sale-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -3434,15 +3450,19 @@ function bindPOSEvents() {
   });
 
   // Eventos Modal de Advertencia Cliente No Registrado
-  document.getElementById('cancel-unregistered-sale-btn')?.addEventListener('click', () => {
+  const closeUnregisteredWarning = () => {
     const warningModal = document.getElementById('unregistered-warning-modal');
     if (warningModal) warningModal.style.display = 'none';
+  };
+  document.getElementById('cancel-unregistered-sale-btn')?.addEventListener('click', () => {
+    closeUnregisteredWarning();
     const nameInput = document.getElementById('pos-client-name') as HTMLInputElement;
     if (nameInput) {
       nameInput.focus();
       nameInput.select();
     }
   });
+  document.getElementById('cancel-unregistered-sale-x')?.addEventListener('click', closeUnregisteredWarning);
 
   document.getElementById('confirm-unregistered-sale-btn')?.addEventListener('click', () => {
     const warningModal = document.getElementById('unregistered-warning-modal');
@@ -6335,6 +6355,7 @@ async function renderAdminCustomers() {
       ${showEditCustomerModal && editingCustomer ? `
         <div class="modal-overlay open" id="edit-customer-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
           <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 540px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827; max-height:90vh; overflow-y:auto;">
+            <button class="modal-close" id="close-edit-customer-x">&times;</button>
             <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">✏️</div>
             <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Editar Cliente</h3>
             <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
@@ -6421,14 +6442,14 @@ async function renderAdminCustomers() {
       ${showCustomerHistoryModal && customerHistoryData && currentUser?.role === 'admin' ? `
         <div class="modal-overlay open" id="customer-history-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
           <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 820px; width: 94%; padding: 24px; border-radius: 16px; border: 1px solid #10b981; background: #111827; max-height:90vh; overflow-y:auto;">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:12px; margin-bottom:16px;">
+            <button class="modal-close" id="close-customer-history-btn">&times;</button>
+            <div style="border-bottom:1px solid var(--border-glass); padding-bottom:12px; margin-bottom:16px;">
               <div>
                 <h3 style="font-size: 20px; font-weight: 800; color: #10b981; margin:0;">📜 Historial de Compras del Cliente</h3>
                 <div style="font-size: 13px; font-weight: 700; color: white; margin-top:2px;">
                   ${customerHistoryData.customer.name} <span style="color:var(--text-muted); font-weight:600;">(${customerHistoryData.customer.ci || 'Sin Cédula'})</span>
                 </div>
               </div>
-              <button type="button" id="close-customer-history-btn" style="background:none; border:none; color:var(--text-muted); font-size:24px; cursor:pointer;">✕</button>
             </div>
 
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
@@ -6535,11 +6556,13 @@ function bindCustomersEvents() {
   });
 
   // Cerrar Modal Editar Cliente
-  document.getElementById('close-edit-customer-btn')?.addEventListener('click', async () => {
+  const closeEditCustomer = async () => {
     showEditCustomerModal = false;
     editingCustomer = null;
     await renderAdminCustomers();
-  });
+  };
+  document.getElementById('close-edit-customer-btn')?.addEventListener('click', closeEditCustomer);
+  document.getElementById('close-edit-customer-x')?.addEventListener('click', closeEditCustomer);
 
   // Guardar Edición de Cliente
   document.getElementById('edit-customer-form')?.addEventListener('submit', async (e) => {
