@@ -221,8 +221,17 @@ async function runMigrations() {
             const [prodCols] = await conn.query('SHOW COLUMNS FROM products');
             const prodColNames = prodCols.map((c) => c.Field);
             if (!prodColNames.includes('code')) {
-                await conn.query('ALTER TABLE products ADD COLUMN code VARCHAR(50) NULL UNIQUE');
+                // En TiDB no se permite agregar columna con CONSTRAINT UNIQUE en la misma sentencia,
+                // por lo que agregamos la columna primero y luego creamos el índice UNIQUE por separado.
+                await conn.query('ALTER TABLE products ADD COLUMN code VARCHAR(50) NULL');
                 console.log('Columna "code" agregada a la tabla products.');
+                try {
+                    await conn.query('ALTER TABLE products ADD UNIQUE INDEX (code)');
+                    console.log('Índice UNIQUE agregado a la columna "code" de products.');
+                }
+                catch (idxErr) {
+                    console.error('Error al agregar índice UNIQUE a la columna code:', idxErr.message);
+                }
             }
         }
         catch (err) {
