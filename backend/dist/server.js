@@ -31,7 +31,16 @@ app.use('/api/stats', stats_1.default);
 app.use('/api/expenses', expenses_1.default);
 // Ruta raiz de prueba
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Servidor FacilitoApp funcionando correctamente 🐒' });
+    res.json({
+        status: 'ok',
+        message: 'Servidor FacilitoApp funcionando correctamente 🐒',
+        smtp: {
+            host: process.env.SMTP_HOST || 'NOT_DEFINED',
+            user: process.env.SMTP_USER || 'NOT_DEFINED',
+            hasPass: !!process.env.SMTP_PASS,
+            from: process.env.SMTP_FROM || 'NOT_DEFINED'
+        }
+    });
 });
 // Función de migraciones automáticas
 async function runMigrations() {
