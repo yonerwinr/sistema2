@@ -772,7 +772,7 @@ router.post('/:id/resend-email', auth_1.authenticate, async (req, res) => {
     }
     catch (error) {
         console.error('Error al reenviar factura por correo:', error);
-        res.status(500).json({ message: 'Error al reenviar la factura por correo', error: error.message });
+        res.status(500).json({ message: `Error al reenviar la factura por correo: ${error.message}` });
     }
 });
 // Obtener configuraciones de recordatorios de deudores (Solo Admin)
