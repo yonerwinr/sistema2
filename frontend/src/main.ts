@@ -1287,7 +1287,7 @@ async function shareInvoiceAsImage(sale: any, items: any[], clientPhone: string,
     }
     
     // Mensaje de agradecimiento amigable y profesional
-    const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${sale.id} por un total de $${Number(sale.total).toFixed(2)}.\n\n*(Pega la factura presionando Ctrl + V o manteniendo presionado y seleccionando Pegar).*`;
+    const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${sale.id} por un total de $${Number(sale.total).toFixed(2)}.`;
     const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMessage)}`;
     
     if (newWindow) {
@@ -1326,7 +1326,7 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
   // WhatsApp Link - Configurado para abrir directamente y evitar popup blocker
   const decodedText = decodeURIComponent(result.whatsappText);
   const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
-  const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${result.saleId} por un total de $${Number(result.total).toFixed(2)}.\n\n*(Pega la factura presionando Ctrl + V o manteniendo presionado y seleccionando Pegar).*`;
+  const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${result.saleId} por un total de $${Number(result.total).toFixed(2)}.`;
   const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMessage)}`;
   
   waBtn.href = waUrl;
@@ -4999,7 +4999,7 @@ function showSaleDetails(details: SaleDetail) {
 
   // Enlace a WhatsApp (Re-envío) - Configurado directamente
   const phoneNum = sale.customer_phone ? sale.customer_phone.replace(/\+/g, '').replace(/\s/g, '') : '';
-  const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${sale.id} por un total de $${Number(sale.total).toFixed(2)}.\n\n*(Pega la factura presionando Ctrl + V o manteniendo presionado y seleccionando Pegar).*`;
+  const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${sale.id} por un total de $${Number(sale.total).toFixed(2)}.`;
   const waUrl = `https://wa.me/${phoneNum}?text=${encodeURIComponent(waMessage)}`;
   
   waBtn.href = waUrl;
