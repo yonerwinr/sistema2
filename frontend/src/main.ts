@@ -312,9 +312,9 @@ function renderNavbar(): string {
   return `
     <div class="exchange-rate-banner" style="background: rgba(16,185,129,0.06); border-bottom: 1px solid var(--border-glass); padding: 6px 0; font-size: 11px; font-weight: 600; text-align: center; color: var(--success); display: flex; justify-content: center; gap: 16px; align-items:center;">
       <span>💵 Tasa Oficial (BCV):</span>
-      <span>Dólar $: <strong>Bs. ${rateUsdToVes.toFixed(2)}</strong></span>
+      <span>Dólar $: <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
       <span style="color:var(--text-muted);">|</span>
-      <span>Euro €: <strong>Bs. ${rateEurToVes.toFixed(2)}</strong></span>
+      <span>Euro €: <strong>Bs. ${formatRate(rateEurToVes)}</strong></span>
     </div>
     <nav class="navbar">
       <div class="container navbar-container">
@@ -772,7 +772,7 @@ function renderCheckoutModal(): string {
               <span>Bs. ${(cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0) * rateUsdToVes).toFixed(2)}</span>
             </div>
             <small style="color: var(--text-muted); font-size:10px; display:block; margin-top:6px; line-height:1.2;">
-              * Tasa oficial de cambio (BCV): 1 USD = Bs. ${rateUsdToVes.toFixed(2)}. Si aplicas un cupón de descuento, el descuento se calculará sobre el total de tu factura.
+              * Tasa oficial de cambio (BCV): 1 USD = Bs. ${formatRate(rateUsdToVes)}. Si aplicas un cupón de descuento, el descuento se calculará sobre el total de tu factura.
             </small>
           </div>
           
@@ -980,6 +980,17 @@ function renderInvoiceSuccessModal(): string {
   `;
 }
 
+function formatRate(num: number): string {
+  const str = Number(num).toFixed(4);
+  if (str.endsWith('00')) {
+    return Number(num).toFixed(2);
+  }
+  if (str.endsWith('0')) {
+    return Number(num).toFixed(3);
+  }
+  return str;
+}
+
 function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
   return new Promise((resolve, reject) => {
     // Cargar la imagen del logotipo
@@ -1170,7 +1181,8 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
         y += 18;
         ctx.textAlign = 'left';
         ctx.fillStyle = '#b91c1c'; // Rojo oscuro
-        ctx.fillText('Descuento', 30, y);
+        const pctVal = (discountVal / subtotalVal) * 100;
+        ctx.fillText(`Descuento (${pctVal.toFixed(1)}%)`, 30, y);
         ctx.textAlign = 'right';
         ctx.fillText(`-$${discountVal.toFixed(2)}`, width - 30, y);
         ctx.fillStyle = '#475569';
@@ -1974,15 +1986,15 @@ function renderAdminDashboard(): string {
             <div style="display:flex; flex-direction:column; gap:6px;">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
                 <span>$ BCV:</span>
-                <input type="number" step="any" inputmode="decimal" id="rate-usd-input" value="${rateUsdToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
+                <input type="number" step="0.0001" inputmode="decimal" id="rate-usd-input" value="${formatRate(rateUsdToVes)}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
                 <span>€ BCV:</span>
-                <input type="number" step="any" inputmode="decimal" id="rate-eur-input" value="${rateEurToVes}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
+                <input type="number" step="0.0001" inputmode="decimal" id="rate-eur-input" value="${formatRate(rateEurToVes)}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; color:#f59e0b;">
                 <span>🟡 Binance:</span>
-                <input type="number" step="any" inputmode="decimal" id="rate-binance-input" value="${rateBinanceToVes}" style="width:70px; padding:2px 6px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:4px; color:#f59e0b; text-align:right; font-size:11px; font-weight:700;">
+                <input type="number" step="0.0001" inputmode="decimal" id="rate-binance-input" value="${formatRate(rateBinanceToVes)}" style="width:70px; padding:2px 6px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:4px; color:#f59e0b; text-align:right; font-size:11px; font-weight:700;">
               </div>
               <div style="display:flex; gap:4px;">
                 <button type="button" class="btn btn-secondary" id="sync-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:45%; background:rgba(255,255,255,0.05); color:white; border-color:var(--border-glass);" title="Sincronizar automáticamente con el BCV y Binance P2P">
@@ -2138,9 +2150,9 @@ async function bindAdminEvents() {
 
   // Guardar Tasas de Cambio Manuales (BCV & Binance)
   document.getElementById('save-rates-btn')?.addEventListener('click', async () => {
-    const usdVal = parseFloat((document.getElementById('rate-usd-input') as HTMLInputElement).value);
-    const eurVal = parseFloat((document.getElementById('rate-eur-input') as HTMLInputElement).value);
-    const binanceVal = parseFloat((document.getElementById('rate-binance-input') as HTMLInputElement).value);
+    const usdVal = Number(parseFloat((document.getElementById('rate-usd-input') as HTMLInputElement).value).toFixed(4));
+    const eurVal = Number(parseFloat((document.getElementById('rate-eur-input') as HTMLInputElement).value).toFixed(4));
+    const binanceVal = Number(parseFloat((document.getElementById('rate-binance-input') as HTMLInputElement).value).toFixed(4));
 
     if (isNaN(usdVal) || usdVal <= 0 || isNaN(eurVal) || eurVal <= 0 || isNaN(binanceVal) || binanceVal <= 0) {
       alert('Por favor ingrese tasas válidas mayores a 0.');
@@ -2176,19 +2188,19 @@ async function bindAdminEvents() {
 
     try {
       const res = await api.sales.syncExchangeRates();
-      rateUsdToVes = res.rates.usdToVes;
-      rateEurToVes = res.rates.eurToVes;
-      rateBinanceToVes = res.rates.binanceUsdToVes;
+      rateUsdToVes = Number(res.rates.usdToVes.toFixed(4));
+      rateEurToVes = Number(res.rates.eurToVes.toFixed(4));
+      rateBinanceToVes = Number(res.rates.binanceUsdToVes.toFixed(4));
       
       // Actualizar inputs si existen en pantalla
       const usdInput = document.getElementById('rate-usd-input') as HTMLInputElement;
       const eurInput = document.getElementById('rate-eur-input') as HTMLInputElement;
       const binanceInput = document.getElementById('rate-binance-input') as HTMLInputElement;
-      if (usdInput) usdInput.value = rateUsdToVes.toString();
-      if (eurInput) eurInput.value = rateEurToVes.toString();
-      if (binanceInput) binanceInput.value = rateBinanceToVes.toString();
+      if (usdInput) usdInput.value = formatRate(rateUsdToVes);
+      if (eurInput) eurInput.value = formatRate(rateEurToVes);
+      if (binanceInput) binanceInput.value = formatRate(rateBinanceToVes);
 
-      alert(`¡Tasas sincronizadas con éxito desde el BCV y Binance P2P!\n\nBCV Dólar: Bs. ${rateUsdToVes.toFixed(2)}\nBCV Euro: Bs. ${rateEurToVes.toFixed(2)}\nBinance USDT: Bs. ${rateBinanceToVes.toFixed(2)}`);
+      alert(`¡Tasas sincronizadas con éxito desde el BCV y Binance P2P!\n\nBCV Dólar: Bs. ${formatRate(rateUsdToVes)}\nBCV Euro: Bs. ${formatRate(rateEurToVes)}\nBinance USDT: Bs. ${formatRate(rateBinanceToVes)}`);
       navigate('admin');
     } catch (err: any) {
       alert(err.message || 'Error al conectar con el servidor para sincronizar tasas.');

@@ -926,7 +926,7 @@ router.post('/:id/resend-email', authenticate, async (req: AuthRequest, res: Res
     });
   } catch (error: any) {
     console.error('Error al reenviar factura por correo:', error);
-    res.status(500).json({ message: 'Error al reenviar la factura por correo', error: error.message });
+    res.status(500).json({ message: `Error al reenviar la factura por correo: ${error.message}` });
   }
 });
 
