@@ -179,7 +179,7 @@ router.post('/checkout', async (req: AuthRequest, res) => {
     const waText = generateWhatsAppText(saleInfo, saleItemsToInsert);
 
     // Intentar enviar correo de factura en segundo plano para no bloquear el checkout
-    if (customerEmail) {
+    if (customerEmail && !customerEmail.endsWith('@cliente.local')) {
       sendInvoiceEmail(customerEmail, saleInfo, saleItemsToInsert).catch(err => {
         console.error('Error enviando correo en checkout:', err);
       });
@@ -422,7 +422,7 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
     const waText = generateWhatsAppText(saleInfo, saleItemsToInsert);
 
     // Intentar enviar correo de factura en segundo plano para no bloquear la venta POS (si hay correo)
-    if (customerEmail) {
+    if (customerEmail && !customerEmail.endsWith('@cliente.local')) {
       sendInvoiceEmail(customerEmail, saleInfo, saleItemsToInsert).catch(err => {
         console.error('Error enviando correo en POS:', err);
       });

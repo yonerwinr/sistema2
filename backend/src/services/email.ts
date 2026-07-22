@@ -1,8 +1,9 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import path from 'path';
 import pool from '../config/db';
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -17,13 +18,15 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
 
   if (host && user && pass) {
     // Usar SMTP provisto por el usuario
+    const isGmail = host.toLowerCase().includes('gmail.com');
     transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass }
+      ...(isGmail ? { service: 'gmail' } : { host, port, secure: port === 465 }),
+      auth: { user, pass },
+      tls: {
+        rejectUnauthorized: false
+      }
     });
-    console.log('Transpotador de correo SMTP configurado con exito.');
+    console.log(`Transpotador de correo SMTP configurado con exito.${isGmail ? ' (Modo Gmail optimizado)' : ''}`);
   } else {
     // Fallback: Crear cuenta de prueba en Ethereal Mail
     console.log('No se detectaron credenciales SMTP en .env. Creando cuenta temporal en Ethereal Mail...');

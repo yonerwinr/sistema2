@@ -8,8 +8,9 @@ exports.sendPlainEmail = sendPlainEmail;
 exports.sendPasswordResetEmail = sendPasswordResetEmail;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const path_1 = __importDefault(require("path"));
 const db_1 = __importDefault(require("../config/db"));
-dotenv_1.default.config();
+dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../../.env') });
 let transporter = null;
 // Inicializa el transportador SMTP
 async function getTransporter() {
@@ -21,13 +22,15 @@ async function getTransporter() {
     const pass = process.env.SMTP_PASS;
     if (host && user && pass) {
         // Usar SMTP provisto por el usuario
+        const isGmail = host.toLowerCase().includes('gmail.com');
         transporter = nodemailer_1.default.createTransport({
-            host,
-            port,
-            secure: port === 465,
-            auth: { user, pass }
+            ...(isGmail ? { service: 'gmail' } : { host, port, secure: port === 465 }),
+            auth: { user, pass },
+            tls: {
+                rejectUnauthorized: false
+            }
         });
-        console.log('Transpotador de correo SMTP configurado con exito.');
+        console.log(`Transpotador de correo SMTP configurado con exito.${isGmail ? ' (Modo Gmail optimizado)' : ''}`);
     }
     else {
         // Fallback: Crear cuenta de prueba en Ethereal Mail

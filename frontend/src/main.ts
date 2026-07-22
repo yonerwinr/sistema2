@@ -1008,12 +1008,12 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       canvas.width = width;
       canvas.height = height;
 
-      // Pintar fondo oscuro elegante
-      ctx.fillStyle = '#0f172a'; // slate-900
+      // Pintar fondo blanco limpio
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
 
-      // Borde brillante de estilo glassmorphism
-      ctx.strokeStyle = '#ff7a00'; // naranja
+      // Borde naranja brillante
+      ctx.strokeStyle = '#e65c00';
       ctx.lineWidth = 4;
       ctx.strokeRect(2, 2, width - 4, height - 4);
 
@@ -1030,22 +1030,22 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       }
 
       // Dibujar Header
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#0f172a'; // Oscuro
       ctx.font = 'bold 20px Outfit, Segoe UI';
       ctx.textAlign = 'center';
       ctx.fillText(sale.is_quotation === 1 ? 'COTIZACIÓN AL MAYOR' : 'COMPROBANTE DE COMPRA', width / 2, textY);
 
-      ctx.fillStyle = '#ff7a00';
+      ctx.fillStyle = '#e65c00'; // Naranja
       ctx.font = 'bold 15px Outfit, Segoe UI';
       ctx.fillText('FACILITOAPP 🐒', width / 2, textY + 25);
 
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = '#475569'; // Gris oscuro
       ctx.font = '13px Outfit, Segoe UI';
       ctx.fillText(`${sale.is_quotation === 1 ? 'Cotización' : 'Factura'}: #${sale.id}`, width / 2, textY + 50);
       ctx.fillText(`Fecha: ${new Date(sale.created_at || new Date()).toLocaleString('es-ES')}`, width / 2, textY + 70);
 
       // Dibujar Línea divisoria
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(30, headerHeight + 5);
@@ -1055,16 +1055,16 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       // Dibujar Datos del Cliente
       let yOffset = headerHeight + 30;
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = '#475569';
       ctx.font = '10px Outfit, Segoe UI';
       ctx.fillText(sale.is_quotation === 1 ? 'COTIZADO A:' : 'FACTURADO A:', 30, yOffset);
 
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 14px Outfit, Segoe UI';
       ctx.fillText(sale.customer_name || 'Cliente General', 30, yOffset + 20);
 
       ctx.font = '12px Outfit, Segoe UI';
-      ctx.fillStyle = '#e2e8f0';
+      ctx.fillStyle = '#334155';
       let nextY = yOffset + 40;
       if (sale.customer_ci) {
         ctx.fillText(`C.I. / RIF: ${sale.customer_ci}`, 30, nextY);
@@ -1081,18 +1081,18 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       // Datos del pago (derecha)
       ctx.textAlign = 'right';
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = '#475569';
       ctx.font = '10px Outfit, Segoe UI';
       ctx.fillText(sale.is_quotation === 1 ? 'DETALLES COTIZACIÓN:' : 'DETALLES DE PAGO:', width - 30, yOffset);
 
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#0f172a';
       ctx.font = '12px Outfit, Segoe UI';
       ctx.fillText(`Metodo: ${sale.payment_method.toUpperCase()}`, width - 30, yOffset + 20);
       ctx.fillText(`Tipo: ${sale.is_quotation === 1 ? 'COTIZACIÓN' : sale.type.toUpperCase()}`, width - 30, yOffset + 40);
       ctx.fillText(`Cajero: ${sale.seller_name || 'Online'}`, width - 30, yOffset + 60);
 
       // Divisor
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)';
       ctx.beginPath();
       ctx.moveTo(30, nextY + 10);
       ctx.lineTo(width - 30, nextY + 10);
@@ -1101,7 +1101,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       // Tabla de ítems
       let y = nextY + 35;
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = '#475569';
       ctx.font = 'bold 11px Outfit, Segoe UI';
       ctx.fillText('PRODUCTO', 30, y);
       ctx.textAlign = 'center';
@@ -1110,7 +1110,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       ctx.fillText('TOTAL', width - 30, y);
 
       y += 15;
-      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.05)';
       ctx.beginPath();
       ctx.moveTo(30, y);
       ctx.lineTo(width - 30, y);
@@ -1120,7 +1120,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       ctx.font = '12px Outfit, Segoe UI';
       items.forEach(item => {
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = '#0f172a';
         
         // Cortar nombre si es muy largo
         let name = item.name;
@@ -1128,18 +1128,18 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
         ctx.fillText(name, 30, y);
 
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#475569';
         ctx.fillText(item.quantity.toString(), 250, y);
 
         ctx.textAlign = 'right';
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = '#0f172a';
         ctx.fillText(`$${(Number(item.price) * item.quantity).toFixed(2)}`, width - 30, y);
 
         y += rowHeight;
       });
 
       // Divisor de Totales
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)';
       ctx.beginPath();
       ctx.moveTo(30, y);
       ctx.lineTo(width - 30, y);
@@ -1150,7 +1150,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       y += 15;
       ctx.font = '11px Outfit, Segoe UI';
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = '#475569';
       
       // Dibujar Subtotal
       ctx.textAlign = 'left';
@@ -1162,11 +1162,11 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       if (discountVal > 0) {
         y += 18;
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#f87171';
+        ctx.fillStyle = '#b91c1c'; // Rojo oscuro
         ctx.fillText('Descuento', 30, y);
         ctx.textAlign = 'right';
         ctx.fillText(`-$${discountVal.toFixed(2)}`, width - 30, y);
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#475569';
       }
       
       // Dibujar IVA 16%
@@ -1179,7 +1179,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       }
 
       y += 15;
-      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.05)';
       ctx.beginPath();
       ctx.moveTo(30, y);
       ctx.lineTo(width - 30, y);
@@ -1187,12 +1187,12 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       y += 25;
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 12px Outfit, Segoe UI';
       ctx.fillText('TOTAL NETO (USD)', 30, y);
 
       ctx.textAlign = 'right';
-      ctx.fillStyle = '#ff7a00'; // Naranja FacilitoApp
+      ctx.fillStyle = '#e65c00'; // Naranja FacilitoApp
       ctx.font = 'bold 18px Outfit, Segoe UI';
       ctx.fillText(`$${Number(sale.total).toFixed(2)}`, width - 30, y);
 
@@ -1201,7 +1201,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       y += 18;
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#f59e0b';
+      ctx.fillStyle = '#b45309'; // Ámbar oscuro
       ctx.font = 'bold 11px Outfit, Segoe UI';
       ctx.fillText('Equivalente Bs. (BCV)', 30, y);
 
@@ -1210,7 +1210,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       y += 16;
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = '#475569';
       ctx.font = '10px Outfit, Segoe UI';
       ctx.fillText('Equivalente EUR (€)', 30, y);
 
@@ -1219,7 +1219,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       // Divisor
       y += 20;
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)';
       ctx.beginPath();
       ctx.moveTo(30, y);
       ctx.lineTo(width - 30, y);
@@ -1228,12 +1228,12 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       // Footer
       y += 35;
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 13px Outfit, Segoe UI';
       ctx.fillText(sale.is_quotation === 1 ? 'Cotización válida por 15 días.' : '¡Gracias por tu compra!', width / 2, y);
 
       y += 20;
-      ctx.fillStyle = '#64748b';
+      ctx.fillStyle = '#475569';
       ctx.font = '10px Outfit, Segoe UI';
       ctx.fillText('Documento digital generado por FacilitoApp.', width / 2, y);
 
@@ -1254,12 +1254,30 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
   });
 }
 
-async function shareInvoiceAsImage(sale: any, items: any[], clientPhone: string) {
+async function shareInvoiceAsImage(sale: any, items: any[], clientPhone: string, existingWindow?: Window | null) {
+  // Evitar bloqueador de popups abriendo la ventana inmediatamente si no se suministra una
+  const newWindow = existingWindow !== undefined ? existingWindow : window.open('', '_blank');
+  if (newWindow && !existingWindow) {
+    try {
+      newWindow.document.write(`
+        <html>
+        <head><title>Preparando WhatsApp...</title></head>
+        <body style="font-family:sans-serif; text-align:center; padding-top:50px; background:#111827; color:#fff;">
+          <div style="font-size:24px; margin-bottom:10px;">🐒 FacilitoApp</div>
+          <div>Preparando comprobante y abriendo WhatsApp...</div>
+        </body>
+        </html>
+      `);
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+
   try {
     const blob = await generateReceiptPNG(sale, items);
     const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
     
-    // Copiar imagen al portapapeles de forma silenciosa (sin interrumpir con alerts)
+    // Copiar imagen al portapapeles de forma silenciosa
     try {
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': blob })
@@ -1271,8 +1289,12 @@ async function shareInvoiceAsImage(sale: any, items: any[], clientPhone: string)
     // Mensaje de agradecimiento amigable y profesional
     const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${sale.id} por un total de $${Number(sale.total).toFixed(2)}.\n\n*(Pega la factura presionando Ctrl + V o manteniendo presionado y seleccionando Pegar).*`;
     const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMessage)}`;
-    window.open(waUrl, '_blank');
+    
+    if (newWindow) {
+      newWindow.location.href = waUrl;
+    }
   } catch (error) {
+    if (newWindow) newWindow.close();
     console.error('Error al compartir la factura PNG:', error);
     alert('No se pudo generar el comprobante digital de la factura.');
   }
@@ -1301,42 +1323,54 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
   }
   if (idEl) idEl.innerText = `ID de Venta: #${result.saleId}`;
 
-  // WhatsApp Link - Interceptado por click
+  // WhatsApp Link - Configurado para abrir directamente y evitar popup blocker
   const decodedText = decodeURIComponent(result.whatsappText);
-  waBtn.setAttribute('data-invoice-text', decodedText);
+  const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
+  const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${result.saleId} por un total de $${Number(result.total).toFixed(2)}.\n\n*(Pega la factura presionando Ctrl + V o manteniendo presionado y seleccionando Pegar).*`;
+  const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMessage)}`;
+  
+  waBtn.href = waUrl;
+  waBtn.target = '_blank';
+  waBtn.removeAttribute('data-invoice-text');
   
   const newWaBtn = waBtn.cloneNode(true) as HTMLAnchorElement;
   waBtn.parentNode?.replaceChild(newWaBtn, waBtn);
   
-  newWaBtn.addEventListener('click', async (e) => {
-    e.preventDefault();
-    
-    // Inferencia de datos de pago
-    let payMethod = 'tarjeta';
-    if (decodedText.toLowerCase().includes('efectivo') || decodedText.toLowerCase().includes('cash')) payMethod = 'efectivo';
-    else if (decodedText.toLowerCase().includes('transfer')) payMethod = 'transferencia';
+  newWaBtn.addEventListener('click', () => {
+    // Proceso de copia en segundo plano sin interrumpir la navegación del enlace
+    void (async () => {
+      try {
+        let payMethod = 'tarjeta';
+        if (decodedText.toLowerCase().includes('efectivo') || decodedText.toLowerCase().includes('cash')) payMethod = 'efectivo';
+        else if (decodedText.toLowerCase().includes('transfer')) payMethod = 'transferencia';
 
-    let saleType = 'online';
-    if (decodedText.toLowerCase().includes('pos')) saleType = 'pos';
+        let saleType = 'online';
+        if (decodedText.toLowerCase().includes('pos')) saleType = 'pos';
 
-    const saleMock = {
-      id: result.saleId,
-      customer_name: result.customerName || 'Cliente General',
-      customer_phone: clientPhone,
-      customer_email: clientEmail,
-      total: result.total,
-      payment_method: payMethod,
-      type: saleType,
-      seller_name: currentUser?.name || 'Online',
-      created_at: new Date()
-    };
-    
-    await shareInvoiceAsImage(saleMock, purchaseItems || [], clientPhone);
+        const saleMock = {
+          id: result.saleId,
+          customer_name: result.customerName || 'Cliente General',
+          customer_phone: clientPhone,
+          customer_email: clientEmail,
+          total: result.total,
+          payment_method: payMethod,
+          type: saleType,
+          seller_name: currentUser?.name || 'Online',
+          created_at: new Date()
+        };
+        const blob = await generateReceiptPNG(saleMock, purchaseItems || []);
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+      } catch (err) {
+        console.warn('Copia en click falló:', err);
+      }
+    })();
   });
 
   // Mostrar estado del correo automático
   if (emailStatusBox) {
-    if (clientEmail) {
+    if (clientEmail && !clientEmail.endsWith('@cliente.local')) {
       emailStatusBox.style.display = 'flex';
       emailStatusBox.innerHTML = `✉️ Factura enviada automáticamente a: ${clientEmail}`;
     } else {
@@ -1418,6 +1452,7 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
 
       // Renderizar imagen
       pngContainer.innerHTML = `<img src="${blobUrl}" style="max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 6px; box-shadow: var(--shadow-lg);" alt="Factura PNG">`;
+
 
       // Configurar Descarga
       if (downloadPngBtn) {
@@ -4962,15 +4997,28 @@ function showSaleDetails(details: SaleDetail) {
     `).join('');
   }
 
-  // Enlace a WhatsApp (Re-envío) - Enviando la imagen de la factura en su lugar
+  // Enlace a WhatsApp (Re-envío) - Configurado directamente
   const phoneNum = sale.customer_phone ? sale.customer_phone.replace(/\+/g, '').replace(/\s/g, '') : '';
+  const waMessage = `¡Hola! Muchas gracias por tu compra. 😊\n\nTe comparto el comprobante digital de tu Factura #${sale.id} por un total de $${Number(sale.total).toFixed(2)}.\n\n*(Pega la factura presionando Ctrl + V o manteniendo presionado y seleccionando Pegar).*`;
+  const waUrl = `https://wa.me/${phoneNum}?text=${encodeURIComponent(waMessage)}`;
   
+  waBtn.href = waUrl;
+  waBtn.target = '_blank';
+
   const newWaBtn = waBtn.cloneNode(true) as HTMLAnchorElement;
   waBtn.parentNode?.replaceChild(newWaBtn, waBtn);
 
-  newWaBtn.addEventListener('click', async (e) => {
-    e.preventDefault();
-    await shareInvoiceAsImage(sale, items, phoneNum);
+  newWaBtn.addEventListener('click', () => {
+    void (async () => {
+      try {
+        const blob = await generateReceiptPNG(sale, items);
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+      } catch (err) {
+        console.warn('Copia silenciosa en click de detalle falló:', err);
+      }
+    })();
   });
 
   // Enlace a Correo (Re-envío)
@@ -5315,19 +5363,35 @@ async function renderAdminQuotations() {
       });
     });
 
-    // Bind send quote to WhatsApp
+    // Bind send quote to WhatsApp - Evita bloqueador de popups pre-abriendo la ventana
     document.querySelectorAll('.send-quote-wa-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
+      btn.addEventListener('click', (e) => {
         const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
-        try {
-          const details = await api.sales.getDetails(id);
-          const phone = details.sale.customer_phone || '';
-          const cleanedPhone = phone.replace(/\+/g, '').replace(/\s/g, '');
-          
-          await shareInvoiceAsImage(details.sale, details.items, cleanedPhone);
-        } catch (err: any) {
-          alert(err.message || 'Error al enviar cotización.');
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+            <head><title>Preparando WhatsApp...</title></head>
+            <body style="font-family:sans-serif; text-align:center; padding-top:50px; background:#111827; color:#fff;">
+              <div style="font-size:24px; margin-bottom:10px;">🐒 FacilitoApp</div>
+              <div>Cargando cotización y abriendo WhatsApp...</div>
+            </body>
+            </html>
+          `);
         }
+        
+        void (async () => {
+          try {
+            const details = await api.sales.getDetails(id);
+            const phone = details.sale.customer_phone || '';
+            const cleanedPhone = phone.replace(/\+/g, '').replace(/\s/g, '');
+            
+            await shareInvoiceAsImage(details.sale, details.items, cleanedPhone, newWindow);
+          } catch (err: any) {
+            if (newWindow) newWindow.close();
+            alert(err.message || 'Error al enviar cotización.');
+          }
+        })();
       });
     });
 
