@@ -200,7 +200,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  void loadProducts();
+  // Load exchange rates (tasas de cambio) as it's needed everywhere
   void loadExchangeRates();
 
   // Si no hay sesión válida, mostrar la tienda inmediatamente mientras los datos llegan.
@@ -247,6 +247,11 @@ function navigate(view: 'store' | 'auth' | 'admin') {
   // Destruir gráficos previos si salimos de admin
   if (currentView !== 'admin') {
     destroyCharts();
+  }
+
+  // Carga perezosa (lazy load) de productos para la tienda
+  if (currentView === 'store' && productsList.length === 0) {
+    void loadProducts();
   }
 
   renderApp();
@@ -1591,6 +1596,7 @@ let activeAuthTab: 'login' | 'register' | 'forgot' = 'login';
 let forgotStep: 'email' | 'code' = 'email';
 let resetTargetEmail = '';
 let resetPreviewUrl = '';
+let cachedGoogleClientId: string | null = null;
 
 function renderAuthView(): string {
   return `
@@ -1796,8 +1802,8 @@ function bindAuthEvents() {
       localStorage.setItem('token', res.token);
       currentUser = res.user;
 
-      if (currentUser.role === 'admin') {
-        activeAdminView = 'stats';
+      if (currentUser.role === 'admin' || currentUser.role === 'seller') {
+        activeAdminView = currentUser.role === 'admin' ? 'stats' : 'pos';
         navigate('admin');
       } else {
         navigate('store');
@@ -1838,11 +1844,21 @@ function bindAuthEvents() {
   });
 
   // Integración de Google Sign-In (Login y Registro)
-  const initGoogleBtn = () => {
+  const initGoogleBtn = async () => {
     const google = (window as any).google;
     if (google) {
+      if (!cachedGoogleClientId) {
+        try {
+          const res = await api.auth.getGoogleClientId();
+          cachedGoogleClientId = res.clientId;
+        } catch (e) {
+          console.warn('No se pudo obtener el Google Client ID del backend, usando valor por defecto:', e);
+          cachedGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '1008719970978-hb24n2dstb40o45upg4689qqt56n74hs.apps.googleusercontent.com';
+        }
+      }
+
       google.accounts.id.initialize({
-        client_id: (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '1008719970978-hb24n2dstb40o45upg4689qqt56n74hs.apps.googleusercontent.com',
+        client_id: cachedGoogleClientId,
         callback: async (response: any) => {
           const credential = response.credential;
           try {
@@ -1853,8 +1869,8 @@ function bindAuthEvents() {
             localStorage.setItem('token', res.token);
             currentUser = res.user;
 
-            if (currentUser.role === 'admin') {
-              activeAdminView = 'stats';
+            if (currentUser.role === 'admin' || currentUser.role === 'seller') {
+              activeAdminView = currentUser.role === 'admin' ? 'stats' : 'pos';
               navigate('admin');
             } else {
               navigate('store');
@@ -2441,17 +2457,20 @@ async function renderAdminPOS() {
       }
     }
     
-    try {
-      const prods = await api.products.getAll();
-      posProductsCache = Array.isArray(prods) ? prods : [];
-    } catch (err) {
-      console.error('Error al cargar lista de productos para POS:', err);
-      posProductsCache = [];
+    if (!Array.isArray(posProductsCache) || posProductsCache.length === 0) {
+      try {
+        const prods = await api.products.getAll();
+        posProductsCache = Array.isArray(prods) ? prods : [];
+      } catch (err) {
+        console.error('Error al cargar lista de productos para POS:', err);
+        posProductsCache = [];
+      }
     }
 
     const posProducts = posProductsCache.filter(prod =>
       smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, posSearchQuery)
     );
+    const posProductsToShow = posProducts.slice(0, 24);
     
     if (currentUser?.role !== 'admin') {
       posDiscount = 0;
@@ -2535,7 +2554,7 @@ async function renderAdminPOS() {
           </div>
 
           <div class="pos-products-grid stagger-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:12px;">
-            ${posProducts.map(prod => `
+            ${posProductsToShow.map(prod => `
               <div class="card pos-product-card add-to-pos-cart" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease;">
                 <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:90px; object-fit:cover; border-radius:8px; margin-bottom:6px;">
                 <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.name}</div>
@@ -2543,6 +2562,11 @@ async function renderAdminPOS() {
                 <div style="font-size:10px; color:var(--text-muted);">Stock: ${prod.stock}</div>
               </div>
             `).join('')}
+            ${posProducts.length > 24 ? `
+              <div style="grid-column:1/-1; text-align:center; padding:12px; color:var(--text-secondary); font-size:11px; border:1px dashed var(--border-glass); border-radius:8px; background:rgba(255,255,255,0.01); margin-top:8px;">
+                ⚠️ Se encontraron ${posProducts.length} productos. Mostrando los primeros 24. Refina la búsqueda si no ves el producto deseado.
+              </div>
+            ` : ''}
             ${posProducts.length === 0 ? '<p style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-secondary);">No se encontraron productos.</p>' : ''}
           </div>
         </div>
@@ -3816,6 +3840,7 @@ function bindPOSEvents() {
       posCustomerPhone = '';
       
       await loadProducts(); // recargar
+      posProductsCache = []; // Limpiar caché POS para forzar recarga
       
       // Mostrar modal de éxito
       const itemsFormatted = items.map(item => {
@@ -3970,6 +3995,7 @@ function bindProductTableActions() {
         try {
           await api.products.delete(id);
           await loadProducts();
+          posProductsCache = []; // Limpiar caché POS para forzar recarga
           await renderAdminProducts();
         } catch (err: any) {
           alert(err.message || 'Error al eliminar');
@@ -4386,6 +4412,7 @@ function bindProductCRUDEvents() {
 
       if (formCard) formCard.style.display = 'none';
       await loadProducts();
+      posProductsCache = []; // Limpiar caché POS para forzar recarga
       await renderAdminProducts();
 
       if (savedProd) {

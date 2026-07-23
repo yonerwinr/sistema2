@@ -181,6 +181,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ credential }),
     }),
+    getGoogleClientId: () => request<{ clientId: string }>('/auth/google-client-id'),
     me: () => request<User>('/auth/me'),
     getCustomers: () => request<User[]>('/auth/customers'),
     registerCustomer: (body: {

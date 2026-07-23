@@ -88,6 +88,11 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor en el login' });
     }
 });
+// Obtener el Client ID de Google configurado en el servidor
+router.get('/google-client-id', (req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID || '1008719970978-hb24n2dstb40o45upg4689qqt56n74hs.apps.googleusercontent.com';
+    res.json({ clientId });
+});
 // Autenticación con Google (Login / Registro integrado)
 router.post('/google', async (req, res) => {
     const { credential } = req.body;
@@ -101,7 +106,7 @@ router.post('/google', async (req, res) => {
         }
         const payload = await googleRes.json();
         const { email, name, email_verified, aud } = payload;
-        if (!email_verified) {
+        if (email_verified !== true && email_verified !== 'true') {
             return res.status(400).json({ message: 'El correo electrónico de Google no está verificado' });
         }
         // Validar GOOGLE_CLIENT_ID si está configurado en .env
@@ -117,7 +122,8 @@ router.post('/google', async (req, res) => {
         }
         else {
             // Registrar un nuevo cliente desde Google
-            const [result] = await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, NULL, ?, NULL, NULL)', [name, email, 'customer']);
+            const userName = name || email.split('@')[0];
+            const [result] = await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, NULL, ?, NULL, NULL)', [userName, email, 'customer']);
             const userId = result.insertId;
             const [newUsers] = await db_1.default.query('SELECT * FROM users WHERE id = ?', [userId]);
             user = newUsers[0];
