@@ -91,6 +91,8 @@ export interface Sale {
   tax?: number;
   is_quotation?: number;
   amount_paid?: number;
+  coupon_code?: string | null;
+  coupon_discount_percent?: number;
 }
 
 export interface Coupon {

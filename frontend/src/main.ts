@@ -927,6 +927,7 @@ function renderInvoiceSuccessModal(): string {
           <div style="font-size: 13px; color:var(--text-secondary); text-transform:uppercase;">Factura</div>
           <div style="font-size: 28px; font-weight:700; color:var(--primary); margin: 6px 0;" id="success-total">$0.00</div>
           <div style="font-size: 12px; color:var(--text-muted);" id="success-id">ID: #000</div>
+          <div id="success-totals-breakdown" style="margin-top: 10px; font-size: 12px; display: none; flex-direction: column; gap: 6px; border-top: 1px dashed var(--border-glass); padding-top: 8px; text-align: left;"></div>
         </div>
 
         <!-- Factura PNG Vista Previa e Interacciones -->
@@ -1181,26 +1182,39 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       ctx.textAlign = 'right';
       ctx.fillText(`$${subtotalVal.toFixed(2)}`, width - 30, y);
       
-      // Dibujar Descuento
-      if (discountVal > 0) {
+      const couponPct = Number(sale.coupon_discount_percent || 0);
+      const couponDiscountVal = couponPct > 0 ? subtotalVal * (couponPct / 100) : 0;
+      const remainingDiscountVal = discountVal - couponDiscountVal;
+
+      // Dibujar Cupón
+      if (couponCode && couponPct > 0) {
         y += 18;
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#b91c1c'; // Rojo oscuro
+        ctx.fillStyle = '#b91c1c'; // Rojo
+        ctx.fillText(`Cupón (${couponCode} -${couponPct.toFixed(0)}%)`, 30, y);
+        ctx.textAlign = 'right';
+        ctx.fillText(`-$${couponDiscountVal.toFixed(2)}`, width - 30, y);
+        ctx.fillStyle = '#475569';
+      }
+
+      // Dibujar Otros Descuentos
+      if (remainingDiscountVal > 0.01) {
+        y += 18;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#b91c1c'; // Rojo
+        ctx.fillText('Otros Descuentos', 30, y);
+        ctx.textAlign = 'right';
+        ctx.fillText(`-$${remainingDiscountVal.toFixed(2)}`, width - 30, y);
+        ctx.fillStyle = '#475569';
+      } else if (discountVal > 0 && !couponCode) {
+        y += 18;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#b91c1c'; // Rojo
         const pctVal = (discountVal / subtotalVal) * 100;
         ctx.fillText(`Descuento (${pctVal.toFixed(1)}%)`, 30, y);
         ctx.textAlign = 'right';
         ctx.fillText(`-$${discountVal.toFixed(2)}`, width - 30, y);
         ctx.fillStyle = '#475569';
-      }
-      
-      // Dibujar Cupón
-      if (couponCode) {
-        y += 18;
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#0f172a';
-        ctx.fillText(`Cupón (${couponCode})`, 30, y);
-        ctx.textAlign = 'right';
-        ctx.fillText('Aplicado', width - 30, y);
       }
       
       // Dibujar IVA 16%
@@ -1377,6 +1391,65 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
   }
   if (idEl) idEl.innerText = `ID de Venta: #${result.saleId}`;
 
+  const breakdownEl = document.getElementById('success-totals-breakdown');
+  if (breakdownEl) {
+    const subtotal = purchaseItems ? purchaseItems.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0) : Number(result.total);
+    const discountVal = Number(result.discount || 0);
+    const taxVal = Number(result.tax || 0);
+    const couponCode = result.coupon_code;
+    const couponPct = Number(result.coupon_discount_percent || 0);
+    const couponDiscount = couponPct > 0 ? subtotal * (couponPct / 100) : 0;
+    const remainingDiscount = discountVal - couponDiscount;
+
+    if (discountVal > 0 || taxVal > 0 || couponCode) {
+      breakdownEl.style.display = 'flex';
+      let breakdownHtml = `
+        <div style="display:flex; justify-content:space-between; color:var(--text-secondary);">
+          <span>Subtotal:</span>
+          <span>$${subtotal.toFixed(2)}</span>
+        </div>
+      `;
+
+      if (couponCode && couponPct > 0) {
+        breakdownHtml += `
+          <div style="display:flex; justify-content:space-between; color:#f87171; font-weight:600;">
+            <span>Cupón (${couponCode} -${couponPct.toFixed(0)}%):</span>
+            <span>-$${couponDiscount.toFixed(2)}</span>
+          </div>
+        `;
+      }
+
+      if (remainingDiscount > 0.01) {
+        breakdownHtml += `
+          <div style="display:flex; justify-content:space-between; color:#f87171;">
+            <span>Otros Descuentos:</span>
+            <span>-$${remainingDiscount.toFixed(2)}</span>
+          </div>
+        `;
+      } else if (discountVal > 0 && !couponCode) {
+        breakdownHtml += `
+          <div style="display:flex; justify-content:space-between; color:#f87171;">
+            <span>Descuento:</span>
+            <span>-$${discountVal.toFixed(2)}</span>
+          </div>
+        `;
+      }
+
+      if (taxVal > 0) {
+        breakdownHtml += `
+          <div style="display:flex; justify-content:space-between; color:var(--text-secondary);">
+            <span>IVA (16%):</span>
+            <span>+$${taxVal.toFixed(2)}</span>
+          </div>
+        `;
+      }
+
+      breakdownEl.innerHTML = breakdownHtml;
+    } else {
+      breakdownEl.style.display = 'none';
+    }
+  }
+
   // WhatsApp Link - Configurado para abrir directamente y evitar popup blocker
   const decodedText = decodeURIComponent(result.whatsappText);
   const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
@@ -1413,6 +1486,7 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
           discount: result.discount || 0,
           tax: result.tax || 0,
           coupon_code: result.coupon_code || null,
+          coupon_discount_percent: result.coupon_discount_percent || 0,
           concept: result.concept || null,
           note: result.note || null,
           created_at: new Date()
@@ -5032,6 +5106,12 @@ function renderSaleDetailModal(): string {
           </table>
         </div>
 
+        <div class="card mb-4" style="padding: 12px 16px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-glass);" id="detail-breakdown-card">
+          <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;" id="detail-totals-breakdown">
+            <!-- Cargado dinámicamente -->
+          </div>
+        </div>
+
         <div class="flex justify-between align-center" style="border-top:1px solid var(--border-glass); padding-top:16px; flex-wrap: wrap; gap: 12px;">
           <div class="flex gap-2">
             <!-- Re-envio WhatsApp -->
@@ -5086,6 +5166,73 @@ function showSaleDetails(details: SaleDetail) {
       <div style="font-size:22px; color:var(--primary); font-weight:700;">$${totalUsd.toFixed(2)}</div>
       <div style="font-size:14px; color:#f59e0b; font-weight:600;">Bs. ${totalVes.toFixed(2)}</div>
     `;
+  }
+
+  const breakdownEl = document.getElementById('detail-totals-breakdown');
+  if (breakdownEl) {
+    const subtotal = items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
+    const discountVal = Number(sale.discount || 0);
+    const taxVal = Number(sale.tax || 0);
+    const totalUsd = Number(sale.total);
+    const totalVes = totalUsd * rateUsdToVes;
+    const couponCode = sale.coupon_code;
+    const couponPct = Number(sale.coupon_discount_percent || 0);
+    const couponDiscount = couponPct > 0 ? subtotal * (couponPct / 100) : 0;
+    const remainingDiscount = discountVal - couponDiscount;
+
+    let breakdownHtml = `
+      <div style="display:flex; justify-content:space-between;">
+        <span>Subtotal:</span>
+        <strong>$${subtotal.toFixed(2)}</strong>
+      </div>
+    `;
+
+    if (couponCode && couponPct > 0) {
+      breakdownHtml += `
+        <div style="display:flex; justify-content:space-between; color:#f87171; font-weight:600;">
+          <span>Cupón (${couponCode} -${couponPct.toFixed(0)}%):</span>
+          <strong>-$${couponDiscount.toFixed(2)}</strong>
+        </div>
+      `;
+    }
+
+    if (remainingDiscount > 0.01) {
+      breakdownHtml += `
+        <div style="display:flex; justify-content:space-between; color:#f87171;">
+          <span>Otros Descuentos:</span>
+          <strong>-$${remainingDiscount.toFixed(2)}</strong>
+        </div>
+      `;
+    } else if (discountVal > 0 && !couponCode) {
+      breakdownHtml += `
+        <div style="display:flex; justify-content:space-between; color:#f87171;">
+          <span>Descuento:</span>
+          <strong>-$${discountVal.toFixed(2)}</strong>
+        </div>
+      `;
+    }
+
+    if (taxVal > 0) {
+      breakdownHtml += `
+        <div style="display:flex; justify-content:space-between;">
+          <span>IVA (16%):</span>
+          <strong>+$${taxVal.toFixed(2)}</strong>
+        </div>
+      `;
+    }
+
+    breakdownHtml += `
+      <div style="display:flex; justify-content:space-between; border-top:1px solid var(--border-glass); padding-top:6px; font-weight:700; color:var(--primary); font-size:14px;">
+        <span>Total Neto:</span>
+        <span>$${totalUsd.toFixed(2)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; color:#f59e0b; font-weight:700;">
+        <span>Total Bs. (BCV):</span>
+        <span>Bs. ${totalVes.toFixed(2)}</span>
+      </div>
+    `;
+
+    breakdownEl.innerHTML = breakdownHtml;
   }
 
   // Elementos

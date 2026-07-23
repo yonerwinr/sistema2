@@ -324,12 +324,38 @@ export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[],
                   <td style="padding: 6px 0; color: #64748b;">Subtotal:</td>
                   <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #2d3748;">$${subtotal.toFixed(2)}</td>
                 </tr>
-                ${Number(sale.discount) > 0 ? `
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b;">Descuento:</td>
-                  <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #ef4444;">-$${Number(sale.discount).toFixed(2)}</td>
-                </tr>
-                ` : ''}
+                ${(() => {
+                  const discountVal = Number(sale.discount || 0);
+                  const couponPct = Number(sale.coupon_discount_percent || 0);
+                  const couponDiscount = couponPct > 0 ? subtotal * (couponPct / 100) : 0;
+                  const remainingDiscount = discountVal - couponDiscount;
+                  
+                  let html = '';
+                  if (sale.coupon_code && couponPct > 0) {
+                    html += `
+                    <tr>
+                      <td style="padding: 6px 0; color: #b91c1c;">Cupón (${sale.coupon_code} -${couponPct.toFixed(0)}%):</td>
+                      <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #ef4444;">-$${couponDiscount.toFixed(2)}</td>
+                    </tr>
+                    `;
+                  }
+                  if (remainingDiscount > 0.01) {
+                    html += `
+                    <tr>
+                      <td style="padding: 6px 0; color: #64748b;">Otros Descuentos:</td>
+                      <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #ef4444;">-$${remainingDiscount.toFixed(2)}</td>
+                    </tr>
+                    `;
+                  } else if (discountVal > 0 && !sale.coupon_code) {
+                    html += `
+                    <tr>
+                      <td style="padding: 6px 0; color: #64748b;">Descuento:</td>
+                      <td style="padding: 6px 0; text-align: right; font-weight: 600; color: #ef4444;">-$${discountVal.toFixed(2)}</td>
+                    </tr>
+                    `;
+                  }
+                  return html;
+                })()}
                 ${Number(sale.tax) > 0 ? `
                 <tr>
                   <td style="padding: 6px 0; color: #64748b;">IVA (16%):</td>
@@ -344,19 +370,13 @@ export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[],
                   <td style="padding: 6px 0; color: #f59e0b; font-weight: 700;">TOTAL Bs. (BCV):</td>
                   <td style="padding: 6px 0; text-align: right; font-weight: 700; color: #f59e0b;">Bs. ${(Number(sale.total) * rateUsdToVes).toFixed(2)}</td>
                 </tr>
-                ${sale.coupon_code ? `
-                <tr>
-                  <td style="padding: 4px 0; color: #64748b; font-size: 11px;">Cupón aplicado:</td>
-                  <td style="padding: 4px 0; text-align: right; color: #64748b; font-size: 11px;">${sale.coupon_code}</td>
-                </tr>
-                ` : ''}
               </table>
               <div style="clear: both;"></div>
             </div>
             
             ${sale.concept || sale.note ? `
             <div style="margin-top: 24px; padding: 16px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #edf2f7; font-size: 13px; color: #4a5568;">
-              ${sale.concept ? `<div style="margin-bottom: 8px;"><strong>Concepto / Descripción:</strong> ${sale.concept}</div>` : ''}
+               ${sale.concept ? `<div style="margin-bottom: 8px;"><strong>Concepto / Descripción:</strong> ${sale.concept}</div>` : ''}
               ${sale.note ? `<div><strong>Nota Adicional:</strong> ${sale.note}</div>` : ''}
             </div>
             ` : ''}
@@ -386,7 +406,23 @@ ${items.map(item => `- ${item.name} x${item.quantity} ($${Number(item.price).toF
 
 -----------------------------------------
 SUBTOTAL: $${subtotal.toFixed(2)}
-${Number(sale.discount) > 0 ? `DESCUENTO: -$${Number(sale.discount).toFixed(2)}\n` : ''}${Number(sale.tax) > 0 ? `IVA (16%): $${Number(sale.tax).toFixed(2)}\n` : ''}${sale.coupon_code ? `CUPÓN: ${sale.coupon_code}\n` : ''}TOTAL: $${Number(sale.total).toFixed(2)}
+${(() => {
+  const discountVal = Number(sale.discount || 0);
+  const couponPct = Number(sale.coupon_discount_percent || 0);
+  const couponDiscount = couponPct > 0 ? subtotal * (couponPct / 100) : 0;
+  const remainingDiscount = discountVal - couponDiscount;
+  
+  let text = '';
+  if (sale.coupon_code && couponPct > 0) {
+    text += `CUPÓN (${sale.coupon_code} -${couponPct.toFixed(0)}%): -$${couponDiscount.toFixed(2)}\n`;
+  }
+  if (remainingDiscount > 0.01) {
+    text += `OTROS DESCUENTOS: -$${remainingDiscount.toFixed(2)}\n`;
+  } else if (discountVal > 0 && !sale.coupon_code) {
+    text += `DESCUENTO: -$${discountVal.toFixed(2)}\n`;
+  }
+  return text;
+})()}${Number(sale.tax) > 0 ? `IVA (16%): $${Number(sale.tax).toFixed(2)}\n` : ''}TOTAL: $${Number(sale.total).toFixed(2)}
 TOTAL Bs.: Bs. ${(Number(sale.total) * rateUsdToVes).toFixed(2)}
 ${sale.concept ? `CONCEPTO: ${sale.concept}\n` : ''}${sale.note ? `NOTA: ${sale.note}\n` : ''}=========================================
 Este es un correo automático generado por FacilitoApp 🐒.

@@ -18,9 +18,10 @@ router.get('/audit-logs', auth_1.authenticate, async (req, res) => {
     }
     try {
         const [logs] = await db_1.default.query('SELECT * FROM audit_logs ORDER BY created_at DESC');
-        const [sales] = await db_1.default.query(`SELECT s.*, u.name AS seller_name 
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name AS seller_name, c.discount_percent AS coupon_discount_percent 
        FROM sales s 
        LEFT JOIN users u ON s.seller_id = u.id 
+       LEFT JOIN coupons c ON s.coupon_code = c.code
        ORDER BY s.created_at DESC`);
         res.json({
             logs: logs || [],
@@ -48,6 +49,7 @@ router.post('/checkout', async (req, res) => {
     const conn = await db_1.default.getConnection();
     try {
         await conn.beginTransaction();
+        let couponDiscountPercent = 0.00;
         // Validar cupón si se suministró alguno
         if (couponCode) {
             const cleanCoupon = couponCode.toUpperCase().trim();
@@ -59,6 +61,7 @@ router.post('/checkout', async (req, res) => {
             if (coupon.is_used === 1) {
                 throw new Error('El cupón ya ha sido utilizado');
             }
+            couponDiscountPercent = Number(coupon.discount_percent || 0);
             const currentUserId = userId || (req.user ? req.user.id : null);
             // Si es personal, verificar coincidencia de usuario
             if (coupon.user_id !== null) {
@@ -69,9 +72,24 @@ router.post('/checkout', async (req, res) => {
                 await conn.query('UPDATE coupons SET is_used = 1 WHERE id = ?', [coupon.id]);
             }
             else {
-                // Si es público/general, verificar si este usuario ya lo usó en una compra previa
+                // Si es público/general, verificar si este usuario, CI o correo ya lo usaron en una compra previa (1 por persona)
+                const conditions = [];
+                const params = [];
                 if (currentUserId) {
-                    const [alreadyUsed] = await conn.query('SELECT id FROM sales WHERE user_id = ? AND coupon_code = ? AND status != "cancelled"', [currentUserId, cleanCoupon]);
+                    conditions.push('user_id = ?');
+                    params.push(currentUserId);
+                }
+                if (customerCi) {
+                    conditions.push('customer_ci = ?');
+                    params.push(customerCi);
+                }
+                if (customerEmail) {
+                    conditions.push('customer_email = ?');
+                    params.push(customerEmail);
+                }
+                if (conditions.length > 0) {
+                    const checkQuery = `SELECT id FROM sales WHERE (${conditions.join(' OR ')}) AND coupon_code = ? AND status != 'cancelled'`;
+                    const [alreadyUsed] = await conn.query(checkQuery, [...params, cleanCoupon]);
                     if (alreadyUsed.length > 0) {
                         throw new Error('Ya has utilizado este cupón en una compra anterior');
                     }
@@ -140,6 +158,8 @@ router.post('/checkout', async (req, res) => {
             discount: discount || 0,
             tax: tax || 0,
             amount_paid: initialPaid,
+            coupon_code: couponCode ? couponCode.toUpperCase().trim() : null,
+            coupon_discount_percent: couponDiscountPercent,
             seller_name: 'Online (Tienda)',
             created_at: new Date()
         };
@@ -162,6 +182,7 @@ router.post('/checkout', async (req, res) => {
             discount: discount || 0,
             tax: tax || 0,
             coupon_code: couponCode || null,
+            coupon_discount_percent: couponDiscountPercent,
             concept: null,
             note: null,
             whatsappText: encodeURIComponent(waText),
@@ -188,6 +209,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
     const conn = await db_1.default.getConnection();
     try {
         await conn.beginTransaction();
+        let couponDiscountPercent = 0.00;
         // Validar cupón si se suministró alguno
         if (couponCode) {
             const cleanCoupon = couponCode.toUpperCase().trim();
@@ -199,6 +221,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
             if (coupon.is_used === 1) {
                 throw new Error('El cupón ya ha sido utilizado');
             }
+            couponDiscountPercent = Number(coupon.discount_percent || 0);
             // Si es personal, verificar coincidencia de usuario
             if (coupon.user_id !== null) {
                 if (!customerUserId || Number(customerUserId) !== Number(coupon.user_id)) {
@@ -208,9 +231,24 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
                 await conn.query('UPDATE coupons SET is_used = 1 WHERE id = ?', [coupon.id]);
             }
             else {
-                // Si es público/general, verificar si este usuario ya lo usó en una compra previa
+                // Si es público/general, verificar si este usuario, CI o correo ya lo usaron en una compra previa (1 por persona)
+                const conditions = [];
+                const params = [];
                 if (customerUserId) {
-                    const [alreadyUsed] = await conn.query('SELECT id FROM sales WHERE user_id = ? AND coupon_code = ? AND status != "cancelled"', [customerUserId, cleanCoupon]);
+                    conditions.push('user_id = ?');
+                    params.push(customerUserId);
+                }
+                if (customerCi) {
+                    conditions.push('customer_ci = ?');
+                    params.push(customerCi);
+                }
+                if (customerEmail) {
+                    conditions.push('customer_email = ?');
+                    params.push(customerEmail);
+                }
+                if (conditions.length > 0) {
+                    const checkQuery = `SELECT id FROM sales WHERE (${conditions.join(' OR ')}) AND coupon_code = ? AND status != 'cancelled'`;
+                    const [alreadyUsed] = await conn.query(checkQuery, [...params, cleanCoupon]);
                     if (alreadyUsed.length > 0) {
                         throw new Error('Este cliente ya ha utilizado este cupón en una compra anterior');
                     }
@@ -346,6 +384,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
             customer_name: customerName || 'Consumidor Final',
             customer_email: customerEmail,
             customer_phone: customerPhone,
+            customer_ci: customerCi || null,
             total: finalTotal,
             payment_method: paymentMethod,
             type: 'pos',
@@ -353,8 +392,12 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
             tax: tax || 0,
             is_quotation: isQuotation ? 1 : 0,
             amount_paid: finalAmountPaid,
+            coupon_code: couponCode ? couponCode.toUpperCase().trim() : null,
+            coupon_discount_percent: couponDiscountPercent,
             seller_name: req.user?.name || 'Vendedor',
-            created_at: new Date()
+            created_at: new Date(),
+            concept: concept || null,
+            note: note || null
         };
         // Generar texto para WhatsApp
         const waText = generateWhatsAppText(saleInfo, saleItemsToInsert);
@@ -375,6 +418,7 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
             discount: discount || 0,
             tax: tax || 0,
             coupon_code: couponCode || null,
+            coupon_discount_percent: couponDiscountPercent,
             concept: concept || null,
             note: note || null,
             whatsappText: encodeURIComponent(waText),
@@ -400,9 +444,10 @@ router.get('/customer-history/:id', auth_1.authenticate, async (req, res) => {
             return res.status(404).json({ message: 'Cliente no encontrado' });
         }
         const customer = userRow[0];
-        const [sales] = await db_1.default.query(`SELECT s.*, seller.name as seller_name 
+        const [sales] = await db_1.default.query(`SELECT s.*, seller.name as seller_name, c.discount_percent AS coupon_discount_percent 
        FROM sales s 
        LEFT JOIN users seller ON s.seller_id = seller.id 
+       LEFT JOIN coupons c ON s.coupon_code = c.code
        WHERE (s.user_id = ? OR (s.customer_ci = ? AND s.customer_ci IS NOT NULL AND s.customer_ci != ''))
        ORDER BY s.created_at DESC`, [customer.id, customer.ci]);
         res.json({
@@ -420,7 +465,11 @@ router.get('/history', auth_1.authenticate, async (req, res) => {
     if (!req.user)
         return res.status(401).json({ message: 'No autenticado' });
     try {
-        const [sales] = await db_1.default.query('SELECT * FROM sales WHERE user_id = ? AND is_quotation = 0 ORDER BY created_at DESC', [req.user.id]);
+        const [sales] = await db_1.default.query(`SELECT s.*, c.discount_percent AS coupon_discount_percent 
+       FROM sales s 
+       LEFT JOIN coupons c ON s.coupon_code = c.code
+       WHERE s.user_id = ? AND s.is_quotation = 0 
+       ORDER BY s.created_at DESC`, [req.user.id]);
         res.json(sales);
     }
     catch (error) {
@@ -432,10 +481,11 @@ router.get('/history', auth_1.authenticate, async (req, res) => {
 router.get('/:id', auth_1.authenticate, async (req, res) => {
     const { id } = req.params;
     try {
-        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by, seller.name as seller_name 
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by, seller.name as seller_name, c.discount_percent AS coupon_discount_percent 
        FROM sales s 
        LEFT JOIN users u ON s.user_id = u.id 
        LEFT JOIN users seller ON s.seller_id = seller.id
+       LEFT JOIN coupons c ON s.coupon_code = c.code
        WHERE s.id = ?`, [id]);
         if (sales.length === 0) {
             return res.status(404).json({ message: 'Venta no encontrada' });
