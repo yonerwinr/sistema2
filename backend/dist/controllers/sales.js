@@ -10,6 +10,7 @@ const email_1 = require("../services/email");
 const sheets_1 = require("../services/sheets");
 const rates_1 = require("../services/rates");
 const audit_1 = require("../services/audit");
+const validation_1 = require("../utils/validation");
 const router = (0, express_1.Router)();
 // GET /sales/audit-logs: Obtener audit_logs y ventas para el histórico global
 router.get('/audit-logs', auth_1.authenticate, async (req, res) => {
@@ -43,6 +44,9 @@ router.get('/audit-logs', auth_1.authenticate, async (req, res) => {
 // Registrar Venta Online (Cliente / Invitado)
 router.post('/checkout', async (req, res) => {
     const { userId, customerName, customerEmail, customerPhone, customerCi, paymentMethod, items, discount, tax, couponCode } = req.body;
+    if (customerCi && !(0, validation_1.validateCi)(customerCi)) {
+        return res.status(400).json({ message: 'Formato de Cédula o RIF del cliente inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
+    }
     if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: 'El carrito no puede estar vacio' });
     }
@@ -203,6 +207,9 @@ router.post('/pos', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado. Solo administradores y vendedores pueden registrar ventas POS' });
     }
     const { customerName, customerEmail, customerPhone, customerCi, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId, concept, note } = req.body;
+    if (customerCi && !(0, validation_1.validateCi)(customerCi)) {
+        return res.status(400).json({ message: 'Formato de Cédula o RIF del cliente inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
+    }
     if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: 'Debe agregar al menos un producto' });
     }

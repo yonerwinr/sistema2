@@ -10,6 +10,7 @@ const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
 const email_1 = require("../services/email");
 const audit_1 = require("../services/audit");
+const validation_1 = require("../utils/validation");
 const router = (0, express_1.Router)();
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secreta_pos_online_token_key_987654321';
 // Registro de Usuario (Clientes)
@@ -18,10 +19,9 @@ router.post('/register', async (req, res) => {
     if (!name || !email || !password || !ci) {
         return res.status(400).json({ message: 'Nombre, correo, contraseña y cédula son obligatorios' });
     }
-    // Validar formato de cédula V-12345678 o E-12345678
-    const ciPattern = /^[VE]-\d{5,10}$/;
-    if (!ciPattern.test(ci)) {
-        return res.status(400).json({ message: 'Formato de cédula inválido. Debe comenzar con V- o E- seguido de 5 a 10 dígitos numéricos (ej: V-12345678)' });
+    // Validar formato de Cédula o RIF
+    if (!(0, validation_1.validateCi)(ci)) {
+        return res.status(400).json({ message: 'Formato de Cédula o RIF inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes (ej: V-12345678, J-301234567)' });
     }
     try {
         // Verificar si el usuario ya existe por correo
@@ -186,6 +186,9 @@ router.post('/register-customer', auth_1.authenticate, async (req, res) => {
         return res.status(400).json({ message: 'El nombre/razón social y la cédula/RIF son obligatorios' });
     }
     const cleanCi = ci.trim();
+    if (!(0, validation_1.validateCi)(cleanCi)) {
+        return res.status(400).json({ message: 'Formato de Cédula o RIF del cliente inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes (ej: V-12345678, J-301234567)' });
+    }
     const cleanName = name.trim();
     const cleanPhone = phone ? phone.trim() : null;
     const cleanAddress = address ? address.trim() : null;
@@ -193,6 +196,9 @@ router.post('/register-customer', auth_1.authenticate, async (req, res) => {
     const cleanType = client_type || (cleanCi.toUpperCase().startsWith('J-') ? 'juridico' : cleanCi.toUpperCase().startsWith('G-') ? 'gubernamental' : 'natural');
     const cleanRepName = representative_name ? representative_name.trim() : null;
     const cleanRepCi = representative_ci ? representative_ci.trim() : null;
+    if (cleanRepCi && !(0, validation_1.validateCi)(cleanRepCi)) {
+        return res.status(400).json({ message: 'Formato de Cédula o RIF del representante legal inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
+    }
     const cleanRepPhone = representative_phone ? representative_phone.trim() : null;
     const cleanRepPosition = representative_position ? representative_position.trim() : null;
     if (!cleanEmail) {
@@ -258,6 +264,9 @@ router.put('/customers/:id', auth_1.authenticate, async (req, res) => {
         return res.status(400).json({ message: 'El nombre/razón social y la cédula/RIF son obligatorios' });
     }
     const cleanCi = ci.trim();
+    if (!(0, validation_1.validateCi)(cleanCi)) {
+        return res.status(400).json({ message: 'Formato de Cédula o RIF del cliente inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes (ej: V-12345678, J-301234567)' });
+    }
     const cleanName = name.trim();
     const cleanPhone = phone ? phone.trim() : null;
     const cleanAddress = address ? address.trim() : null;
@@ -265,6 +274,9 @@ router.put('/customers/:id', auth_1.authenticate, async (req, res) => {
     const cleanType = client_type || (cleanCi.toUpperCase().startsWith('J-') ? 'juridico' : cleanCi.toUpperCase().startsWith('G-') ? 'gubernamental' : 'natural');
     const cleanRepName = representative_name ? representative_name.trim() : null;
     const cleanRepCi = representative_ci ? representative_ci.trim() : null;
+    if (cleanRepCi && !(0, validation_1.validateCi)(cleanRepCi)) {
+        return res.status(400).json({ message: 'Formato de Cédula o RIF del representante legal inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
+    }
     const cleanRepPhone = representative_phone ? representative_phone.trim() : null;
     const cleanRepPosition = representative_position ? representative_position.trim() : null;
     if (!cleanEmail) {
@@ -365,6 +377,9 @@ router.post('/staff', auth_1.authenticate, async (req, res) => {
     if (!['admin', 'seller'].includes(role)) {
         return res.status(400).json({ message: 'Rol inválido. Debe ser admin o seller' });
     }
+    if (ci && !(0, validation_1.validateCi)(ci)) {
+        return res.status(400).json({ message: 'Formato de Cédula o RIF del personal inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
+    }
     try {
         // Verificar si el correo ya existe
         const [existing] = await db_1.default.query('SELECT id FROM users WHERE email = ?', [email]);
@@ -402,6 +417,9 @@ router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
     }
     if (!['admin', 'seller'].includes(role)) {
         return res.status(400).json({ message: 'Rol inválido' });
+    }
+    if (ci && !(0, validation_1.validateCi)(ci)) {
+        return res.status(400).json({ message: 'Formato de Cédula o RIF del personal inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
     }
     try {
         // Verificar si el correo ya existe para otro usuario
