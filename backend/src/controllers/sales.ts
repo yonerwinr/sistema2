@@ -5,6 +5,7 @@ import { sendInvoiceEmail, sendPlainEmail } from '../services/email';
 import { syncSaleToSheets } from '../services/sheets';
 import { syncExchangeRatesFromBCV } from '../services/rates';
 import { logAuditEvent } from '../services/audit';
+import { validateCi } from '../utils/validation';
 
 const router = Router();
 
@@ -47,6 +48,10 @@ router.get('/audit-logs', authenticate, async (req: AuthRequest, res: Response) 
 // Registrar Venta Online (Cliente / Invitado)
 router.post('/checkout', async (req: AuthRequest, res) => {
   const { userId, customerName, customerEmail, customerPhone, customerCi, paymentMethod, items, discount, tax, couponCode } = req.body;
+
+  if (customerCi && !validateCi(customerCi)) {
+    return res.status(400).json({ message: 'Formato de Cédula o RIF del cliente inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
+  }
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'El carrito no puede estar vacio' });
@@ -238,6 +243,10 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
   }
 
   const { customerName, customerEmail, customerPhone, customerCi, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId, concept, note } = req.body;
+
+  if (customerCi && !validateCi(customerCi)) {
+    return res.status(400).json({ message: 'Formato de Cédula o RIF del cliente inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
+  }
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'Debe agregar al menos un producto' });

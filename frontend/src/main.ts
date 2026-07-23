@@ -48,6 +48,36 @@ function normalizeText(str: string): string {
     .trim();
 }
 
+function validateFrontendCi(prefix: string, num: string): { isValid: boolean, message?: string } {
+  const cleanNum = num.trim();
+  const cleanPrefix = prefix.replace('-', '').toUpperCase(); // V, E, J, G, etc.
+
+  if (cleanPrefix === 'V') {
+    if (!/^\d{6,8}$/.test(cleanNum)) {
+      return { isValid: false, message: 'La cédula venezolana (V) debe tener entre 6 y 8 dígitos numéricos.' };
+    }
+  } else if (cleanPrefix === 'E') {
+    if (!/^\d{6,8}$/.test(cleanNum)) {
+      return { isValid: false, message: 'La cédula extranjera (E) debe tener entre 6 y 8 dígitos numéricos.' };
+    }
+  } else if (cleanPrefix === 'J') {
+    if (!/^\d{9}$/.test(cleanNum)) {
+      return { isValid: false, message: 'El RIF jurídico (J) debe tener exactamente 9 dígitos numéricos (8 dígitos + 1 verificador sin guiones).' };
+    }
+  } else if (cleanPrefix === 'G') {
+    if (!/^\d{9}$/.test(cleanNum)) {
+      return { isValid: false, message: 'El RIF gubernamental (G) debe tener exactamente 9 dígitos numéricos (8 dígitos + 1 verificador sin guiones).' };
+    }
+  } else {
+    // Para otros (Pasaporte P, etc.), exigir al menos 5 alfanuméricos
+    if (!/^[a-zA-Z0-9]{5,15}$/.test(cleanNum)) {
+      return { isValid: false, message: 'El documento debe tener entre 5 y 15 caracteres alfanuméricos.' };
+    }
+  }
+
+  return { isValid: true };
+}
+
 function levenshteinDistance(a: string, b: string): number {
   if (a.length === 0) return b.length;
   if (b.length === 0) return a.length;
@@ -742,7 +772,7 @@ function renderCheckoutModal(): string {
                 <option value="J-">J-</option>
                 <option value="G-">G-</option>
               </select>
-              <input type="text" class="form-control" id="checkout-ci-num" required placeholder="12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" style="flex-grow: 1;">
+              <input type="text" class="form-control" id="checkout-ci-num" required placeholder="12345678" style="flex-grow: 1;">
             </div>
           </div>
           <div class="form-group mb-3">
@@ -855,6 +885,15 @@ function bindCheckoutEvents() {
     const phone = (document.getElementById('checkout-phone') as HTMLInputElement).value;
     const ciPrefix = (document.getElementById('checkout-ci-prefix') as HTMLSelectElement).value;
     const ciNum = (document.getElementById('checkout-ci-num') as HTMLInputElement).value.trim();
+
+    if (ciNum) {
+      const validation = validateFrontendCi(ciPrefix, ciNum);
+      if (!validation.isValid) {
+        alert(validation.message);
+        return;
+      }
+    }
+
     const customerCi = ciNum ? `${ciPrefix}${ciNum}` : undefined;
     const payment = (document.getElementById('checkout-payment') as HTMLSelectElement).value;
 
@@ -1713,8 +1752,10 @@ function renderAuthView(): string {
                 <select class="form-control" id="reg-ci-prefix" style="width: 80px; font-weight: 700; flex-shrink: 0;">
                   <option value="V-">V-</option>
                   <option value="E-">E-</option>
+                  <option value="J-">J-</option>
+                  <option value="G-">G-</option>
                 </select>
-                <input type="text" class="form-control" id="reg-ci-num" required placeholder="12345678" pattern="\\d{5,10}" title="Ingrese de 5 a 10 dígitos numéricos" style="flex-grow: 1;">
+                <input type="text" class="form-control" id="reg-ci-num" required placeholder="12345678" style="flex-grow: 1;">
               </div>
             </div>
             <div class="form-group">
@@ -1898,6 +1939,12 @@ function bindAuthEvents() {
     const email = (document.getElementById('reg-email') as HTMLInputElement).value;
     const password = (document.getElementById('reg-password') as HTMLInputElement).value;
     const phone = (document.getElementById('reg-phone') as HTMLInputElement).value;
+
+    const validation = validateFrontendCi(ciPrefix, ciNum);
+    if (!validation.isValid) {
+      alert(validation.message);
+      return;
+    }
 
     const ci = `${ciPrefix}${ciNum}`;
 
@@ -3187,6 +3234,13 @@ function bindPOSEvents() {
     e.preventDefault();
     const prefix = (document.getElementById('reg-cust-ci-prefix') as HTMLSelectElement).value;
     const num = (document.getElementById('reg-cust-ci-num') as HTMLInputElement).value.trim();
+
+    const validation = validateFrontendCi(prefix, num);
+    if (!validation.isValid) {
+      alert(validation.message);
+      return;
+    }
+
     const ci = `${prefix}${num}`;
     const name = (document.getElementById('reg-cust-name') as HTMLInputElement).value.trim();
     const phone = (document.getElementById('reg-cust-phone') as HTMLInputElement).value.trim();
@@ -3206,6 +3260,14 @@ function bindPOSEvents() {
       const repCiNum = (document.getElementById('reg-cust-rep-ci-num') as HTMLInputElement)?.value.trim();
       const repPhoneVal = (document.getElementById('reg-cust-rep-phone') as HTMLInputElement)?.value.trim();
       const repPosVal = (document.getElementById('reg-cust-rep-position') as HTMLInputElement)?.value.trim();
+
+      if (repCiNum) {
+        const repValidation = validateFrontendCi(repCiPrefix, repCiNum);
+        if (!repValidation.isValid) {
+          alert('Representante legal: ' + repValidation.message);
+          return;
+        }
+      }
 
       if (repNameVal) repName = repNameVal;
       if (repCiNum) repCi = `${repCiPrefix}${repCiNum}`;
@@ -3248,6 +3310,13 @@ function bindPOSEvents() {
     e.preventDefault();
     const prefix = (document.getElementById('pos-id-prefix') as HTMLSelectElement).value;
     const num = (document.getElementById('pos-id-num') as HTMLInputElement).value.trim();
+
+    const validation = validateFrontendCi(prefix, num);
+    if (!validation.isValid) {
+      alert(validation.message);
+      return;
+    }
+
     const fullCi = `${prefix}${num}`;
     const btn = document.getElementById('pos-id-submit-btn') as HTMLButtonElement;
     if (btn) {
@@ -6357,6 +6426,15 @@ function bindStaffEvents() {
     const ciPrefix = (document.getElementById('staff-ci-prefix') as HTMLSelectElement).value;
     const ciNumRaw = (document.getElementById('staff-ci-num') as HTMLInputElement).value.trim();
     const ciNumClean = ciNumRaw.replace(/^[VEJGP]-/i, '').replace(/\D/g, '');
+
+    if (ciNumClean) {
+      const validation = validateFrontendCi(ciPrefix, ciNumClean);
+      if (!validation.isValid) {
+        alert(validation.message);
+        return;
+      }
+    }
+
     const ci = ciNumClean ? `${ciPrefix}${ciNumClean}` : null;
     const role = (document.getElementById('staff-role') as HTMLSelectElement).value;
     const password = passInput.value;
@@ -6757,6 +6835,13 @@ function bindCustomersEvents() {
 
     const prefix = (document.getElementById('edit-cust-ci-prefix') as HTMLSelectElement).value;
     const num = (document.getElementById('edit-cust-ci-num') as HTMLInputElement).value.trim();
+
+    const validation = validateFrontendCi(prefix, num);
+    if (!validation.isValid) {
+      alert(validation.message);
+      return;
+    }
+
     const ci = `${prefix}${num}`;
     const name = (document.getElementById('edit-cust-name') as HTMLInputElement).value.trim();
     const phone = (document.getElementById('edit-cust-phone') as HTMLInputElement).value.trim();
@@ -6767,6 +6852,19 @@ function bindCustomersEvents() {
 
     const repName = (document.getElementById('edit-cust-rep-name') as HTMLInputElement)?.value.trim() || undefined;
     const repCi = (document.getElementById('edit-cust-rep-ci') as HTMLInputElement)?.value.trim() || undefined;
+
+    if (repCi) {
+      const parts = repCi.split('-');
+      if (parts.length !== 2) {
+        alert('El documento del representante legal debe tener el formato Prefijo-Número (ej: V-12345678).');
+        return;
+      }
+      const repValidation = validateFrontendCi(parts[0], parts[1]);
+      if (!repValidation.isValid) {
+        alert('Representante legal: ' + repValidation.message);
+        return;
+      }
+    }
     const repPhone = (document.getElementById('edit-cust-rep-phone') as HTMLInputElement)?.value.trim() || undefined;
     const repPosition = (document.getElementById('edit-cust-rep-position') as HTMLInputElement)?.value.trim() || undefined;
 
