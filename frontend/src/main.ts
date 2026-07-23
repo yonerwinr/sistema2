@@ -147,6 +147,7 @@ let rateUsdToVes = 40.00;
 let rateEurToVes = 43.50;
 let rateBinanceToVes = 44.50;
 let productsLoading = false;
+let productsLoaded = false;
 let posConfirmedUnregisteredWarning = false;
 let showFreeSaleModal = false;
 let showExpenseModal = false;
@@ -243,6 +244,7 @@ async function loadProducts() {
   productsLoading = true;
   try {
     productsList = await api.products.getAll(selectedCategory || undefined, searchQuery || undefined);
+    productsLoaded = true;
   } catch (error) {
     console.error('Error al cargar productos:', error);
   } finally {
@@ -280,7 +282,7 @@ function navigate(view: 'store' | 'auth' | 'admin') {
   }
 
   // Carga perezosa (lazy load) de productos para la tienda
-  if (currentView === 'store' && productsList.length === 0) {
+  if (currentView === 'store' && !productsLoaded) {
     void loadProducts();
   }
 
@@ -4151,6 +4153,14 @@ function bindProductTableActions() {
 async function renderAdminProducts() {
   const panel = document.getElementById('dashboard-content-panel');
   if (!panel) return;
+
+  if (!productsLoaded || productsLoading) {
+    panel.innerHTML = `<div style="padding:20px; font-weight:700; color:var(--text-muted);">Cargando productos...</div>`;
+    if (!productsLoaded && !productsLoading) {
+      await loadProducts();
+    }
+    return;
+  }
 
   const existingCategories = Array.from(new Set(productsList.map(p => p.category).filter(Boolean)));
   if (!existingCategories.includes('General')) existingCategories.push('General');
