@@ -579,55 +579,50 @@ function renderStoreView(): string {
     <div class="container store-container" style="display:flex; flex-direction:column; gap:24px;">
       <!-- Dashboard de Búsqueda y Filtros Premium -->
       <div class="store-filter-dashboard animate-on-scroll animate-fade-up visible">
-        <!-- Fila Superior: Buscador y Ordenamiento -->
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
-          
+        <!-- Fila Superior: Categorías en Horizontal (Sin Envoltura) -->
+        <div style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 10px; overflow-x: auto; width: 100%; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); -webkit-overflow-scrolling: touch; scrollbar-width: none;">
+          ${categories.map(cat => {
+            const icon = categoryIcons[cat] || '📦';
+            const isActive = selectedCategory === (cat === 'Todas' ? '' : cat);
+            return `
+              <button class="filter-category-btn-premium ${isActive ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}" style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+                <span>${icon}</span>
+                <span>${cat}</span>
+              </button>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Fila Inferior: Buscador, Ordenamiento, Disponibilidad y Contador -->
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
           <!-- Buscador con icono y limpiador -->
-          <div style="position: relative; flex: 1; min-width: 280px; max-width: 450px;">
-            <input type="text" class="form-control store-search-glow" id="store-search" placeholder="🔍 Buscar por nombre o descripción..." value="${searchQuery}" style="padding-left: 16px; padding-right: 40px; border-radius: 50px; height: 46px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 14px; font-weight: 500; width: 100%;">
+          <div style="position: relative; flex: 1; min-width: 260px; max-width: 400px;">
+            <input type="text" class="form-control store-search-glow" id="store-search" placeholder="🔍 Buscar productos..." value="${searchQuery}" style="padding-left: 16px; padding-right: 40px; border-radius: 50px; height: 42px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 13.5px; font-weight: 500; width: 100%;">
             ${searchQuery ? `
               <button id="store-search-clear" class="search-clear-btn" title="Limpiar búsqueda">&times;</button>
             ` : ''}
           </div>
 
-          <!-- Filtro de ordenamiento y switch de disponibilidad -->
+          <!-- Controles de ordenamiento y disponibilidad -->
           <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Ordenar:</span>
-              <select id="store-sort-select" class="select-premium">
+              <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Ordenar:</span>
+              <select id="store-sort-select" class="select-premium" style="height: 38px; padding: 0 16px !important;">
                 <option value="default" ${storeSortOrder === 'default' ? 'selected' : ''}>Relevancia</option>
-                <option value="price_asc" ${storeSortOrder === 'price_asc' ? 'selected' : ''}>Precio: Menor a Mayor</option>
-                <option value="price_desc" ${storeSortOrder === 'price_desc' ? 'selected' : ''}>Precio: Mayor a Menor</option>
+                <option value="price_asc" ${storeSortOrder === 'price_asc' ? 'selected' : ''}>Menor Precio</option>
+                <option value="price_desc" ${storeSortOrder === 'price_desc' ? 'selected' : ''}>Mayor Precio</option>
               </select>
             </div>
 
-            <label class="switch-premium-label">
+            <label class="switch-premium-label" style="display: flex; align-items: center; gap: 8px;">
               <input type="checkbox" id="store-available-toggle" class="switch-premium-checkbox" ${storeOnlyAvailable ? 'checked' : ''}>
               <span>Solo en Stock 🐒</span>
             </label>
-          </div>
-
-        </div>
-
-        <!-- Fila Inferior: Filtros de Categorías e Indicador de Resultados -->
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px;">
-          <!-- Categorías Premium -->
-          <div class="categories-container" style="display: flex; gap: 10px; overflow-x: auto; max-width: 100%; white-space: nowrap; padding-bottom: 4px; -webkit-overflow-scrolling: touch; border: none; background: transparent; flex: 1;">
-            ${categories.map(cat => {
-              const icon = categoryIcons[cat] || '📦';
-              const isActive = selectedCategory === (cat === 'Todas' ? '' : cat);
-              return `
-                <button class="filter-category-btn-premium ${isActive ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}">
-                  <span>${icon}</span>
-                  <span>${cat}</span>
-                </button>
-              `;
-            }).join('')}
-          </div>
-
-          <!-- Contador de Resultados -->
-          <div style="font-size: 13px; font-weight: 700; color: var(--text-secondary); background: rgba(255,255,255,0.03); padding: 8px 14px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.05); white-space: nowrap;">
-            🛒 ${displayedProducts.length} ${displayedProducts.length === 1 ? 'producto' : 'productos'}
+            
+            <!-- Contador de Resultados -->
+            <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); background: rgba(255,255,255,0.03); padding: 8px 14px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.05); white-space: nowrap;">
+              🛒 ${displayedProducts.length} ${displayedProducts.length === 1 ? 'producto' : 'productos'}
+            </div>
           </div>
         </div>
       </div>
