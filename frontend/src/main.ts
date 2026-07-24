@@ -3429,48 +3429,43 @@ function bindPOSEvents() {
     await renderAdminPOS();
   });
 
-  // Buscador de productos POS (Ultra Rápido e Inteligente sin congelar pantalla)
+  // Buscador de productos POS (Ultra Rápido con Debounce para evitar congelamientos)
   const searchInput = document.getElementById('pos-search-input') as HTMLInputElement;
+  let posSearchTimeout: any;
   searchInput?.addEventListener('input', (e) => {
     const val = (e.target as HTMLInputElement).value;
     posSearchQuery = val;
-    const grid = document.querySelector('.pos-products-grid');
-    if (grid) {
-      const filtered = posProductsCache.filter(prod =>
-        smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, val)
-      );
+    clearTimeout(posSearchTimeout);
+    posSearchTimeout = setTimeout(() => {
+      const grid = document.querySelector('.pos-products-grid');
+      if (grid) {
+        const filtered = posProductsCache.filter(prod =>
+          smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, val)
+        );
 
-      grid.innerHTML = filtered.map(prod => `
-        <div class="card pos-product-card add-to-pos-cart" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease;">
-          <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:90px; object-fit:cover; border-radius:8px; margin-bottom:6px;">
-          <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.name}</div>
-          <div style="font-weight:800; color:var(--primary); font-size:13px; margin-top:2px;">$${Number(prod.price).toFixed(2)}</div>
-          <div style="font-size:10px; color:var(--text-muted);">Stock: ${prod.stock}</div>
-        </div>
-      `).join('') || '<p style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-secondary);">No se encontraron productos.</p>';
-
-      // Re-vincular eventos de clic para añadir a la canasta
-      grid.querySelectorAll('.add-to-pos-cart').forEach(card => {
-        card.addEventListener('click', async (evt) => {
-          const id = parseInt((evt.currentTarget as HTMLDivElement).dataset.id || '0');
-          const prod = posProductsCache.find(p => p.id === id) || productsList.find(p => p.id === id);
-          if (prod) {
-            await addToPOSCart(prod);
-          }
-        });
-      });
-    }
+        grid.innerHTML = filtered.map(prod => `
+          <div class="card pos-product-card add-to-pos-cart" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease;">
+            <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:90px; object-fit:cover; border-radius:8px; margin-bottom:6px;">
+            <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.name}</div>
+            <div style="font-weight:800; color:var(--primary); font-size:13px; margin-top:2px;">$${Number(prod.price).toFixed(2)}</div>
+            <div style="font-size:10px; color:var(--text-muted);">Stock: ${prod.stock}</div>
+          </div>
+        `).join('') || '<p style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-secondary);">No se encontraron productos.</p>';
+      }
+    }, 120);
   });
 
-  // Agregar al POS Cart
-  document.querySelectorAll('.add-to-pos-cart').forEach(card => {
-    card.addEventListener('click', async (e) => {
-      const id = parseInt((e.currentTarget as HTMLDivElement).dataset.id || '0');
-      const prod = productsList.find(p => p.id === id);
+  // Delegación de eventos para agregar productos al carrito en el POS
+  document.getElementById('dashboard-content-panel')?.addEventListener('click', async (e) => {
+    const target = e.target as HTMLElement;
+    const card = target.closest('.add-to-pos-cart') as HTMLDivElement | null;
+    if (card) {
+      const id = parseInt(card.dataset.id || '0');
+      const prod = posProductsCache.find(p => p.id === id) || productsList.find(p => p.id === id);
       if (prod) {
         await addToPOSCart(prod);
       }
-    });
+    }
   });
 
   // Inc/Dec y Borrar
