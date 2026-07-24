@@ -128,7 +128,7 @@ function smartMatch(target: string | undefined | null, query: string | undefined
 }
 
 // Vista activa dentro de Administración
-type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports';
+type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports' | 'suppliers';
 let activeAdminView: AdminSubView = 'pos';
 
 // Nuevas variables de estado para el control en POS
@@ -162,6 +162,14 @@ let editingCustomer: User | null = null;
 let showEditCustomerModal = false;
 let customerHistoryData: { customer: User; sales: Sale[] } | null = null;
 let showCustomerHistoryModal = false;
+
+// Estado de Proveedores (Admin)
+let suppliersList: any[] = [];
+let suppliersLoading = false;
+let suppliersLoaded = false;
+let supplierSearchQuery = '';
+let editingSupplierId: number | null = null;
+
 
 interface POSPaymentLine {
   id: number;
@@ -2275,6 +2283,11 @@ function renderAdminDashboard(): string {
           <button class="sidebar-nav-btn ${activeAdminView === 'customers' ? 'active' : ''}" id="admin-tab-customers">
             👤 Clientes Registrados
           </button>
+          ${hasPermission('products') ? `
+            <button class="sidebar-nav-btn ${activeAdminView === 'suppliers' ? 'active' : ''}" id="admin-tab-suppliers">
+              🚚 Proveedores
+            </button>
+          ` : ''}
           ${currentUser.role === 'admin' ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'expenses' ? 'active' : ''}" id="admin-tab-expenses">
               💼 Gastos
@@ -2352,6 +2365,7 @@ async function bindAdminEvents() {
   const tabExpenses = document.getElementById('admin-tab-expenses');
   const tabStaff = document.getElementById('admin-tab-staff');
   const tabReports = document.getElementById('admin-tab-reports');
+  const tabSuppliers = document.getElementById('admin-tab-suppliers');
 
   const clearActiveTabs = () => {
     tabStats?.classList.remove('active');
@@ -2365,6 +2379,7 @@ async function bindAdminEvents() {
     tabExpenses?.classList.remove('active');
     tabStaff?.classList.remove('active');
     tabReports?.classList.remove('active');
+    tabSuppliers?.classList.remove('active');
   };
 
   tabStats?.addEventListener('click', async () => {
@@ -2455,6 +2470,14 @@ async function bindAdminEvents() {
     await renderAdminStaff();
   });
 
+  tabSuppliers?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabSuppliers.classList.add('active');
+    activeAdminView = 'suppliers';
+    destroyCharts();
+    await renderAdminSuppliers();
+  });
+
   // Renderizar la subvista por defecto al cargar
   if (activeAdminView === 'stats') {
     await renderAdminStats();
@@ -2478,6 +2501,8 @@ async function bindAdminEvents() {
     await renderAdminStaff();
   } else if (activeAdminView === 'reports') {
     await renderAdminReports();
+  } else if (activeAdminView === 'suppliers') {
+    await renderAdminSuppliers();
   }
 
   // Guardar Tasas de Cambio Manuales (BCV & Binance)
@@ -8254,3 +8279,244 @@ function printReportPDF(metrics: any, sales: any[], paymentMethods: any[], perio
   window.print();
 }
 
+
+
+async function renderAdminSuppliers() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  if (!suppliersLoaded || suppliersLoading) {
+    panel.innerHTML = `<div style="padding:20px; font-weight:700; color:var(--text-muted);">Cargando proveedores...</div>`;
+    try {
+      suppliersLoading = true;
+      suppliersList = await api.suppliers.getAll();
+      suppliersLoaded = true;
+      suppliersLoading = false;
+    } catch (e: any) {
+      panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar proveedores: ${e.message}</div>`;
+      suppliersLoading = false;
+      return;
+    }
+  }
+
+  const query = (supplierSearchQuery || '').trim();
+  const filteredSuppliers = query ? suppliersList.filter(s =>
+    smartMatch(`${s.name || ''} ${s.contact_name || ''} ${s.email || ''} ${s.phone || ''} ${s.rif || ''}`, query)
+  ) : suppliersList;
+
+  const editingSupplier = editingSupplierId ? suppliersList.find(s => s.id === editingSupplierId) : null;
+
+  panel.innerHTML = `
+    <div class="animate-on-scroll animate-fade-up visible">
+      <div class="flex justify-between align-center mb-4">
+        <div>
+          <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Gestión de Proveedores</h2>
+          <p style="font-size:12px; color:var(--text-secondary);">Directorio de proveedores y suministros de FacilitoApp 🚚</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="admin-add-supplier-btn" style="padding:10px 16px; font-weight:700; border-radius:50px;">
+          ➕ Registrar Nuevo Proveedor
+        </button>
+      </div>
+
+      <!-- Formulario Agregar / Editar Proveedor -->
+      <div class="card mb-4" id="supplier-form-card" style="display: ${editingSupplier || editingSupplierId === 0 ? 'block' : 'none'}; padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
+        <h3 id="supplier-form-title" class="mb-4" style="font-size:16px; font-weight:700;">
+          ${editingSupplier ? '📝 Editar Proveedor' : '➕ Registrar Nuevo Proveedor'}
+        </h3>
+        <form id="supplier-form">
+          <div class="grid grid-2 gap-2 mb-3">
+            <div class="form-group">
+              <label class="form-label" style="font-size: 11px; font-weight: 700;">Nombre Comercial / Razón Social *</label>
+              <input type="text" class="form-control" id="supp-name" value="${editingSupplier ? editingSupplier.name : ''}" required placeholder="Ej: Inversiones Tech C.A." style="font-size:13px;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size: 11px; font-weight: 700;">RIF / Identificación Fiscal</label>
+              <input type="text" class="form-control" id="supp-rif" value="${editingSupplier ? editingSupplier.rif || '' : ''}" placeholder="Ej: J-12345678-9" style="font-size:13px;">
+            </div>
+          </div>
+
+          <div class="grid grid-3 gap-2 mb-3">
+            <div class="form-group">
+              <label class="form-label" style="font-size: 11px; font-weight: 700;">Nombre de Contacto</label>
+              <input type="text" class="form-control" id="supp-contact" value="${editingSupplier ? editingSupplier.contact_name || '' : ''}" placeholder="Ej: Ing. Pedro Pérez" style="font-size:13px;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size: 11px; font-weight: 700;">Teléfono</label>
+              <input type="text" class="form-control" id="supp-phone" value="${editingSupplier ? editingSupplier.phone || '' : ''}" placeholder="Ej: 0424-9876543" style="font-size:13px;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size: 11px; font-weight: 700;">Correo Electrónico</label>
+              <input type="email" class="form-control" id="supp-email" value="${editingSupplier ? editingSupplier.email || '' : ''}" placeholder="proveedor@correo.com" style="font-size:13px;">
+            </div>
+          </div>
+
+          <div class="form-group mb-4">
+            <label class="form-label" style="font-size: 11px; font-weight: 700;">Dirección Física</label>
+            <input type="text" class="form-control" id="supp-address" value="${editingSupplier ? editingSupplier.address || '' : ''}" placeholder="Dirección completa del proveedor..." style="font-size:13px;">
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button type="button" class="btn btn-secondary" id="cancel-supplier-btn" style="padding: 8px 16px;">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" id="save-supplier-btn" style="padding: 8px 20px; font-weight:800;">
+              💾 Guardar Proveedor
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Buscador -->
+      <div class="card mb-4" style="padding:14px; border-radius: var(--radius-md);">
+        <input type="text" class="form-control" id="supplier-search-input" placeholder="🔍 Buscar por nombre comercial, RIF, contacto o teléfono..." value="${supplierSearchQuery}" style="font-size:13px; padding:10px 14px;">
+      </div>
+
+      <!-- Tabla -->
+      <div class="card" style="border-radius: var(--radius-md);">
+        <div class="table-responsive">
+          <table class="table-custom">
+            <thead>
+              <tr>
+                <th>Proveedor / RIF</th>
+                <th>Contacto</th>
+                <th>Teléfono / Correo</th>
+                <th>Dirección</th>
+                <th class="text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredSuppliers.map(supp => `
+                <tr>
+                  <td>
+                    <strong>${supp.name}</strong><br>
+                    <span class="badge" style="background:rgba(99,102,241,0.15); color:#818cf8; font-weight:700; font-size:10px;">
+                      ${supp.rif || 'Sin RIF'}
+                    </span>
+                  </td>
+                  <td>${supp.contact_name || '<span style="color:var(--text-muted);">No registrado</span>'}</td>
+                  <td>
+                    <div>${supp.phone || '<span style="color:var(--text-muted);">N/A</span>'}</div>
+                    <div style="font-size:11px; color:var(--text-secondary);">${supp.email || ''}</div>
+                  </td>
+                  <td style="font-size:12px; color:var(--text-secondary); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${supp.address || ''}">
+                    ${supp.address || '<span style="color:var(--text-muted);">Sin dirección</span>'}
+                  </td>
+                  <td class="text-right">
+                    <div style="display:inline-flex; gap:6px; align-items:center; justify-content:flex-end;">
+                      <button type="button" class="btn btn-secondary edit-supplier-btn" style="padding:6px 10px; font-size:11px;" data-id="${supp.id}">
+                        ✏️ Editar
+                      </button>
+                      <button type="button" class="btn btn-danger delete-supplier-btn" style="padding:6px 10px; font-size:11px;" data-id="${supp.id}" data-name="${supp.name}">
+                        🗑️ Borrar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+              ${filteredSuppliers.length === 0 ? '<tr><td colspan="5" class="text-center" style="padding:30px; color:var(--text-secondary);">No se encontraron proveedores registrados.</td></tr>' : ''}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  bindSupplierEvents();
+}
+
+function bindSupplierEvents() {
+  // Buscador con debounce
+  let searchTimeout: any;
+  document.getElementById('supplier-search-input')?.addEventListener('input', (e) => {
+    supplierSearchQuery = (e.target as HTMLInputElement).value;
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async () => {
+      await renderAdminSuppliers();
+      const input = document.getElementById('supplier-search-input') as HTMLInputElement;
+      if (input) {
+        input.focus();
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
+      }
+    }, 450);
+  });
+
+  // Mostrar Formulario de Agregar
+  document.getElementById('admin-add-supplier-btn')?.addEventListener('click', () => {
+    editingSupplierId = 0; // 0 significa nuevo proveedor
+    renderAdminSuppliers();
+  });
+
+  // Cancelar Formulario
+  document.getElementById('cancel-supplier-btn')?.addEventListener('click', () => {
+    editingSupplierId = null;
+    renderAdminSuppliers();
+  });
+
+  // Guardar / Crear Proveedor
+  document.getElementById('supplier-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = (document.getElementById('supp-name') as HTMLInputElement).value.trim();
+    const rif = (document.getElementById('supp-rif') as HTMLInputElement).value.trim();
+    const contact_name = (document.getElementById('supp-contact') as HTMLInputElement).value.trim();
+    const phone = (document.getElementById('supp-phone') as HTMLInputElement).value.trim();
+    const email = (document.getElementById('supp-email') as HTMLInputElement).value.trim();
+    const address = (document.getElementById('supp-address') as HTMLInputElement).value.trim();
+
+    const saveBtn = document.getElementById('save-supplier-btn') as HTMLButtonElement;
+    if (saveBtn) saveBtn.disabled = true;
+
+    const payload = {
+      name,
+      rif: rif || undefined,
+      contact_name: contact_name || undefined,
+      phone: phone || undefined,
+      email: email || undefined,
+      address: address || undefined
+    };
+
+    try {
+      if (editingSupplierId && editingSupplierId > 0) {
+        await api.suppliers.update(editingSupplierId, payload);
+        alert('Proveedor actualizado con éxito');
+      } else {
+        await api.suppliers.create(payload);
+        alert('Proveedor registrado con éxito');
+      }
+      editingSupplierId = null;
+      suppliersLoaded = false; // Forzar recarga
+      await renderAdminSuppliers();
+    } catch (err: any) {
+      alert(err.message || 'Error al guardar proveedor');
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  });
+
+  // Editar Proveedor click
+  document.querySelectorAll('.edit-supplier-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      editingSupplierId = id;
+      renderAdminSuppliers();
+    });
+  });
+
+  // Eliminar Proveedor click
+  document.querySelectorAll('.delete-supplier-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const name = (e.currentTarget as HTMLButtonElement).dataset.name || 'este proveedor';
+
+      if (confirm(`¿Estás seguro de que deseas eliminar permanentemente al proveedor "${name}"?`)) {
+        try {
+          await api.suppliers.delete(id);
+          alert('Proveedor eliminado con éxito');
+          suppliersLoaded = false; // Forzar recarga
+          await renderAdminSuppliers();
+        } catch (err: any) {
+          alert(err.message || 'Error al eliminar proveedor');
+        }
+      }
+    });
+  });
+}

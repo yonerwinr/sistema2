@@ -119,12 +119,23 @@ export interface Expense {
   created_at?: string;
 }
 
+export interface Supplier {
+  id: number;
+  name: string;
+  contact_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  rif?: string | null;
+  created_at?: string;
+}
+
 export interface AuditLog {
   id: number;
   user_id?: number;
   user_name?: string;
   user_role?: string;
-  action_type: 'sale_online' | 'sale_pos' | 'quotation' | 'staff_crud' | 'user_edit' | 'product_crud' | 'coupon_crud' | 'settings';
+  action_type: 'sale_online' | 'sale_pos' | 'quotation' | 'staff_crud' | 'user_edit' | 'product_crud' | 'coupon_crud' | 'settings' | 'supplier_crud';
   title: string;
   details?: string;
   created_at: string;
@@ -430,6 +441,23 @@ export const api = {
     cashDrop: (body: { amount: number; supervisorEmail?: string; supervisorPassword?: string }) => request<any>('/cash/cash-drop', {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+  },
+
+  // Proveedores
+  suppliers: {
+    getAll: () => request<Supplier[]>('/suppliers'),
+    getOne: (id: number) => request<Supplier>(`/suppliers/${id}`),
+    create: (body: Partial<Supplier>) => request<Supplier>('/suppliers', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    update: (id: number, body: Partial<Supplier>) => request<Supplier>(`/suppliers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+    delete: (id: number) => request<{ message: string }>(`/suppliers/${id}`, {
+      method: 'DELETE',
     }),
   },
 };

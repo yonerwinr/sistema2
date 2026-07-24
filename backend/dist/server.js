@@ -15,6 +15,7 @@ const sales_1 = __importDefault(require("./controllers/sales"));
 const stats_1 = __importDefault(require("./controllers/stats"));
 const expenses_1 = __importDefault(require("./controllers/expenses"));
 const cash_1 = __importDefault(require("./controllers/cash"));
+const suppliers_1 = __importDefault(require("./controllers/suppliers"));
 const reminders_1 = require("./services/reminders");
 const rates_1 = require("./services/rates");
 dotenv_1.default.config();
@@ -33,6 +34,7 @@ app.use('/api/sales', sales_1.default);
 app.use('/api/stats', stats_1.default);
 app.use('/api/expenses', expenses_1.default);
 app.use('/api/cash', cash_1.default);
+app.use('/api/suppliers', suppliers_1.default);
 // Ruta raiz de prueba
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Servidor FacilitoApp funcionando correctamente 🐒' });
@@ -371,6 +373,20 @@ async function runMigrations() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB;
     `);
+        // Crear tabla de proveedores si no existe
+        await conn.query(`
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        contact_name VARCHAR(100) NULL,
+        email VARCHAR(100) NULL,
+        phone VARCHAR(30) NULL,
+        address TEXT NULL,
+        rif VARCHAR(50) NULL UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+        console.log('Tabla "suppliers" verificada.');
         // Insertar configuraciones por defecto si no existen
         await conn.query(`
       INSERT IGNORE INTO settings (settings_key, settings_value) VALUES 

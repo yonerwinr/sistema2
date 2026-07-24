@@ -10,6 +10,7 @@ import saleRoutes from './controllers/sales';
 import statsRoutes from './controllers/stats';
 import expenseRoutes from './controllers/expenses';
 import cashRoutes from './controllers/cash';
+import supplierRoutes from './controllers/suppliers';
 import { startReminderCron } from './services/reminders';
 import { startRatesCron } from './services/rates';
 
@@ -33,6 +34,7 @@ app.use('/api/sales', saleRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/cash', cashRoutes);
+app.use('/api/suppliers', supplierRoutes);
 
 // Ruta raiz de prueba
 app.get('/api/health', (req, res) => {
@@ -375,6 +377,21 @@ async function runMigrations() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB;
     `);
+
+    // Crear tabla de proveedores si no existe
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        contact_name VARCHAR(100) NULL,
+        email VARCHAR(100) NULL,
+        phone VARCHAR(30) NULL,
+        address TEXT NULL,
+        rif VARCHAR(50) NULL UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+    console.log('Tabla "suppliers" verificada.');
 
     // Insertar configuraciones por defecto si no existen
     await conn.query(`
