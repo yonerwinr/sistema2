@@ -321,6 +321,7 @@ function renderApp() {
     ${renderCheckoutModal()}
     ${renderInvoiceSuccessModal()}
     ${renderSaleDetailModal()}
+    ${renderSaleDetailPngModal()}
   `;
 
   // Enlazar eventos de la vista activa y modales comunes
@@ -1040,6 +1041,73 @@ function formatRate(num: number): string {
   return str;
 }
 
+function drawCode128OnCanvas(ctx: CanvasRenderingContext2D, codeText: string, x: number, y: number, width: number, height: number) {
+  if (!codeText) return;
+
+  const PATTERNS: number[][] = [
+    [2,1,2,2,2,2],[2,2,2,1,2,2],[2,2,2,2,2,1],[1,2,1,2,2,3],[1,2,1,3,2,2],[1,3,1,2,2,2],
+    [1,2,2,2,1,3],[1,2,2,3,1,2],[1,3,2,2,1,2],[2,2,1,2,1,3],[2,2,1,3,1,2],[2,3,1,2,1,2],
+    [1,1,2,2,3,2],[1,2,2,1,3,2],[1,2,2,2,3,1],[1,1,3,2,2,2],[1,2,3,1,2,2],[1,2,3,2,2,1],
+    [2,2,3,2,1,1],[2,2,1,1,3,2],[2,2,1,2,3,1],[2,1,3,2,1,2],[2,2,3,1,1,2],[3,1,2,1,3,1],
+    [3,1,1,2,2,2],[3,2,1,1,2,2],[3,2,1,2,2,1],[3,1,2,2,1,2],[3,2,2,1,1,2],[3,2,2,2,1,1],
+    [2,1,2,1,2,3],[2,1,2,3,2,1],[2,3,2,1,2,1],[1,1,1,3,2,3],[1,3,1,1,2,3],[1,3,1,3,2,1],
+    [1,1,2,3,1,3],[1,3,2,1,1,3],[1,3,2,3,1,1],[2,1,1,3,1,3],[2,3,1,1,1,3],[2,3,1,3,1,1],
+    [1,1,2,1,3,3],[1,1,2,3,3,1],[1,3,2,1,3,1],[1,1,3,1,2,3],[1,1,3,3,2,1],[1,3,3,1,2,1],
+    [3,1,3,1,2,1],[2,1,1,3,3,1],[2,3,1,1,3,1],[2,1,3,1,1,3],[2,1,3,3,1,1],[2,1,3,1,3,1],
+    [3,1,1,1,2,3],[3,1,1,3,2,1],[3,3,1,1,2,1],[3,1,2,1,1,3],[3,1,2,3,1,1],[3,3,2,1,1,1],
+    [3,1,4,1,1,1],[2,2,1,4,1,1],[4,3,1,1,1,1],[1,1,1,2,2,4],[1,1,1,4,2,2],[1,2,1,1,2,4],
+    [1,2,1,4,2,1],[1,4,1,1,2,2],[1,4,1,2,2,1],[1,1,2,2,1,4],[1,1,2,4,1,2],[1,2,2,1,1,4],
+    [1,2,2,4,1,1],[1,4,2,1,1,2],[1,4,2,2,1,1],[2,4,1,2,1,1],[2,2,1,1,1,4],[4,1,3,1,1,1],
+    [2,4,1,1,1,2],[1,3,4,1,1,1],[1,1,1,2,4,2],[1,2,1,1,4,2],[1,2,1,2,4,1],[1,1,4,2,1,2],
+    [1,2,4,1,1,2],[1,2,4,2,1,1],[4,1,1,2,1,2],[4,2,1,1,1,2],[4,2,1,2,1,1],[2,1,2,1,4,1],
+    [2,1,4,1,2,1],[4,1,2,1,2,1],[1,1,1,1,4,3],[1,1,1,3,4,1],[1,3,1,1,4,1],[1,1,4,1,1,3],
+    [1,1,4,3,1,1],[4,1,1,1,1,3],[4,1,1,3,1,1],[1,1,3,1,4,1],[1,1,4,1,3,1],[3,1,1,1,4,1],
+    [4,1,1,1,3,1],[2,1,1,4,1,2],[2,1,1,2,1,4],[2,1,1,2,3,2],[2,3,3,1,1,1,2]
+  ];
+
+  const codeSymbols: number[] = [104];
+  let checksum = 104;
+
+  for (let i = 0; i < codeText.length; i++) {
+    const codeVal = Math.max(0, Math.min(102, codeText.charCodeAt(i) - 32));
+    codeSymbols.push(codeVal);
+    checksum += codeVal * (i + 1);
+  }
+
+  codeSymbols.push(checksum % 103);
+  codeSymbols.push(106);
+
+  let totalModules = 0;
+  codeSymbols.forEach(sym => {
+    const pattern = PATTERNS[sym] || PATTERNS[0];
+    pattern.forEach(w => totalModules += w);
+  });
+
+  const quietZone = 10;
+  const usableWidth = width - quietZone * 2;
+  const moduleWidth = usableWidth / totalModules;
+
+  let currentX = x + quietZone;
+
+  ctx.fillStyle = '#000000';
+  codeSymbols.forEach(sym => {
+    const pattern = PATTERNS[sym] || PATTERNS[0];
+    pattern.forEach((barWidth, idx) => {
+      const w = barWidth * moduleWidth;
+      if (idx % 2 === 0) {
+        ctx.fillRect(currentX, y, w, height - 15);
+      }
+      currentX += w;
+    });
+  });
+
+  // Dibujar texto abajo del código de barras
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 11px Outfit, monospace, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(codeText, x + width / 2, y + height);
+}
+
 function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
   return new Promise((resolve, reject) => {
     // Cargar la imagen del logotipo
@@ -1068,7 +1136,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       if (sale.concept) extraHeight += 40;
       if (sale.note) extraHeight += 40;
       
-      const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight + extraHeight + 40;
+      const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight + extraHeight + 40 + 80;
 
       canvas.width = width;
       canvas.height = height;
@@ -1338,8 +1406,14 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       ctx.lineTo(width - 30, y);
       ctx.stroke();
 
+      // Dibujar Código de Barras Único de la Factura
+      y += 20;
+      const barcodeText = `${sale.is_quotation === 1 ? 'COT' : 'FAC'}-${sale.id}`;
+      drawCode128OnCanvas(ctx, barcodeText, (width - 240) / 2, y, 240, 50);
+      y += 65;
+
       // Footer
-      y += 35;
+      y += 15;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 13px Outfit, Segoe UI';
@@ -4911,54 +4985,6 @@ function generateCode128SVG(codeText: string, width = 240, height = 60): string 
   `;
 }
 
-function generateQRCodeSVG(text: string, size = 85): string {
-  if (!text) return '';
-
-  const gridCount = 21;
-  const cellSize = Math.floor(size / gridCount);
-  const realSize = cellSize * gridCount;
-  
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    hash = (hash << 5) - hash + text.charCodeAt(i);
-    hash |= 0;
-  }
-
-  const isModuleBlack = (r: number, c: number): boolean => {
-    const inTopLeftFinder = (r <= 6 && c <= 6);
-    const inTopRightFinder = (r <= 6 && c >= 14);
-    const inBottomLeftFinder = (r >= 14 && c <= 6);
-
-    if (inTopLeftFinder || inTopRightFinder || inBottomLeftFinder) {
-      const lr = r <= 6 ? r : r - 14;
-      const lc = c <= 6 ? c : (c >= 14 ? c - 14 : c);
-      if (lr === 0 || lr === 6 || lc === 0 || lc === 6) return true;
-      if (lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4) return true;
-      return false;
-    }
-
-    if (r === 6 || c === 6) return (r + c) % 2 === 0;
-
-    const val = (r * 31 + c * 17 + Math.abs(hash)) % 100;
-    return val > 45;
-  };
-
-  let rects = '';
-  for (let r = 0; r < gridCount; r++) {
-    for (let c = 0; c < gridCount; c++) {
-      if (isModuleBlack(r, c)) {
-        rects += `<rect x="${c * cellSize}" y="${r * cellSize}" width="${cellSize}" height="${cellSize}" fill="#000000" />`;
-      }
-    }
-  }
-
-  return `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${realSize} ${realSize}" width="${size}" height="${size}" style="background:#ffffff; display:block;">
-      <rect width="100%" height="100%" fill="#ffffff" />
-      ${rects}
-    </svg>
-  `;
-}
 
 function showProductLabelModal(product: any, defaultQty = 1) {
   let modalCard = document.getElementById('product-label-modal');
@@ -4972,7 +4998,6 @@ function showProductLabelModal(product: any, defaultQty = 1) {
   }
 
   const barcodeSvg = generateCode128SVG(product.code || 'SKU-0000', 240, 60);
-  const qrSvg = generateQRCodeSVG(product.code || 'SKU-0000', 80);
   const vesPrice = (product.price * rateUsdToVes).toFixed(2);
 
   modalCard.innerHTML = `
@@ -4985,7 +5010,7 @@ function showProductLabelModal(product: any, defaultQty = 1) {
       </div>
 
       <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
-        Vista previa digital en alta resolución vectorial (Code 128 + QR) lista para impresoras térmicas de código de barras.
+        Vista previa digital en alta resolución vectorial (Code 128) lista para impresoras térmicas de código de barras.
       </p>
 
       <!-- Vista Previa de la Etiqueta Digital -->
@@ -5010,12 +5035,9 @@ function showProductLabelModal(product: any, defaultQty = 1) {
           </div>
         </div>
 
-        <div style="display: flex; gap: 10px; align-items: center; justify-content: space-between; background: #ffffff; padding: 4px; border: 1px dashed #cbd5e1; border-radius: 8px;">
-          <div style="flex-grow: 1; text-align: center;">
+        <div style="display: flex; align-items: center; justify-content: center; background: #ffffff; padding: 8px; border: 1px dashed #cbd5e1; border-radius: 8px;">
+          <div style="text-align: center; width: 100%;">
             ${barcodeSvg}
-          </div>
-          <div style="flex-shrink: 0; padding: 2px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;">
-            ${qrSvg}
           </div>
         </div>
       </div>
@@ -5065,7 +5087,6 @@ function printProductLabels(product: any, count: number) {
   }
 
   const barcodeSvg = generateCode128SVG(product.code || 'SKU-0000', 220, 55);
-  const qrSvg = generateQRCodeSVG(product.code || 'SKU-0000', 70);
   const vesPrice = (product.price * rateUsdToVes).toFixed(2);
 
   let htmlLabels = '';
@@ -5083,9 +5104,8 @@ function printProductLabels(product: any, count: number) {
           <span>$${Number(product.price).toFixed(2)}</span>
           <span style="font-size: 8px; font-weight: 700;">Bs. ${vesPrice}</span>
         </div>
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-top: 1px;">
-          <div style="flex-grow:1; text-align:center;">${barcodeSvg}</div>
-          <div style="flex-shrink:0;">${qrSvg}</div>
+        <div style="display:flex; align-items:center; justify-content:center; margin-top: 2px;">
+          <div style="text-align:center; width: 100%;">${barcodeSvg}</div>
         </div>
       </div>
     `;
@@ -5459,11 +5479,42 @@ function renderSaleDetailModal(): string {
             <button class="btn btn-secondary" id="detail-email-btn" style="padding: 8px 12px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;">
               ✉️ Reenviar por Correo
             </button>
+            <!-- Ver Factura PNG -->
+            <button class="btn btn-secondary" id="detail-view-png-btn" style="padding: 8px 12px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;">
+              📄 Ver Factura Digital
+            </button>
           </div>
           <div class="text-right">
             <div style="font-size:12px; color:var(--text-muted);">TOTAL FACTURADO</div>
             <strong style="font-size:24px; color:var(--primary);" id="detail-total-value">$0.00</strong>
           </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSaleDetailPngModal(): string {
+  return `
+    <div class="modal-overlay" id="sale-detail-png-modal">
+      <div class="modal-content text-center animate-on-scroll animate-zoom-in visible" style="max-width: 450px;">
+        <button class="modal-close" id="sale-detail-png-close">&times;</button>
+        <h3 class="mb-2" style="font-size:18px; font-weight:700;">📄 Comprobante Digital (PNG)</h3>
+        <p style="color:var(--text-secondary); font-size:12px;" class="mb-4">
+          Esta es la imagen de la factura generada para el cliente.
+        </p>
+
+        <div id="detail-png-container" style="width: 100%; max-height: 400px; overflow-y: auto; border: 1px solid var(--border-glass); border-radius: var(--radius-md); background: #0f172a; padding: 8px; display:flex; align-items:center; justify-content:center; margin-bottom: 16px;">
+          <p style="color: var(--text-muted); font-size: 11px; padding: 20px;">Generando imagen PNG...</p>
+        </div>
+
+        <div class="flex gap-2 w-100">
+          <button type="button" class="btn btn-secondary w-100" id="detail-copy-png-btn" style="font-size: 13px; font-weight:600; padding: 10px; display:flex; align-items:center; justify-content:center; gap:6px;">
+            📋 Copiar
+          </button>
+          <a href="#" class="btn btn-primary w-100" id="detail-download-png-btn" style="font-size: 13px; font-weight:600; padding: 10px; display:flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; color:white;">
+            📥 Descargar PNG
+          </a>
         </div>
       </div>
     </div>
@@ -5703,6 +5754,58 @@ function showSaleDetails(details: SaleDetail) {
       });
     }
   }
+
+  // Enlace a Ver Factura PNG
+  const viewPngBtn = document.getElementById('detail-view-png-btn') as HTMLButtonElement;
+  if (viewPngBtn) {
+    const newViewPngBtn = viewPngBtn.cloneNode(true) as HTMLButtonElement;
+    viewPngBtn.parentNode?.replaceChild(newViewPngBtn, viewPngBtn);
+
+    newViewPngBtn.addEventListener('click', async () => {
+      const pngModal = document.getElementById('sale-detail-png-modal');
+      const pngContainer = document.getElementById('detail-png-container');
+      const copyPngBtn = document.getElementById('detail-copy-png-btn') as HTMLButtonElement;
+      const downloadPngBtn = document.getElementById('detail-download-png-btn') as HTMLAnchorElement;
+
+      if (!pngModal || !pngContainer) return;
+
+      pngModal.classList.add('open');
+      pngContainer.innerHTML = `<p style="color:var(--text-muted); font-size: 11px; padding: 20px;">Generando imagen PNG...</p>`;
+
+      try {
+        const blob = await generateReceiptPNG(sale, items);
+        const blobUrl = URL.createObjectURL(blob);
+
+        pngContainer.innerHTML = `<img src="${blobUrl}" style="max-width: 100%; max-height: 380px; object-fit: contain; border-radius: 6px; box-shadow: var(--shadow-lg);" alt="Factura PNG">`;
+
+        // Descarga
+        if (downloadPngBtn) {
+          downloadPngBtn.href = blobUrl;
+          downloadPngBtn.download = `factura-${sale.id}.png`;
+        }
+
+        // Copiar al portapapeles
+        if (copyPngBtn) {
+          const newCopyBtn = copyPngBtn.cloneNode(true) as HTMLButtonElement;
+          copyPngBtn.parentNode?.replaceChild(newCopyBtn, copyPngBtn);
+          newCopyBtn.addEventListener('click', async () => {
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+              ]);
+              alert('¡Factura PNG copiada al portapapeles! Abre WhatsApp u otro chat y presiona Ctrl + V para enviarla.');
+            } catch (err) {
+              console.error(err);
+              alert('Error al copiar la imagen. Por favor descarga la factura.');
+            }
+          });
+        }
+      } catch (err: any) {
+        console.error(err);
+        pngContainer.innerHTML = `<p style="color:var(--danger); font-size:12px; padding:20px;">Error al generar el comprobante digital.</p>`;
+      }
+    });
+  }
 }
 
 function bindSaleDetailEvents() {
@@ -5710,6 +5813,12 @@ function bindSaleDetailEvents() {
   const closeBtn = document.getElementById('sale-detail-close');
   closeBtn?.addEventListener('click', () => {
     modal?.classList.remove('open');
+  });
+
+  const pngModal = document.getElementById('sale-detail-png-modal');
+  const pngCloseBtn = document.getElementById('sale-detail-png-close');
+  pngCloseBtn?.addEventListener('click', () => {
+    pngModal?.classList.remove('open');
   });
 }
 
