@@ -19,7 +19,7 @@ const canManageSuppliers = (req, res, next) => {
     return res.status(403).json({ message: 'Acceso denegado, se requieren privilegios de administracion o vendedor' });
 };
 // Obtener todos los proveedores
-router.get('/', auth_1.authenticate, canManageSuppliers, async (req, res) => {
+router.get('/', auth_1.authenticate, canManageSuppliers, async (_req, res) => {
     try {
         const [rows] = await db_1.default.query('SELECT * FROM suppliers ORDER BY id DESC');
         res.json(rows);

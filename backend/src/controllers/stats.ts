@@ -5,7 +5,7 @@ import { authenticate, isAdmin, AuthRequest } from '../middleware/auth';
 const router = Router();
 
 // Endpoint de estadísticas del dashboard (Solo Admin)
-router.get('/', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, isAdmin, async (_req: AuthRequest, res: Response) => {
   try {
     // 1. Resumen de tarjetas métricas (Ventas totales, Ingresos, Promedio, Productos sin stock)
     const [summaryResult]: any = await pool.query(`

@@ -62,14 +62,11 @@ export async function sendInvoiceEmail(toEmail: string, sale: any, items: any[],
 
     // Obtener tasas de cambio oficiales y nombre del vendedor
     let rateUsdToVes = 40.00;
-    let rateEurToVes = 43.50;
     let registeredBy = 'Online (Tienda)';
     try {
-      const [settingsRows]: any = await pool.query("SELECT * FROM settings WHERE settings_key IN ('usd_to_ves_rate', 'eur_to_ves_rate')");
+      const [settingsRows]: any = await pool.query("SELECT * FROM settings WHERE settings_key = 'usd_to_ves_rate'");
       const usdSetting = settingsRows.find((s: any) => s.settings_key === 'usd_to_ves_rate');
-      const eurSetting = settingsRows.find((s: any) => s.settings_key === 'eur_to_ves_rate');
       if (usdSetting) rateUsdToVes = parseFloat(usdSetting.settings_value);
-      if (eurSetting) rateEurToVes = parseFloat(eurSetting.settings_value);
 
       if (sale.seller_name) {
         registeredBy = sale.seller_name;
@@ -430,7 +427,7 @@ Este es un correo automático generado por FacilitoApp 🐒.
     `;
 
     const info = await client.sendMail({
-      from: fromAddress,
+      from: friendlyFrom,
       to: toEmail,
       subject: sale.is_quotation === 1 
         ? `Cotización al mayor #${sale.id} - FacilitoApp 🐒` 

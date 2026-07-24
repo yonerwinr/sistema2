@@ -36,7 +36,7 @@ app.use('/api/expenses', expenses_1.default);
 app.use('/api/cash', cash_1.default);
 app.use('/api/suppliers', suppliers_1.default);
 // Ruta raiz de prueba
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', message: 'Servidor FacilitoApp funcionando correctamente 🐒' });
 });
 // Función de migraciones automáticas

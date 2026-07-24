@@ -17,7 +17,7 @@ const canManageSuppliers = (req: AuthRequest, res: Response, next: any) => {
 };
 
 // Obtener todos los proveedores
-router.get('/', authenticate, canManageSuppliers, async (req: AuthRequest, res: Response) => {
+router.get('/', authenticate, canManageSuppliers, async (_req: AuthRequest, res: Response) => {
   try {
     const [rows] = await pool.query('SELECT * FROM suppliers ORDER BY id DESC');
     res.json(rows);

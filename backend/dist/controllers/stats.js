@@ -8,7 +8,7 @@ const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 // Endpoint de estadísticas del dashboard (Solo Admin)
-router.get('/', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
+router.get('/', auth_1.authenticate, auth_1.isAdmin, async (_req, res) => {
     try {
         // 1. Resumen de tarjetas métricas (Ventas totales, Ingresos, Promedio, Productos sin stock)
         const [summaryResult] = await db_1.default.query(`

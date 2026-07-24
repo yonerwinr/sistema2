@@ -89,7 +89,7 @@ router.post('/login', async (req, res) => {
     }
 });
 // Obtener el Client ID de Google configurado en el servidor
-router.get('/google-client-id', (req, res) => {
+router.get('/google-client-id', (_req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID || '1008719970978-hb24n2dstb40o45upg4689qqt56n74hs.apps.googleusercontent.com';
     res.json({ clientId });
 });

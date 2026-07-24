@@ -21,10 +21,10 @@ const canManageProducts = (req, res, next) => {
 };
 // Configuración de almacenamiento para Multer (Imágenes Locales)
 const storage = multer_1.default.diskStorage({
-    destination: (req, file, cb) => {
+    destination: (_req, _file, cb) => {
         cb(null, path_1.default.join(__dirname, '../../uploads')); // backend/uploads
     },
-    filename: (req, file, cb) => {
+    filename: (_req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
         cb(null, uniqueSuffix + path_1.default.extname(file.originalname));
     }

@@ -1061,7 +1061,7 @@ router.get('/settings/rates/historical', async (req, res) => {
     }
 });
 // Obtener tasas de cambio (Público)
-router.get('/settings/rates', async (req, res) => {
+router.get('/settings/rates', async (_req, res) => {
     try {
         const [rows] = await db_1.default.query('SELECT * FROM settings WHERE settings_key IN (?, ?, ?)', [
             'usd_to_ves_rate',
@@ -1122,7 +1122,7 @@ router.post('/settings/rates/sync', auth_1.authenticate, async (req, res) => {
     }
 });
 // GET /sales/coupons/all: Obtener lista de cupones
-router.get('/coupons/all', auth_1.authenticate, async (req, res) => {
+router.get('/coupons/all', auth_1.authenticate, async (_req, res) => {
     try {
         const [coupons] = await db_1.default.query(`SELECT c.*, u.name AS user_name 
        FROM coupons c 
