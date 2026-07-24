@@ -1279,3 +1279,91 @@ select option:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   OPTIMIZACIÓN PARA TELÉFONOS (MOBILE RESPONSIVE LAYOUTS)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr !important;
+    min-height: calc(100vh - 60px) !important;
+  }
+  
+  .dashboard-sidebar {
+    flex-direction: row !important;
+    min-height: auto !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    padding: 10px 12px !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-glass) !important;
+    gap: 8px !important;
+  }
+
+  .sidebar-nav-group {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .sidebar-nav-btn {
+    width: auto !important;
+    white-space: nowrap !important;
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+    display: inline-flex !important;
+    flex-shrink: 0 !important;
+  }
+
+  .rates-widget-sidebar {
+    display: none !important; /* Ocultar el widget de tasas en móvil para ahorrar espacio */
+  }
+
+  .dashboard-content {
+    padding: 16px 10px !important;
+  }
+
+  /* Ajustes del POS en Móvil */
+  .pos-responsive-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .pos-cart-column {
+    border-left: none !important;
+    padding: 12px !important;
+  }
+
+  /* Ajustar filas de pago mixtas en móvil */
+  .pos-payment-row > div {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .pos-payment-row input {
+    font-size: 12px !important;
+    padding: 4px 6px !important;
+  }
+
+  .fill-pos-payment-balance {
+    width: 100% !important;
+    text-align: center !important;
+    margin-top: 4px !important;
+  }
+  
+  /* Ajustar tablas en móvil */
+  .table-custom th, .table-custom td {
+    padding: 10px 8px !important;
+    font-size: 12px !important;
+  }
+  
+  /* Modal de detalle de venta en móvil */
+  .modal-content {
+    padding: 16px !important;
+    width: 95% !important;
+    max-height: 95vh !important;
+  }
+}

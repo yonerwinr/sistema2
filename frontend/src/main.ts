@@ -2067,7 +2067,7 @@ function renderAdminDashboard(): string {
     <div class="dashboard-layout">
       <!-- Sidebar de Administracion -->
       <aside class="dashboard-sidebar" style="display:flex; flex-direction:column; justify-content:space-between; min-height: 500px;">
-        <div>
+        <div class="sidebar-nav-group">
           ${hasPermission('pos') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'pos' ? 'active' : ''}" id="admin-tab-pos">
               ${icons.pos} Punto de Venta (POS)
@@ -2125,7 +2125,7 @@ function renderAdminDashboard(): string {
 
         ${currentUser.role === 'admin' ? `
           <!-- Tasas de Cambio Widget -->
-          <div class="card" style="margin-top: 20px; padding: 12px; font-size:11px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
+          <div class="card rates-widget-sidebar" style="margin-top: 20px; padding: 12px; font-size:11px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
             <div style="font-weight:700; margin-bottom: 8px; display:flex; align-items:center; gap:4px; color:var(--primary);">
               💵 Tasas BCV & Binance
             </div>
@@ -2801,7 +2801,7 @@ async function renderAdminPOS() {
             </div>
 
             <!-- Cliente Seleccionado & Botón para Validar / Registrar Cliente -->
-            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:12px; padding:12px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:12px; padding:12px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
               <div>
                 <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Cliente Factura:</div>
                 <div style="font-size:14px; font-weight:800; color:var(--primary);">
