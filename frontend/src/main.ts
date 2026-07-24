@@ -7435,8 +7435,8 @@ async function renderAdminReports() {
             <h2 style="font-size:24px; font-weight:800; margin:0;">Informes y Reportes Avanzados 📊</h2>
             <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Consulta el balance financiero, gastos y exporta el reporte del periodo.</p>
           </div>
-          <button class="btn btn-success" id="export-reports-csv-btn" style="padding:10px 18px; font-weight:700; background:#10b981; border:none; display:flex; align-items:center; gap:6px; border-radius:10px; color:white; cursor:pointer;">
-            📥 Exportar Reporte a CSV
+          <button class="btn btn-primary" id="export-reports-pdf-btn" style="padding:10px 18px; font-weight:700; background:#4f46e5; border:none; display:flex; align-items:center; gap:6px; border-radius:10px; color:white; cursor:pointer;">
+            📄 Exportar Reporte a PDF
           </button>
         </div>
 
@@ -7595,41 +7595,176 @@ async function renderAdminReports() {
       });
     });
 
-    // Exportar CSV
-    document.getElementById('export-reports-csv-btn')?.addEventListener('click', () => {
-      if (sales.length === 0) {
+    // Exportar PDF
+    document.getElementById('export-reports-pdf-btn')?.addEventListener('click', () => {
+      if (sales.length === 0 && Number(metrics.totalExpenses) === 0) {
         alert('No hay datos en este periodo para exportar.');
         return;
       }
 
-      let csvContent = '\uFEFF'; // BOM para que Excel detecte acentos en español
-      csvContent += 'Fecha/Hora,Factura #,Cliente,Vendedor/Canal,Metodo de Pago,Total (USD),Total (Bs. equiv.)\n';
+      // Obtener nombre del vendedor/canal seleccionado
+      let selectedSellerName = 'Todos los vendedores y canales';
+      if (sellerId === 'online') {
+        selectedSellerName = 'Tienda Online (Ecommerce)';
+      } else if (sellerId) {
+        const staffMember = staffList.find(s => String(s.id) === sellerId);
+        if (staffMember) {
+          selectedSellerName = `${staffMember.name} (${staffMember.role === 'admin' ? 'Admin' : 'Vendedor'})`;
+        }
+      }
 
-      sales.forEach((s: any) => {
-        const dateStr = new Date(s.created_at).toLocaleString('es-ES').replace(/,/g, '');
-        const client = (s.customer_name || 'Consumidor Final').replace(/,/g, '');
-        const seller = (s.seller_name || 'Online (Tienda)').replace(/,/g, '');
-        const payment = s.payment_method.replace(/,/g, ' + ');
-        const totalUsd = s.total.toFixed(2);
-        const totalVes = (s.total * rateUsdToVes).toFixed(2);
-
-        csvContent += `"${dateStr}",#${s.id},"${client}","${seller}","${payment}",$${totalUsd},Bs. ${totalVes}\n`;
-      });
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `Reporte_Ventas_${period}_${date}_FacilitoApp.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      printReportPDF(metrics, sales, paymentMethods, period, date, selectedSellerName);
     });
 
   } catch (error) {
     console.error('Error al generar reportes:', error);
     panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al obtener datos de los reportes del servidor.</div>`;
   }
+}
+
+function printReportPDF(metrics: any, sales: any[], paymentMethods: any[], period: string, date: string, sellerName: string) {
+  let printContainer = document.getElementById('report-printable-area');
+  if (!printContainer) {
+    printContainer = document.createElement('div');
+    printContainer.id = 'report-printable-area';
+    document.body.appendChild(printContainer);
+  }
+
+  const periodLabel = period === 'day' ? 'Diario' : period === 'week' ? 'Semanal' : period === 'month' ? 'Mensual' : 'Anual';
+
+  const htmlContent = `
+    <div class="printable-report" style="padding: 20mm; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; color: #111827; background: #ffffff;">
+      <!-- Encabezado -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 20px;">
+        <div>
+          <h1 style="font-size: 26px; font-weight: 800; margin: 0; color: #4f46e5;">FACILITO POS 🛒</h1>
+          <p style="font-size: 12px; color: #4b5563; margin: 2px 0 0 0;">Reporte de Ventas y Balance de Caja</p>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 14px; font-weight: 700; color: #1f2937;">REPORTE ${periodLabel.toUpperCase()}</div>
+          <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">Fecha Base: ${date}</div>
+          <div style="font-size: 11px; color: #6b7280;">Filtro Vendedor: ${sellerName}</div>
+        </div>
+      </div>
+
+      <!-- Resumen / KPIs -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px;">
+        <div style="border: 1px solid #e5e7eb; padding: 14px; border-radius: 8px; background: #f9fafb;">
+          <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 700;">Total Ingresos</div>
+          <div style="font-size: 20px; font-weight: 800; color: #111827; margin-top: 4px;">$${Number(metrics.totalRevenue).toFixed(2)}</div>
+          <div style="font-size: 11px; color: #d97706; font-weight: 600;">Bs. ${(Number(metrics.totalRevenue) * rateUsdToVes).toFixed(2)}</div>
+        </div>
+        <div style="border: 1px solid #e5e7eb; padding: 14px; border-radius: 8px; background: #f9fafb;">
+          <div style="font-size: 10px; text-transform: uppercase; color: #6b7280; font-weight: 700;">Gastos Registrados</div>
+          <div style="font-size: 20px; font-weight: 800; color: #ef4444; margin-top: 4px;">$${Number(metrics.totalExpenses).toFixed(2)}</div>
+          <div style="font-size: 11px; color: #ef4444; font-weight: 600;">Bs. ${(Number(metrics.totalExpenses) * rateUsdToVes).toFixed(2)}</div>
+        </div>
+        <div style="border: 1px solid #e5e7eb; padding: 14px; border-radius: 8px; background: #f0fdf4; border-color: #bbf7d0;">
+          <div style="font-size: 10px; text-transform: uppercase; color: #166534; font-weight: 700;">Ganancia Neta</div>
+          <div style="font-size: 20px; font-weight: 800; color: #166534; margin-top: 4px;">$${Number(metrics.netProfit).toFixed(2)}</div>
+          <div style="font-size: 11px; color: #166534; font-weight: 600;">Bs. ${(Number(metrics.netProfit) * rateUsdToVes).toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; font-size: 12px; color: #374151; margin-bottom: 25px; border: 1px dashed #e5e7eb; padding: 10px; border-radius: 6px;">
+        <span><strong>Ventas procesadas:</strong> ${metrics.salesCount}</span> | 
+        <span><strong>Nuevos clientes:</strong> ${metrics.newCustomers}</span>
+      </div>
+
+      <!-- Métodos de Pago -->
+      <div style="margin-bottom: 30px;">
+        <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 10px 0; text-transform: uppercase; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">Distribución de Pagos</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+          <thead>
+            <tr style="background: #f3f4f6; text-align: left;">
+              <th style="padding: 8px; border: 1px solid #e5e7eb;">Método de Pago</th>
+              <th style="padding: 8px; border: 1px solid #e5e7eb; text-align: center;">Transacciones</th>
+              <th style="padding: 8px; border: 1px solid #e5e7eb; text-align: right;">Ingresos (USD)</th>
+              <th style="padding: 8px; border: 1px solid #e5e7eb; text-align: right;">Equivalente (Bs.)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${paymentMethods.map((pm: any) => `
+              <tr>
+                <td style="padding: 8px; border: 1px solid #e5e7eb; font-weight: 600;">${pm.payment_method}</td>
+                <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: center;">${pm.count}</td>
+                <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: right; font-weight: 700;">$${Number(pm.revenue).toFixed(2)}</td>
+                <td style="padding: 8px; border: 1px solid #e5e7eb; text-align: right; color: #6b7280;">Bs. ${(Number(pm.revenue) * rateUsdToVes).toFixed(2)}</td>
+              </tr>
+            `).join('')}
+            ${paymentMethods.length === 0 ? '<tr><td colspan="4" style="padding: 10px; text-align: center; color: #6b7280;">No hay pagos registrados</td></tr>' : ''}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Detalle de Transacciones -->
+      <div>
+        <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 10px 0; text-transform: uppercase; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px;">Transacciones Detalladas</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background: #f3f4f6; text-align: left;">
+              <th style="padding: 6px; border: 1px solid #e5e7eb;">Factura</th>
+              <th style="padding: 6px; border: 1px solid #e5e7eb;">Fecha/Hora</th>
+              <th style="padding: 6px; border: 1px solid #e5e7eb;">Cliente</th>
+              <th style="padding: 6px; border: 1px solid #e5e7eb;">Vendedor</th>
+              <th style="padding: 6px; border: 1px solid #e5e7eb;">Método de Pago</th>
+              <th style="padding: 6px; border: 1px solid #e5e7eb; text-align: right;">Total (USD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sales.map((s: any) => `
+              <tr>
+                <td style="padding: 6px; border: 1px solid #e5e7eb; font-weight: 700;">#${s.id}</td>
+                <td style="padding: 6px; border: 1px solid #e5e7eb; white-space: nowrap;">${new Date(s.created_at).toLocaleString('es-ES')}</td>
+                <td style="padding: 6px; border: 1px solid #e5e7eb;">${s.customer_name || 'Consumidor Final'}</td>
+                <td style="padding: 6px; border: 1px solid #e5e7eb;">${s.seller_name || 'Online (Tienda)'}</td>
+                <td style="padding: 6px; border: 1px solid #e5e7eb; font-size: 10px;">${s.payment_method}</td>
+                <td style="padding: 6px; border: 1px solid #e5e7eb; text-align: right; font-weight: 700;">$${s.total.toFixed(2)}</td>
+              </tr>
+            `).join('')}
+            ${sales.length === 0 ? '<tr><td colspan="6" style="padding: 10px; text-align: center; color: #6b7280;">No hay ventas registradas</td></tr>' : ''}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pie de página de impresión -->
+      <div style="margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 10px; text-align: center; font-size: 10px; color: #9ca3af;">
+        Reporte de Ventas generado automáticamente el ${new Date().toLocaleString('es-ES')}.
+      </div>
+    </div>
+  `;
+
+  printContainer.innerHTML = htmlContent;
+
+  let printStyle = document.getElementById('report-print-style');
+  if (!printStyle) {
+    printStyle = document.createElement('style');
+    printStyle.id = 'report-print-style';
+    document.head.appendChild(printStyle);
+  }
+
+  printStyle.innerHTML = `
+    @media print {
+      body > *:not(#report-printable-area) {
+        display: none !important;
+      }
+      #report-printable-area, #report-printable-area * {
+        visibility: visible !important;
+      }
+      #report-printable-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: #ffffff;
+      }
+      @page {
+        size: A4;
+        margin: 15mm;
+      }
+    }
+  `;
+
+  window.print();
 }
 
