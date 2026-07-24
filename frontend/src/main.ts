@@ -4603,9 +4603,15 @@ async function renderAdminProducts() {
     <div class="animate-on-scroll animate-fade-up visible">
       <div class="flex justify-between align-center mb-4">
         <h2 style="font-size:26px; font-weight:800;">Catalogo de Productos</h2>
-        <button class="btn btn-primary" id="add-product-btn">
-          ${icons.plus} Agregar Producto
-        </button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="file" id="product-csv-input" accept=".csv" style="display:none;">
+          <button class="btn btn-secondary" id="import-csv-btn" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700; font-size: 13px; height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; border-radius: 50px;">
+            📊 Importar Excel (CSV)
+          </button>
+          <button class="btn btn-primary" id="add-product-btn" style="height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 0 16px; border-radius: 50px;">
+            ${icons.plus} Agregar Producto
+          </button>
+        </div>
       </div>
 
       <!-- Formulario para Crear / Editar (Oculto inicialmente) -->
@@ -5012,7 +5018,251 @@ function bindProductCRUDEvents() {
     }
   });
 
+  // Eventos de Importación CSV (Excel)
+  const importCsvBtn = document.getElementById('import-csv-btn');
+  const csvFileInput = document.getElementById('product-csv-input') as HTMLInputElement;
+
+  importCsvBtn?.addEventListener('click', () => {
+    csvFileInput?.click();
+  });
+
+  csvFileInput?.addEventListener('change', () => {
+    const file = csvFileInput.files?.[0];
+    if (file) {
+      showImportCsvModal(file);
+      // Resetear para permitir recargar el mismo archivo si es necesario
+      csvFileInput.value = '';
+    }
+  });
+
   bindProductTableActions();
+}
+
+function downloadCSVTemplate() {
+  const headers = 'codigo,nombre,categoria,descripcion,precio,stock\n';
+  const row1 = '10-101-0001,iPhone 15 Pro,Smartphones,Pantalla OLED 120Hz 128GB,999.99,10\n';
+  const row2 = '10-101-0002,MacBook Air M3,Laptops,Chip M3 8GB RAM 256GB SSD,1099.00,5\n';
+  const row3 = '30-100-0001,Cargador Anker 20W,Accesorios,Cargador rapido USB-C,19.99,50\n';
+  
+  const csvContent = '\uFEFF' + headers + row1 + row2 + row3; // UTF-8 BOM
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'plantilla_productos.csv');
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function showImportCsvModal(file: File) {
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const text = e.target?.result as string;
+    if (!text) return;
+
+    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    if (lines.length === 0) {
+      alert('El archivo CSV esta vacio.');
+      return;
+    }
+
+    const firstLine = lines[0];
+    const separator = firstLine.includes(';') ? ';' : ',';
+    
+    // Parsear cabeceras y limpiar comillas
+    const headers = firstLine.split(separator).map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase());
+    
+    // Buscar indices
+    const colIndex = {
+      code: headers.findIndex(h => h.includes('cod') || h.includes('sku') || h.includes('barr')),
+      name: headers.findIndex(h => h.includes('nom') || h.includes('name') || h.includes('tit')),
+      category: headers.findIndex(h => h.includes('cat')),
+      description: headers.findIndex(h => h.includes('desc') || h.includes('det')),
+      price: headers.findIndex(h => h.includes('prec') || h.includes('val') || h.includes('cost') || h.includes('price')),
+      stock: headers.findIndex(h => h.includes('stoc') || h.includes('cant') || h.includes('inv') || h.includes('uni'))
+    };
+
+    if (colIndex.name === -1 || colIndex.price === -1 || colIndex.stock === -1) {
+      alert('Formato CSV invalido. Asegurese de incluir al menos las columnas: Nombre, Precio y Stock.');
+      return;
+    }
+
+    const parsedProducts: any[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const row = lines[i].split(separator).map(cell => cell.trim().replace(/^["']|["']$/g, ''));
+      if (row.length < 3) continue;
+
+      const name = row[colIndex.name];
+      if (!name) continue;
+
+      const price = parseFloat(row[colIndex.price]?.replace(',', '.'));
+      const stock = parseInt(row[colIndex.stock]);
+
+      if (isNaN(price) || isNaN(stock)) continue;
+
+      parsedProducts.push({
+        code: colIndex.code !== -1 ? row[colIndex.code] || null : null,
+        name: name,
+        category: colIndex.category !== -1 ? row[colIndex.category] || 'General' : 'General',
+        description: colIndex.description !== -1 ? row[colIndex.description] || '' : '',
+        price: price,
+        stock: stock,
+        image_url: null
+      });
+    }
+
+    if (parsedProducts.length === 0) {
+      alert('No se encontraron productos validos para importar.');
+      return;
+    }
+
+    let modal = document.getElementById('product-import-modal');
+    if (!modal) {
+      const div = document.createElement('div');
+      div.id = 'product-import-modal';
+      div.className = 'modal-backdrop';
+      div.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.8); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(8px); padding:16px;';
+      document.body.appendChild(div);
+      modal = div;
+    }
+
+    const previewRows = parsedProducts.slice(0, 10).map(p => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size:12px;">${p.code || '<span style="color:var(--text-muted);">AUTO</span>'}</td>
+        <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size:12px; font-weight:700;">${p.name}</td>
+        <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size:12px;">${p.category}</td>
+        <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size:12px; color:var(--primary); font-weight:700;">$${p.price.toFixed(2)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size:12px;">${p.stock}</td>
+      </tr>
+    `).join('');
+
+    modal.innerHTML = `
+      <div class="card" style="width: 100%; max-width: 650px; background: var(--bg-secondary); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 16px; max-height: 90vh;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:12px;">
+          <h3 style="font-size:18px; font-weight:800; display:flex; align-items:center; gap:8px;">
+            📊 Vista Previa de Importacion
+          </h3>
+          <span style="font-size:12px; font-weight:700; color:var(--text-secondary); background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:50px;">
+            ${parsedProducts.length} productos detectados
+          </span>
+        </div>
+
+        <div style="font-size: 13px; color: var(--text-secondary);">
+          Se muestra una vista previa de los primeros 10 productos. Pulsa **Confirmar Importacion** para cargarlos masivamente.
+        </div>
+
+        <div style="overflow-x:auto; flex-grow:1; max-height: 220px; border: 1px solid rgba(255,255,255,0.05); border-radius:8px; margin-bottom: 8px;">
+          <table style="width:100%; border-collapse:collapse; text-align:left;">
+            <thead>
+              <tr style="background:rgba(255,255,255,0.02);">
+                <th style="padding: 8px; border-bottom:1px solid rgba(255,255,255,0.1); font-size:11px; text-transform:uppercase; color:var(--text-muted);">Codigo</th>
+                <th style="padding: 8px; border-bottom:1px solid rgba(255,255,255,0.1); font-size:11px; text-transform:uppercase; color:var(--text-muted);">Nombre</th>
+                <th style="padding: 8px; border-bottom:1px solid rgba(255,255,255,0.1); font-size:11px; text-transform:uppercase; color:var(--text-muted);">Categoria</th>
+                <th style="padding: 8px; border-bottom:1px solid rgba(255,255,255,0.1); font-size:11px; text-transform:uppercase; color:var(--text-muted);">Precio</th>
+                <th style="padding: 8px; border-bottom:1px solid rgba(255,255,255,0.1); font-size:11px; text-transform:uppercase; color:var(--text-muted);">Stock</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${previewRows}
+            </tbody>
+          </table>
+        </div>
+
+        <div id="import-progress-container" style="display:none; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700; color:var(--text-secondary);">
+            <span id="import-progress-label">Importando...</span>
+            <span id="import-progress-percent">0%</span>
+          </div>
+          <div style="width:100%; height:8px; background:rgba(255,255,255,0.08); border-radius:99px; overflow:hidden;">
+            <div id="import-progress-fill" style="width:0%; height:100%; background:linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); transition: width 0.2s ease;"></div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.05); gap:12px;">
+          <button class="btn btn-secondary" id="btn-download-template" style="font-size:12px; padding: 8px 12px; background:transparent; border:1px solid var(--border-glass); color:var(--text-secondary);">
+            📥 Descargar Plantilla CSV
+          </button>
+          
+          <div style="display:flex; gap:8px; margin-left:auto;">
+            <button class="btn btn-secondary" id="btn-cancel-import" style="padding: 8px 16px;">
+              Cancelar
+            </button>
+            <button class="btn btn-primary" id="btn-confirm-import" style="padding: 8px 20px; font-weight:800;">
+              Confirmar Importacion
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    modal.classList.add('open');
+
+    document.getElementById('btn-download-template')?.addEventListener('click', () => {
+      downloadCSVTemplate();
+    });
+
+    const closeModal = () => {
+      modal?.classList.remove('open');
+      modal?.remove();
+    };
+
+    document.getElementById('btn-cancel-import')?.addEventListener('click', closeModal);
+
+    const confirmBtn = document.getElementById('btn-confirm-import') as HTMLButtonElement;
+    const cancelBtn = document.getElementById('btn-cancel-import') as HTMLButtonElement;
+    const progressContainer = document.getElementById('import-progress-container');
+    const progressLabel = document.getElementById('import-progress-label');
+    const progressPercent = document.getElementById('import-progress-percent');
+    const progressFill = document.getElementById('import-progress-fill');
+
+    confirmBtn?.addEventListener('click', async () => {
+      confirmBtn.disabled = true;
+      cancelBtn.disabled = true;
+      if (progressContainer) progressContainer.style.display = 'flex';
+
+      let successCount = 0;
+      let errorCount = 0;
+      const total = parsedProducts.length;
+
+      for (let i = 0; i < total; i++) {
+        const prod = parsedProducts[i];
+        
+        if (!prod.code) {
+          try {
+            const skuData = await api.products.getNextSku(prod.category, prod.name.split(' ')[0]);
+            prod.code = skuData.sku;
+          } catch (e) {
+            prod.code = 'AUTO-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+          }
+        }
+
+        try {
+          await api.products.create(prod);
+          successCount++;
+        } catch (err: any) {
+          console.error(`Error al importar producto ${prod.name}:`, err);
+          errorCount++;
+        }
+
+        const percent = Math.round(((i + 1) / total) * 100);
+        if (progressFill) progressFill.style.width = `${percent}%`;
+        if (progressPercent) progressPercent.innerText = `${percent}%`;
+        if (progressLabel) progressLabel.innerText = `Procesando: ${i + 1} de ${total}...`;
+      }
+
+      alert(`Importacion Finalizada:\n\n✅ ${successCount} productos creados con exito.\n❌ ${errorCount} productos fallaron.`);
+      
+      closeModal();
+      
+      await loadProducts();
+      posProductsCache = [];
+      await renderAdminProducts();
+    });
+  };
+
+  reader.readAsText(file, 'UTF-8');
 }
 
 // ==========================================================================
