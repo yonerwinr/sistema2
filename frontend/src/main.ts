@@ -16,6 +16,8 @@ let activeCashSession: CashSession | null = null;
 let posCashLimit = 500.00;
 let selectedCategory: string = '';
 let searchQuery: string = '';
+let storeSortOrder: 'default' | 'price_asc' | 'price_desc' = 'default';
+let storeOnlyAvailable: boolean = false;
 
 // Estado del Carrito E-commerce
 interface CartItem {
@@ -465,6 +467,14 @@ function bindGeneralEvents() {
 function renderStoreView(): string {
   // Categorías estáticas
   const categories = ['Todas', 'Smartphones', 'Laptops', 'Accesorios', 'Tablets', 'Smartwatches'];
+  const categoryIcons: Record<string, string> = {
+    'Todas': '🌐',
+    'Smartphones': '📱',
+    'Laptops': '💻',
+    'Accesorios': '🎧',
+    'Tablets': '📟',
+    'Smartwatches': '⌚'
+  };
 
   if (productsLoading && productsList.length === 0) {
     return `
@@ -479,29 +489,61 @@ function renderStoreView(): string {
     `;
   }
 
-  // Agrupar HTML de tarjetas de producto
-  const productsHtml = productsList.map(prod => {
-    const isLowStock = prod.stock < 5;
+  // 1. Filtrar productos según disponibilidad localmente si storeOnlyAvailable es true
+  let displayedProducts = [...productsList];
+  if (storeOnlyAvailable) {
+    displayedProducts = displayedProducts.filter(p => p.stock > 0);
+  }
+
+  // 2. Ordenar productos según el criterio seleccionado
+  if (storeSortOrder === 'price_asc') {
+    displayedProducts.sort((a, b) => Number(a.price) - Number(b.price));
+  } else if (storeSortOrder === 'price_desc') {
+    displayedProducts.sort((a, b) => Number(b.price) - Number(a.price));
+  }
+
+  // Agrupar HTML de tarjetas de producto rediseñadas
+  const productsHtml = displayedProducts.map(prod => {
+    const isLowStock = prod.stock > 0 && prod.stock < 5;
+    const isOutOfStock = prod.stock <= 0;
+    
+    // Calcular porcentaje de stock para la barra de progreso (por ejemplo, max 20)
+    const stockPercent = Math.min(100, (prod.stock / 20) * 100);
+    const stockClass = isOutOfStock ? 'empty' : (isLowStock ? 'medium' : 'high');
+    const stockLabel = isOutOfStock ? 'Agotado 😢' : (isLowStock ? `¡Solo ${prod.stock} disp.! 🐒` : `En Stock (${prod.stock})`);
+
+    // Verificar si el producto ya está en el carrito
+    const cartItem = cart.find(item => item.product.id === prod.id);
+    const cartQty = cartItem ? cartItem.quantity : 0;
+
     return `
-      <div class="card product-card animate-on-scroll animate-fade-up">
+      <div class="product-card-premium animate-on-scroll animate-fade-up visible">
         <div class="product-image-container">
           <img class="product-image" src="${prod.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=600&auto=format&fit=crop'}" alt="${prod.name}">
-          ${isLowStock ? `<span class="product-badge danger">¡Pocos 🐒!</span>` : ''}
-          ${prod.code ? `<span class="product-badge info">${prod.code}</span>` : ''}
+          ${isLowStock ? `<span class="product-badge-premium danger">¡Últimos!</span>` : ''}
+          ${isOutOfStock ? `<span class="product-badge-premium danger" style="background:rgba(239, 68, 68, 0.4); border-color:#ef4444; color:#fff;">Agotado</span>` : ''}
+          ${prod.code ? `<span class="product-badge-premium info" style="right: 12px;">${prod.code}</span>` : ''}
         </div>
         <div class="product-info">
           <div class="product-category">${prod.category || 'General'}</div>
-          <h3 class="product-title">${prod.name}</h3>
-          <p class="product-description">${prod.description || 'Sin descripcion.'}</p>
-          <div class="product-footer">
-            <div>
-              <div class="product-price">$${Number(prod.price).toFixed(2)}</div>
-              <div class="product-stock ${isLowStock ? 'low-stock' : ''}">
-                ${isLowStock ? `¡Solo ${prod.stock} disp.!` : `Stock: ${prod.stock}`}
-              </div>
+          <h3 class="product-title" title="${prod.name}">${prod.name}</h3>
+          <p class="product-description" title="${prod.description || 'Sin descripción.'}">${prod.description || 'Sin descripción.'}</p>
+          
+          <!-- Indicador de Stock Visual -->
+          <div class="stock-progress-container">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700; color: ${isOutOfStock ? 'var(--danger)' : (isLowStock ? 'var(--warning)' : 'var(--success)')};">
+              <span>Disponibilidad:</span>
+              <span>${stockLabel}</span>
             </div>
-            <button class="btn btn-primary add-to-cart-btn" data-id="${prod.id}" style="padding: 8px 14px; border-radius: 50px; font-size: 12px; font-weight:700; display:flex; align-items:center; gap:6px;">
-              ${icons.plus} Agregar
+            <div class="stock-progress-bar">
+              <div class="stock-progress-fill ${stockClass}" style="width: ${isOutOfStock ? 100 : stockPercent}%;"></div>
+            </div>
+          </div>
+
+          <div class="product-footer">
+            <div class="price-badge-premium">$${Number(prod.price).toFixed(2)}</div>
+            <button class="btn btn-primary add-to-cart-btn" data-id="${prod.id}" ${isOutOfStock ? 'disabled style="background:rgba(255,255,255,0.05); color:var(--text-muted); cursor:not-allowed;"' : ''} style="padding: 10px 18px; border-radius: 50px; font-size: 13px; font-weight:700; display:flex; align-items:center; gap:6px; transition: all 0.3s ease;">
+              ${cartQty > 0 ? `🛒 Agregado (${cartQty})` : `${icons.plus} Agregar`}
             </button>
           </div>
         </div>
@@ -535,20 +577,58 @@ function renderStoreView(): string {
     </section>
 
     <div class="container store-container" style="display:flex; flex-direction:column; gap:24px;">
-      <!-- Barra de Filtros Horizontal Superior (Modern E-Commerce Layout) -->
-      <div class="store-filter-bar card" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 24px; position: sticky; top: 75px; z-index: 10; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); background: rgba(18,24,39,0.85); border-radius: var(--radius-md); border: 1px solid var(--border-glass);">
-        <!-- Buscador Elegante -->
-        <div style="position: relative; flex: 1; min-width: 240px; max-width: 320px;">
-          <input type="text" class="form-control" id="store-search" placeholder="🔍 Buscar productos..." value="${searchQuery}" style="padding-left: 14px; border-radius: 50px; background: rgba(255,255,255,0.03);">
+      <!-- Dashboard de Búsqueda y Filtros Premium -->
+      <div class="store-filter-dashboard animate-on-scroll animate-fade-up visible">
+        <!-- Fila Superior: Buscador y Ordenamiento -->
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+          
+          <!-- Buscador con icono y limpiador -->
+          <div style="position: relative; flex: 1; min-width: 280px; max-width: 450px;">
+            <input type="text" class="form-control store-search-glow" id="store-search" placeholder="🔍 Buscar por nombre o descripción..." value="${searchQuery}" style="padding-left: 16px; padding-right: 40px; border-radius: 50px; height: 46px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 14px; font-weight: 500; width: 100%;">
+            ${searchQuery ? `
+              <button id="store-search-clear" class="search-clear-btn" title="Limpiar búsqueda">&times;</button>
+            ` : ''}
+          </div>
+
+          <!-- Filtro de ordenamiento y switch de disponibilidad -->
+          <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Ordenar:</span>
+              <select id="store-sort-select" class="select-premium">
+                <option value="default" ${storeSortOrder === 'default' ? 'selected' : ''}>Relevancia</option>
+                <option value="price_asc" ${storeSortOrder === 'price_asc' ? 'selected' : ''}>Precio: Menor a Mayor</option>
+                <option value="price_desc" ${storeSortOrder === 'price_desc' ? 'selected' : ''}>Precio: Mayor a Menor</option>
+              </select>
+            </div>
+
+            <label class="switch-premium-label">
+              <input type="checkbox" id="store-available-toggle" class="switch-premium-checkbox" ${storeOnlyAvailable ? 'checked' : ''}>
+              <span>Solo en Stock 🐒</span>
+            </label>
+          </div>
+
         </div>
-        
-        <!-- Categorías Horizontales -->
-        <div class="categories-container" style="display: flex; gap: 8px; overflow-x: auto; max-width: 100%; white-space: nowrap; padding-bottom: 2px; -webkit-overflow-scrolling: touch; border: none; background: transparent;">
-          ${categories.map(cat => `
-            <button class="filter-category-btn ${selectedCategory === (cat === 'Todas' ? '' : cat) ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}" style="padding: 8px 16px; border-radius: 50px; font-size: 13px; font-weight: 600; border: 1px solid var(--border-glass); background: ${selectedCategory === (cat === 'Todas' ? '' : cat) ? 'var(--primary)' : 'rgba(255,255,255,0.02)'}; color: ${selectedCategory === (cat === 'Todas' ? '' : cat) ? '#000' : 'var(--text-secondary)'}; transition: all 0.3s ease; cursor:pointer;">
-              ${cat}
-            </button>
-          `).join('')}
+
+        <!-- Fila Inferior: Filtros de Categorías e Indicador de Resultados -->
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px;">
+          <!-- Categorías Premium -->
+          <div class="categories-container" style="display: flex; gap: 10px; overflow-x: auto; max-width: 100%; white-space: nowrap; padding-bottom: 4px; -webkit-overflow-scrolling: touch; border: none; background: transparent; flex: 1;">
+            ${categories.map(cat => {
+              const icon = categoryIcons[cat] || '📦';
+              const isActive = selectedCategory === (cat === 'Todas' ? '' : cat);
+              return `
+                <button class="filter-category-btn-premium ${isActive ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}">
+                  <span>${icon}</span>
+                  <span>${cat}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- Contador de Resultados -->
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-secondary); background: rgba(255,255,255,0.03); padding: 8px 14px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.05); white-space: nowrap;">
+            🛒 ${displayedProducts.length} ${displayedProducts.length === 1 ? 'producto' : 'productos'}
+          </div>
         </div>
       </div>
 
@@ -566,7 +646,6 @@ function renderStoreView(): string {
     </div>
   `;
 }
-
 function bindStoreEvents() {
   // Buscador con debounce
   let searchTimeout: any;
@@ -578,11 +657,37 @@ function bindStoreEvents() {
     searchTimeout = setTimeout(async () => {
       await loadProducts();
       renderApp();
+      // Restablecer el foco del buscador y posicionar el cursor al final
+      const input = document.getElementById('store-search') as HTMLInputElement;
+      if (input) {
+        input.focus();
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
+      }
     }, 450);
   });
 
+  // Limpiar buscador
+  document.getElementById('store-search-clear')?.addEventListener('click', async () => {
+    searchQuery = '';
+    await loadProducts();
+    renderApp();
+  });
+
+  // Ordenamiento por precio
+  document.getElementById('store-sort-select')?.addEventListener('change', (e) => {
+    storeSortOrder = (e.target as HTMLSelectElement).value as any;
+    renderApp();
+  });
+
+  // Filtro de solo disponibles
+  document.getElementById('store-available-toggle')?.addEventListener('change', (e) => {
+    storeOnlyAvailable = (e.target as HTMLInputElement).checked;
+    renderApp();
+  });
+
   // Filtro de categorías
-  document.querySelectorAll('.filter-category-btn').forEach(btn => {
+  document.querySelectorAll('.filter-category-btn-premium').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       const cat = (e.currentTarget as HTMLButtonElement).dataset.category || '';
       selectedCategory = cat;
