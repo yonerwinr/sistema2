@@ -33,6 +33,8 @@ interface POSCartItem {
 }
 let posCart: POSCartItem[] = [];
 let posSearchQuery: string = '';
+let showCameraScanModal = false;
+let html5QrcodeScannerInstance: any = null;
 
 // Helper de Redondeo para Evitar Artefactos de Punto Flotante (Máximo 4 Decimales)
 function roundDecimal(num: number | string | null | undefined, decimals: number = 4): number {
@@ -50,6 +52,31 @@ function normalizeText(str: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
+}
+
+function playScannerBeep(isSuccess: boolean = true) {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    if (isSuccess) {
+      oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.1);
+    } else {
+      oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.25);
+    }
+  } catch (err) {
+    console.error('AudioContext error:', err);
+  }
 }
 
 function validateFrontendCi(prefix: string, num: string): { isValid: boolean, message?: string } {
@@ -2917,8 +2944,11 @@ async function renderAdminPOS() {
             </div>
           </div>
 
-          <div class="pos-search-bar mb-3">
-            <input type="text" class="form-control" id="pos-search-input" placeholder="🔍 Buscar por nombre o código de producto..." value="${posSearchQuery}" style="font-size:14px; padding:10px 14px;">
+          <div class="pos-search-bar mb-3" style="display:flex; gap:10px;">
+            <input type="text" class="form-control" id="pos-search-input" placeholder="🔍 Buscar por nombre o código de producto..." value="${posSearchQuery}" style="font-size:14px; padding:10px 14px; flex-grow:1;" autofocus>
+            <button type="button" class="btn btn-primary" id="pos-camera-scan-btn" style="padding:10px 14px; display:flex; align-items:center; justify-content:center; gap:6px; background:var(--primary); border:none; border-radius:10px; color:white; cursor:pointer;" title="Escanear con Cámara">
+              📷 <span style="font-weight:700; font-size:13px;">Escanear</span>
+            </button>
           </div>
 
           <div class="pos-products-grid stagger-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:12px;">
@@ -3349,6 +3379,52 @@ async function renderAdminPOS() {
         </div>
       ` : ''}
 
+      ${showCameraScanModal ? `
+        <div class="modal-overlay open" id="camera-scan-modal-overlay" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
+          <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 480px; width: 92%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827;">
+            <button class="modal-close" id="close-camera-scan-x">&times;</button>
+            <div style="font-size: 36px; text-align: center; margin-bottom: 4px;">📷</div>
+            <h3 style="font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--primary);">Escáner de Código de Barras</h3>
+            <p style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-bottom: 16px;">
+              Apunta la cámara de tu dispositivo hacia el código de barras del producto.
+            </p>
+
+            <div id="pos-scanner-reader-container" style="position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 4/3; border: 1px solid var(--border-glass);">
+              <div id="pos-scanner-reader" style="width: 100%;"></div>
+              
+              <!-- Línea láser de escaneo animada -->
+              <div style="position: absolute; top: 50%; left: 5%; width: 90%; height: 2px; background: #ef4444; box-shadow: 0 0 8px #ef4444; animation: laser-scanner 2s infinite ease-in-out; pointer-events: none; z-index: 10;"></div>
+            </div>
+
+            <!-- Feedback del escáner en tiempo real -->
+            <div id="scanner-feedback" style="margin-top: 14px; text-align: center; font-size: 12px; font-weight: 700; min-height: 24px; color: var(--text-secondary);">
+              Buscando cámara...
+            </div>
+
+            <!-- Lista de productos escaneados recientemente en esta sesión del modal -->
+            <div id="scanned-items-list" style="margin-top: 16px; border-top: 1px solid var(--border-glass); padding-top: 12px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px;">Escaneados Recientemente:</div>
+              <div id="scanned-items-container" style="display: flex; flex-direction: column; gap: 6px; max-height: 100px; overflow-y: auto; font-size: 12px;">
+                <div style="color: var(--text-muted); text-align: center; font-style: italic;">Ninguno escaneado aún.</div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+              <button type="button" class="btn btn-secondary w-100" id="close-camera-scan-btn" style="padding: 10px; font-size: 13px; font-weight: 800;">
+                Terminar / Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <style>
+          @keyframes laser-scanner {
+            0%, 100% { top: 15%; }
+            50% { top: 85%; }
+          }
+        </style>
+      ` : ''}
+
       <!-- Modal de Advertencia por Cliente No Registrado -->
       <div class="modal-overlay" id="unregistered-warning-modal" style="display: none; z-index: 999999; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);">
         <div class="modal-content animate-on-scroll animate-zoom-in visible" style="max-width: 480px; width: 90%; padding: 28px; border-radius: 16px; border: 1px solid rgba(239, 68, 68, 0.5); background: #111827;">
@@ -3652,6 +3728,157 @@ function bindPOSEvents() {
         `).join('') || '<p style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-secondary);">No se encontraron productos.</p>';
       }
     }, 120);
+  });
+
+  // Escáner de código de barras por Cámara (Botón de Escanear)
+  document.getElementById('pos-camera-scan-btn')?.addEventListener('click', async () => {
+    showCameraScanModal = true;
+    await renderAdminPOS();
+
+    const readerEl = document.getElementById('pos-scanner-reader');
+    if (!readerEl) {
+      console.error('Lector pos-scanner-reader no encontrado en el DOM');
+      return;
+    }
+
+    try {
+      const html5QrCode = new (window as any).Html5Qrcode("pos-scanner-reader");
+      html5QrcodeScannerInstance = html5QrCode;
+
+      const config = {
+        fps: 10,
+        qrbox: (width: number, height: number) => {
+          return { width: Math.floor(width * 0.85), height: Math.floor(height * 0.45) };
+        },
+        aspectRatio: 1.333333
+      };
+
+      let lastScannedCode = '';
+      let lastScannedTime = 0;
+
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        async (decodedText: string) => {
+          const now = Date.now();
+          if (decodedText === lastScannedCode && (now - lastScannedTime) < 2000) {
+            return;
+          }
+
+          lastScannedCode = decodedText;
+          lastScannedTime = now;
+
+          const matchedProduct = posProductsCache.find(p => p.code?.toLowerCase() === decodedText.trim().toLowerCase());
+          const feedbackEl = document.getElementById('scanner-feedback');
+
+          if (matchedProduct) {
+            playScannerBeep(true);
+            await addToPOSCart(matchedProduct);
+
+            if (feedbackEl) {
+              feedbackEl.style.color = '#10b981';
+              feedbackEl.innerText = `✅ Agregado: ${matchedProduct.name}`;
+            }
+
+            addRecentlyScannedUI(matchedProduct);
+          } else {
+            playScannerBeep(false);
+            if (feedbackEl) {
+              feedbackEl.style.color = '#ef4444';
+              feedbackEl.innerText = `❌ No encontrado: "${decodedText}"`;
+            }
+          }
+        },
+        () => {
+          // Ignorar errores menores
+        }
+      );
+
+      const feedbackEl = document.getElementById('scanner-feedback');
+      if (feedbackEl) {
+        feedbackEl.style.color = 'var(--text-secondary)';
+        feedbackEl.innerText = '🎥 Cámara activa. Escaneando...';
+      }
+    } catch (err: any) {
+      console.error("Error al iniciar cámara:", err);
+      const feedbackEl = document.getElementById('scanner-feedback');
+      if (feedbackEl) {
+        feedbackEl.style.color = '#ef4444';
+        feedbackEl.innerText = `❌ Error de cámara: ${err.message || 'No se pudo acceder'}`;
+      }
+    }
+  });
+
+  function addRecentlyScannedUI(product: Product) {
+    const container = document.getElementById('scanned-items-container');
+    if (!container) return;
+
+    if (container.innerText.includes('Ninguno') || container.querySelector('div') === null) {
+      container.innerHTML = '';
+    }
+
+    const div = document.createElement('div');
+    div.style.display = 'flex';
+    div.style.justifyContent = 'space-between';
+    div.style.alignItems = 'center';
+    div.style.padding = '6px 10px';
+    div.style.background = 'rgba(16,185,129,0.15)';
+    div.style.border = '1px solid rgba(16,185,129,0.3)';
+    div.style.borderRadius = '8px';
+    div.style.color = '#10b981';
+    div.style.fontWeight = '600';
+    div.style.marginBottom = '4px';
+
+    div.innerHTML = `
+      <span>${product.name} (código: ${product.code})</span>
+      <span style="font-weight:800;">$${Number(product.price).toFixed(2)}</span>
+    `;
+
+    container.prepend(div);
+  }
+
+  const closeCameraScanner = async () => {
+    showCameraScanModal = false;
+    if (html5QrcodeScannerInstance) {
+      try {
+        if (html5QrcodeScannerInstance.isScanning) {
+          await html5QrcodeScannerInstance.stop();
+        }
+      } catch (err) {
+        console.error("Error al detener cámara:", err);
+      }
+      html5QrcodeScannerInstance = null;
+    }
+    await renderAdminPOS();
+  };
+
+  document.getElementById('close-camera-scan-btn')?.addEventListener('click', closeCameraScanner);
+  document.getElementById('close-camera-scan-x')?.addEventListener('click', closeCameraScanner);
+
+  // Escáner Físico / Tecla Enter en el buscador POS
+  searchInput?.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const codeToSearch = searchInput.value.trim();
+      if (!codeToSearch) return;
+
+      const matchedProduct = posProductsCache.find(p => p.code?.toLowerCase() === codeToSearch.toLowerCase());
+      if (matchedProduct) {
+        playScannerBeep(true);
+        await addToPOSCart(matchedProduct);
+
+        searchInput.value = '';
+        posSearchQuery = '';
+        
+        setTimeout(() => {
+          const newSearchInput = document.getElementById('pos-search-input') as HTMLInputElement;
+          if (newSearchInput) newSearchInput.focus();
+        }, 50);
+      } else {
+        playScannerBeep(false);
+        alert(`Producto con código "${codeToSearch}" no encontrado.`);
+      }
+    }
   });
 
   // Delegación de eventos para agregar productos al carrito en el POS
