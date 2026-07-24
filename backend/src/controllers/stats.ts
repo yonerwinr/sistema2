@@ -108,9 +108,14 @@ router.get('/', authenticate, isAdmin, async (req: AuthRequest, res: Response) =
   }
 });
 
-// GET /reports: Reportes avanzados filtrables para administración
-router.get('/reports', authenticate, isAdmin, async (req: AuthRequest, res: Response) => {
-  const { seller_id, period = 'day', date } = req.query;
+// GET /reports: Reportes avanzados filtrables para administración y vendedores
+router.get('/reports', authenticate, async (req: AuthRequest, res: Response) => {
+  let { seller_id, period = 'day', date } = req.query;
+
+  // Si el usuario es vendedor (seller), forzar que filtre solo por su propio ID
+  if (req.user?.role === 'seller') {
+    seller_id = String(req.user.id);
+  }
 
   try {
     let targetDate = date ? new Date(date as string) : new Date();
@@ -170,20 +175,27 @@ router.get('/reports', authenticate, isAdmin, async (req: AuthRequest, res: Resp
     // 2. Calcular KPIs
     const totalRevenue = sales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
 
-    // Obtener gastos totales en el rango (son globales, no por vendedor)
-    const [expensesRows]: any = await pool.query(
-      'SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE is_active = 1 AND created_at >= ? AND created_at <= ?',
-      [startDateStr, endDateStr]
-    );
-    const totalExpenses = Number(expensesRows[0]?.total_expenses || 0);
-    const netProfit = totalRevenue - totalExpenses;
+    let totalExpenses = 0;
+    let netProfit = totalRevenue;
+    let newCustomers = 0;
 
-    // Obtener cantidad de clientes nuevos registrados
-    const [customersRows]: any = await pool.query(
-      'SELECT COUNT(*) as count FROM users WHERE role = "customer" AND created_at >= ? AND created_at <= ?',
-      [startDateStr, endDateStr]
-    );
-    const newCustomers = customersRows[0]?.count || 0;
+    // Solo los administradores pueden ver datos financieros consolidados y clientes nuevos globales
+    if (req.user?.role !== 'seller') {
+      // Obtener gastos totales en el rango (son globales, no por vendedor)
+      const [expensesRows]: any = await pool.query(
+        'SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE is_active = 1 AND created_at >= ? AND created_at <= ?',
+        [startDateStr, endDateStr]
+      );
+      totalExpenses = Number(expensesRows[0]?.total_expenses || 0);
+      netProfit = totalRevenue - totalExpenses;
+
+      // Obtener cantidad de clientes nuevos registrados
+      const [customersRows]: any = await pool.query(
+        'SELECT COUNT(*) as count FROM users WHERE role = "customer" AND created_at >= ? AND created_at <= ?',
+        [startDateStr, endDateStr]
+      );
+      newCustomers = customersRows[0]?.count || 0;
+    }
 
     // 3. Distribución de métodos de pago
     let paymentQuery = `

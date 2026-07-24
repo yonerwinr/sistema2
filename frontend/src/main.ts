@@ -2111,10 +2111,12 @@ function renderAdminDashboard(): string {
               👥 Vendedores
             </button>
           ` : ''}
-          ${currentUser.role === 'admin' ? `
+          ${(currentUser.role === 'admin' || currentUser.role === 'seller') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'reports' ? 'active' : ''}" id="admin-tab-reports">
               📊 Reportes y Cierres
             </button>
+          ` : ''}
+          ${currentUser.role === 'admin' ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'stats' ? 'active' : ''}" id="admin-tab-stats">
               ${icons.dashboard} Estadísticas
             </button>
@@ -7460,57 +7462,87 @@ async function renderAdminReports() {
 
             <div class="form-group">
               <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Vendedor / Canal:</label>
-              <select class="form-control" id="report-seller-select" style="padding:8px 12px; font-size:13px; font-weight:700;">
-                <option value="" ${sellerId === '' ? 'selected' : ''}>🌐 Todos los Vendedores y Canales</option>
-                <option value="online" ${sellerId === 'online' ? 'selected' : ''}>🌐 Tienda Online (Ecommerce)</option>
-                ${staffList.map(s => `<option value="${s.id}" ${sellerId === String(s.id) ? 'selected' : ''}>👤 POS: ${s.name} (${s.role === 'admin' ? 'Admin' : 'Vendedor'})</option>`).join('')}
-              </select>
+              ${currentUser?.role === 'seller' ? `
+                <select class="form-control" id="report-seller-select" disabled style="padding:8px 12px; font-size:13px; font-weight:700; opacity:0.75;">
+                  <option value="${currentUser?.id}">Mi Cuenta: ${currentUser?.name}</option>
+                </select>
+              ` : `
+                <select class="form-control" id="report-seller-select" style="padding:8px 12px; font-size:13px; font-weight:700;">
+                  <option value="" ${sellerId === '' ? 'selected' : ''}>🌐 Todos los Vendedores y Canales</option>
+                  <option value="online" ${sellerId === 'online' ? 'selected' : ''}>🌐 Tienda Online (Ecommerce)</option>
+                  ${staffList.map(s => `<option value="${s.id}" ${sellerId === String(s.id) ? 'selected' : ''}>👤 POS: ${s.name} (${s.role === 'admin' ? 'Admin' : 'Vendedor'})</option>`).join('')}
+                </select>
+              `}
             </div>
           </div>
         </div>
 
         <!-- Tarjetas KPIs -->
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
-          <!-- Ingresos -->
-          <div class="card" style="padding:20px; border-left:4px solid var(--primary); display:flex; align-items:center; justify-content:space-between;">
-            <div>
-              <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Total Ingresos</div>
-              <div style="font-size:24px; font-weight:900; color:white; font-family:monospace; margin-top:4px;">$${Number(metrics.totalRevenue).toFixed(2)}</div>
-              <div style="font-size:12px; color:#f59e0b; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.totalRevenue) * rateUsdToVes).toFixed(2)}</div>
+        ${currentUser?.role === 'seller' ? `
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
+            <!-- Ingresos -->
+            <div class="card" style="padding:20px; border-left:4px solid var(--primary); display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Total de mis Ventas</div>
+                <div style="font-size:24px; font-weight:900; color:white; font-family:monospace; margin-top:4px;">$${Number(metrics.totalRevenue).toFixed(2)}</div>
+                <div style="font-size:12px; color:#f59e0b; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.totalRevenue) * rateUsdToVes).toFixed(2)}</div>
+              </div>
+              <div style="font-size:32px;">💰</div>
             </div>
-            <div style="font-size:32px;">💰</div>
-          </div>
 
-          <!-- Gastos -->
-          <div class="card" style="padding:20px; border-left:4px solid #ef4444; display:flex; align-items:center; justify-content:space-between;">
-            <div>
-              <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Gastos Registrados</div>
-              <div style="font-size:24px; font-weight:900; color:white; font-family:monospace; margin-top:4px;">$${Number(metrics.totalExpenses).toFixed(2)}</div>
-              <div style="font-size:12px; color:#ef4444; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.totalExpenses) * rateUsdToVes).toFixed(2)}</div>
+            <!-- Ventas -->
+            <div class="card" style="padding:20px; border-left:4px solid #3b82f6; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Ventas Realizadas</div>
+                <div style="font-size:24px; font-weight:900; color:white; margin-top:4px;">${metrics.salesCount} Ventas</div>
+                <div style="font-size:12px; color:var(--text-secondary); font-weight:600; margin-top:2px;">Registradas en el periodo</div>
+              </div>
+              <div style="font-size:32px;">🛒</div>
             </div>
-            <div style="font-size:32px;">💸</div>
           </div>
+        ` : `
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
+            <!-- Ingresos -->
+            <div class="card" style="padding:20px; border-left:4px solid var(--primary); display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Total Ingresos</div>
+                <div style="font-size:24px; font-weight:900; color:white; font-family:monospace; margin-top:4px;">$${Number(metrics.totalRevenue).toFixed(2)}</div>
+                <div style="font-size:12px; color:#f59e0b; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.totalRevenue) * rateUsdToVes).toFixed(2)}</div>
+              </div>
+              <div style="font-size:32px;">💰</div>
+            </div>
 
-          <!-- Ganancia -->
-          <div class="card" style="padding:20px; border-left:4px solid #10b981; display:flex; align-items:center; justify-content:space-between;">
-            <div>
-              <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Ganancia Neta</div>
-              <div style="font-size:24px; font-weight:900; color:#10b981; font-family:monospace; margin-top:4px;">$${Number(metrics.netProfit).toFixed(2)}</div>
-              <div style="font-size:12px; color:#10b981; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.netProfit) * rateUsdToVes).toFixed(2)}</div>
+            <!-- Gastos -->
+            <div class="card" style="padding:20px; border-left:4px solid #ef4444; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Gastos Registrados</div>
+                <div style="font-size:24px; font-weight:900; color:white; font-family:monospace; margin-top:4px;">$${Number(metrics.totalExpenses).toFixed(2)}</div>
+                <div style="font-size:12px; color:#ef4444; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.totalExpenses) * rateUsdToVes).toFixed(2)}</div>
+              </div>
+              <div style="font-size:32px;">💸</div>
             </div>
-            <div style="font-size:32px;">📈</div>
-          </div>
 
-          <!-- Ventas & Clientes -->
-          <div class="card" style="padding:20px; border-left:4px solid #3b82f6; display:flex; align-items:center; justify-content:space-between;">
-            <div>
-              <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Ventas & Clientes</div>
-              <div style="font-size:18px; font-weight:900; color:white; margin-top:4px;">${metrics.salesCount} Ventas del Periodo</div>
-              <div style="font-size:12px; color:var(--text-secondary); font-weight:600; margin-top:2px;">👤 ${metrics.newCustomers} clientes nuevos</div>
+            <!-- Ganancia -->
+            <div class="card" style="padding:20px; border-left:4px solid #10b981; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Ganancia Neta</div>
+                <div style="font-size:24px; font-weight:900; color:#10b981; font-family:monospace; margin-top:4px;">$${Number(metrics.netProfit).toFixed(2)}</div>
+                <div style="font-size:12px; color:#10b981; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.netProfit) * rateUsdToVes).toFixed(2)}</div>
+              </div>
+              <div style="font-size:32px;">📈</div>
             </div>
-            <div style="font-size:32px;">👥</div>
+
+            <!-- Ventas & Clientes -->
+            <div class="card" style="padding:20px; border-left:4px solid #3b82f6; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Ventas & Clientes</div>
+                <div style="font-size:18px; font-weight:900; color:white; margin-top:4px;">${metrics.salesCount} Ventas del Periodo</div>
+                <div style="font-size:12px; color:var(--text-secondary); font-weight:600; margin-top:2px;">👤 ${metrics.newCustomers} clientes nuevos</div>
+              </div>
+              <div style="font-size:32px;">👥</div>
+            </div>
           </div>
-        </div>
+        `}
 
         <!-- Métodos de Pago y Lista de Ventas -->
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">

@@ -103,9 +103,13 @@ router.get('/', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
         res.status(500).json({ message: 'Error al generar las estadisticas de ventas' });
     }
 });
-// GET /reports: Reportes avanzados filtrables para administración
-router.get('/reports', auth_1.authenticate, auth_1.isAdmin, async (req, res) => {
-    const { seller_id, period = 'day', date } = req.query;
+// GET /reports: Reportes avanzados filtrables para administración y vendedores
+router.get('/reports', auth_1.authenticate, async (req, res) => {
+    let { seller_id, period = 'day', date } = req.query;
+    // Si el usuario es vendedor (seller), forzar que filtre solo por su propio ID
+    if (req.user?.role === 'seller') {
+        seller_id = String(req.user.id);
+    }
     try {
         let targetDate = date ? new Date(date) : new Date();
         if (isNaN(targetDate.getTime())) {
@@ -162,13 +166,19 @@ router.get('/reports', auth_1.authenticate, auth_1.isAdmin, async (req, res) => 
         const [sales] = await db_1.default.query(salesQuery, salesParams);
         // 2. Calcular KPIs
         const totalRevenue = sales.reduce((sum, s) => sum + Number(s.total), 0);
-        // Obtener gastos totales en el rango (son globales, no por vendedor)
-        const [expensesRows] = await db_1.default.query('SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE is_active = 1 AND created_at >= ? AND created_at <= ?', [startDateStr, endDateStr]);
-        const totalExpenses = Number(expensesRows[0]?.total_expenses || 0);
-        const netProfit = totalRevenue - totalExpenses;
-        // Obtener cantidad de clientes nuevos registrados
-        const [customersRows] = await db_1.default.query('SELECT COUNT(*) as count FROM users WHERE role = "customer" AND created_at >= ? AND created_at <= ?', [startDateStr, endDateStr]);
-        const newCustomers = customersRows[0]?.count || 0;
+        let totalExpenses = 0;
+        let netProfit = totalRevenue;
+        let newCustomers = 0;
+        // Solo los administradores pueden ver datos financieros consolidados y clientes nuevos globales
+        if (req.user?.role !== 'seller') {
+            // Obtener gastos totales en el rango (son globales, no por vendedor)
+            const [expensesRows] = await db_1.default.query('SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE is_active = 1 AND created_at >= ? AND created_at <= ?', [startDateStr, endDateStr]);
+            totalExpenses = Number(expensesRows[0]?.total_expenses || 0);
+            netProfit = totalRevenue - totalExpenses;
+            // Obtener cantidad de clientes nuevos registrados
+            const [customersRows] = await db_1.default.query('SELECT COUNT(*) as count FROM users WHERE role = "customer" AND created_at >= ? AND created_at <= ?', [startDateStr, endDateStr]);
+            newCustomers = customersRows[0]?.count || 0;
+        }
         // 3. Distribución de métodos de pago
         let paymentQuery = `
       SELECT payment_method, COUNT(*) as count, SUM(total) as revenue
