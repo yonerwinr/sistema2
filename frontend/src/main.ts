@@ -510,7 +510,7 @@ function renderStoreView(): string {
     // Calcular porcentaje de stock para la barra de progreso (por ejemplo, max 20)
     const stockPercent = Math.min(100, (prod.stock / 20) * 100);
     const stockClass = isOutOfStock ? 'empty' : (isLowStock ? 'medium' : 'high');
-    const stockLabel = isOutOfStock ? 'Agotado 😢' : (isLowStock ? `¡Solo ${prod.stock} disp.! 🐒` : `En Stock (${prod.stock})`);
+    const stockLabel = isOutOfStock ? 'Agotado 😢' : (isLowStock ? 'Pocas unidades 🐒' : 'Disponible');
 
     // Verificar si el producto ya está en el carrito
     const cartItem = cart.find(item => item.product.id === prod.id);
