@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import pool from '../config/db';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { sendInvoiceEmail, sendPlainEmail } from '../services/email';
@@ -244,6 +245,42 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
 
   const { customerName, customerEmail, customerPhone, customerCi, customerUserId, paymentMethod, items, discount, tax, isQuotation, status, amountPaid, couponCode, loadedQuotationId, concept, note } = req.body;
 
+  // Si no es cotización, verificar que el cajero tenga una sesión de caja abierta
+  let activeSession: any = null;
+  let limit = 500.00;
+  if (!isQuotation) {
+    try {
+      const [sessions]: any = await pool.query(
+        'SELECT * FROM cash_sessions WHERE user_id = ? AND status = "open" ORDER BY id DESC LIMIT 1',
+        [req.user?.id]
+      );
+      if (sessions.length === 0) {
+        return res.status(400).json({ message: 'No tienes un turno de caja abierto. Por favor, abre la caja en el POS antes de realizar una venta.' });
+      }
+      activeSession = sessions[0];
+
+      // Obtener el límite de efectivo de settings
+      const [limitRows]: any = await pool.query(
+        'SELECT settings_value FROM settings WHERE settings_key = "cash_drop_limit" LIMIT 1'
+      );
+      if (limitRows.length > 0) {
+        limit = parseFloat(limitRows[0].settings_value);
+      }
+
+      // Si el balance esperado actual ya supera el límite, bloquear la venta
+      if (Number(activeSession.expected_balance) > limit) {
+        return res.status(400).json({
+          message: `Caja Bloqueada: El efectivo esperado acumulado ($${Number(activeSession.expected_balance).toFixed(2)}) supera el límite de $${limit.toFixed(2)}. Requiere realizar una Sangría de Caja con autorización de supervisor.`,
+          isBlocked: true,
+          cashDropLimit: limit
+        });
+      }
+    } catch (dbErr: any) {
+      console.error('Error al validar sesión de caja:', dbErr);
+      return res.status(500).json({ message: 'Error interno al validar sesión de caja' });
+    }
+  }
+
   if (customerCi && !validateCi(customerCi)) {
     return res.status(400).json({ message: 'Formato de Cédula o RIF del cliente inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
   }
@@ -450,6 +487,36 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
       );
     }
 
+    // Calcular efectivo recibido para actualizar la sesión de caja
+    let cashUsdAmount = 0;
+    let finalExpected = activeSession ? Number(activeSession.expected_balance) : 0;
+    if (activeSession && !isQuotation && saleStatus !== 'cancelled') {
+      if (paymentMethod) {
+        const usdCashMatch = paymentMethod.match(/Efectivo \$:\s*\$(\d+(?:\.\d+)?)/i);
+        if (usdCashMatch) {
+          cashUsdAmount += parseFloat(usdCashMatch[1]);
+        }
+        const vesCashMatch = paymentMethod.match(/Efectivo Bs\.:\s*Bs\.\s*\d+(?:\.\d+)?\s*\(\$(\d+(?:\.\d+)?)\)/i);
+        if (vesCashMatch) {
+          cashUsdAmount += parseFloat(vesCashMatch[1]);
+        }
+        // Fallback para strings simples:
+        if (!usdCashMatch && !vesCashMatch && (paymentMethod.toLowerCase() === 'cash' || paymentMethod.toLowerCase() === 'efectivo')) {
+          cashUsdAmount = finalTotal;
+        }
+      }
+
+      if (cashUsdAmount > 0) {
+        finalExpected += cashUsdAmount;
+        await conn.query(
+          'UPDATE cash_sessions SET expected_balance = ? WHERE id = ?',
+          [finalExpected, activeSession.id]
+        );
+      }
+    }
+
+    const isBlocked = activeSession ? (finalExpected > limit) : false;
+
     await conn.commit();
     conn.release();
 
@@ -500,7 +567,10 @@ router.post('/pos', authenticate, async (req: AuthRequest, res: Response) => {
       concept: concept || null,
       note: note || null,
       whatsappText: encodeURIComponent(waText),
-      emailPreviewUrl: ''
+      emailPreviewUrl: '',
+      isBlocked,
+      cashDropLimit: limit,
+      newExpectedBalance: finalExpected
     });
   } catch (error: any) {
     await conn.rollback();
@@ -652,14 +722,39 @@ router.get('/debtors/all', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
-// Modificar estado de una Venta (Solo Admin - ej. Completar pago de deudor)
+// Modificar estado de una Venta (Solo Admin o Cajero con Autorización de Supervisor)
 router.put('/:id/status', authenticate, async (req: AuthRequest, res: Response) => {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ message: 'No autorizado' });
+  const { id } = req.params;
+  const { status, abono, supervisorEmail, supervisorPassword } = req.body; // 'completed' | 'cancelled' | 'pending', abono: number (opcional)
+
+  let isAuthorized = false;
+  if (req.user?.role === 'admin') {
+    isAuthorized = true;
+  } else if (req.user?.role === 'seller' && status === 'cancelled') {
+    // Si es cajero/vendedor, requiere credenciales de supervisor (admin)
+    if (!supervisorEmail || !supervisorPassword) {
+      return res.status(401).json({ message: 'Se requiere autorización de supervisor para anular una venta.' });
+    }
+    try {
+      const [supervisors]: any = await pool.query('SELECT * FROM users WHERE email = ? LIMIT 1', [supervisorEmail]);
+      if (supervisors.length > 0) {
+        const supervisor = supervisors[0];
+        if (supervisor.role === 'admin') {
+          const isMatch = await bcrypt.compare(supervisorPassword, supervisor.password);
+          if (isMatch) {
+            isAuthorized = true;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error al verificar supervisor en reembolso:', err);
+      return res.status(500).json({ message: 'Error interno al validar supervisor' });
+    }
   }
 
-  const { id } = req.params;
-  const { status, abono } = req.body; // 'completed' | 'cancelled' | 'pending', abono: number (opcional)
+  if (!isAuthorized) {
+    return res.status(403).json({ message: 'No autorizado. Se requieren credenciales de administrador o autorización de supervisor.' });
+  }
 
   if (status && !['completed', 'cancelled', 'pending'].includes(status)) {
     return res.status(400).json({ message: 'Estado inválido' });

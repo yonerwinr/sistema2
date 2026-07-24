@@ -167,6 +167,27 @@ export interface StatsData {
   lowStockProducts: Product[];
 }
 
+export interface CashSession {
+  id: number;
+  user_id: number;
+  opened_at: string;
+  closed_at: string | null;
+  status: 'open' | 'closed';
+  opening_balance: number;
+  expected_balance: number;
+  actual_balance: number | null;
+  difference: number | null;
+  closed_by: number | null;
+}
+
+export interface CashDrop {
+  id: number;
+  session_id: number;
+  amount: number;
+  authorized_by: number;
+  created_at: string;
+}
+
 // API Endpoints
 export const api = {
   // Autenticación
@@ -226,6 +247,10 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
     resetPassword: (body: { email: string; code: string; newPassword: string }) => request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    verifySupervisor: (body: any) => request<{ user: User }>('/auth/verify-supervisor', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -324,9 +349,9 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
     getDebtors: () => request<Sale[]>('/sales/debtors/all'),
-    updateStatus: (id: number, status?: 'completed' | 'cancelled' | 'pending', abono?: number) => request<{ message: string; status?: string; amount_paid?: number }>(`/sales/${id}/status`, {
+    updateStatus: (id: number, status?: 'completed' | 'cancelled' | 'pending', abono?: number, supervisorEmail?: string, supervisorPassword?: string) => request<{ message: string; status?: string; amount_paid?: number }>(`/sales/${id}/status`, {
       method: 'PUT',
-      body: JSON.stringify({ status, abono }),
+      body: JSON.stringify({ status, abono, supervisorEmail, supervisorPassword }),
     }),
     getQuotations: () => request<Sale[]>('/sales/quotations/all'),
     validateCoupon: (code: string, userId?: number) => request<Coupon>('/sales/coupon/validate', {
@@ -382,5 +407,29 @@ export const api = {
   // Estadísticas (Dashboard Admin)
   stats: {
     getDashboard: () => request<StatsData>('/stats'),
+    getReports: (filters: { seller_id?: string; period: string; date?: string }) => {
+      const params = new URLSearchParams();
+      if (filters.seller_id) params.append('seller_id', filters.seller_id);
+      if (filters.period) params.append('period', filters.period);
+      if (filters.date) params.append('date', filters.date);
+      return request<any>(`/stats/reports?${params.toString()}`);
+    },
+  },
+
+  // Caja Registradora / Turnos
+  cash: {
+    getActive: () => request<CashSession | null>('/cash/active'),
+    open: (openingBalance: number) => request<CashSession>('/cash/open', {
+      method: 'POST',
+      body: JSON.stringify({ openingBalance }),
+    }),
+    close: (actualBalance: number) => request<any>('/cash/close', {
+      method: 'POST',
+      body: JSON.stringify({ actualBalance }),
+    }),
+    cashDrop: (body: { amount: number; supervisorEmail?: string; supervisorPassword?: string }) => request<any>('/cash/cash-drop', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   },
 };

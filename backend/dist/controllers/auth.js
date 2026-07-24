@@ -619,4 +619,37 @@ router.delete('/staff/:id', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ message: 'Error al eliminar personal' });
     }
 });
+// POST /auth/verify-supervisor: Verifica credenciales de administrador/supervisor
+router.post('/verify-supervisor', async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Correo y contraseña son obligatorios' });
+    }
+    try {
+        const [users] = await db_1.default.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
+        if (users.length === 0) {
+            return res.status(401).json({ message: 'Credenciales de supervisor inválidas' });
+        }
+        const user = users[0];
+        if (user.role !== 'admin') {
+            return res.status(403).json({ message: 'El usuario no tiene privilegios de supervisor (administrador)' });
+        }
+        const isMatch = await bcryptjs_1.default.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Credenciales de supervisor inválidas' });
+        }
+        res.json({
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error al verificar supervisor:', error);
+        res.status(500).json({ message: 'Error interno al verificar supervisor' });
+    }
+});
 exports.default = router;

@@ -1,6 +1,6 @@
 import { Chart, registerables } from 'chart.js';
 import { api } from './utils/api';
-import type { Product, User, SaleDetail, AuditLog, Sale } from './utils/api';
+import type { Product, User, SaleDetail, AuditLog, Sale, CashSession } from './utils/api';
 import { initScrollAnimations } from './utils/scroll-animation';
 import './index.css';
 
@@ -12,6 +12,8 @@ Chart.register(...registerables);
 let currentView: 'store' | 'auth' | 'admin' = 'store';
 let currentUser: User | null = null;
 let productsList: Product[] = [];
+let activeCashSession: CashSession | null = null;
+let posCashLimit = 500.00;
 let selectedCategory: string = '';
 let searchQuery: string = '';
 
@@ -124,7 +126,7 @@ function smartMatch(target: string | undefined | null, query: string | undefined
 }
 
 // Vista activa dentro de Administración
-type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers';
+type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports';
 let activeAdminView: AdminSubView = 'pos';
 
 // Nuevas variables de estado para el control en POS
@@ -2110,6 +2112,9 @@ function renderAdminDashboard(): string {
             </button>
           ` : ''}
           ${currentUser.role === 'admin' ? `
+            <button class="sidebar-nav-btn ${activeAdminView === 'reports' ? 'active' : ''}" id="admin-tab-reports">
+              📊 Reportes y Cierres
+            </button>
             <button class="sidebar-nav-btn ${activeAdminView === 'stats' ? 'active' : ''}" id="admin-tab-stats">
               ${icons.dashboard} Estadísticas
             </button>
@@ -2170,6 +2175,7 @@ async function bindAdminEvents() {
   const tabCustomers = document.getElementById('admin-tab-customers');
   const tabExpenses = document.getElementById('admin-tab-expenses');
   const tabStaff = document.getElementById('admin-tab-staff');
+  const tabReports = document.getElementById('admin-tab-reports');
 
   const clearActiveTabs = () => {
     tabStats?.classList.remove('active');
@@ -2182,6 +2188,7 @@ async function bindAdminEvents() {
     tabCustomers?.classList.remove('active');
     tabExpenses?.classList.remove('active');
     tabStaff?.classList.remove('active');
+    tabReports?.classList.remove('active');
   };
 
   tabStats?.addEventListener('click', async () => {
@@ -2198,6 +2205,14 @@ async function bindAdminEvents() {
     activeAdminView = 'pos';
     destroyCharts();
     await renderAdminPOS();
+  });
+
+  tabReports?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabReports.classList.add('active');
+    activeAdminView = 'reports';
+    destroyCharts();
+    await renderAdminReports();
   });
 
   tabProducts?.addEventListener('click', async () => {
@@ -2285,6 +2300,8 @@ async function bindAdminEvents() {
     await renderAdminExpenses();
   } else if (activeAdminView === 'staff') {
     await renderAdminStaff();
+  } else if (activeAdminView === 'reports') {
+    await renderAdminReports();
   }
 
   // Guardar Tasas de Cambio Manuales (BCV & Binance)
@@ -2568,6 +2585,26 @@ async function renderAdminPOS() {
   const panel = document.getElementById('dashboard-content-panel');
   if (!panel) return;
 
+  // Verificar si hay una sesión de caja activa
+  if (!activeCashSession) {
+    try {
+      activeCashSession = await api.cash.getActive();
+      if (activeCashSession && (activeCashSession as any).cash_drop_limit) {
+        posCashLimit = Number((activeCashSession as any).cash_drop_limit);
+      }
+    } catch (err) {
+      console.error('Error al obtener sesión de caja activa:', err);
+    }
+  }
+
+  if (!activeCashSession) {
+    renderOpenCashSessionScreen(panel);
+    return;
+  }
+
+  const expectedBalance = activeCashSession ? Number(activeCashSession.expected_balance) : 0;
+  const isLockedByCashLimit = expectedBalance > posCashLimit;
+
   try {
     // Cargar lista de clientes para el POS si está vacía
     if (!Array.isArray(posCustomersList) || posCustomersList.length === 0) {
@@ -2667,8 +2704,15 @@ async function renderAdminPOS() {
                 ➕ Nueva Venta Libre
               </button>
             </div>
-            <div style="font-size:13px; color:var(--text-secondary);">
-              Vendedor: <strong style="color:white; font-size:14px;">${currentUser?.name || 'Admin'}</strong>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+              <div style="font-size:12px; color:var(--text-secondary);">
+                Vendedor: <strong style="color:white; font-size:13px;">${currentUser?.name || 'Admin'}</strong>
+              </div>
+              <div style="font-size:12px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
+                <span>Caja: <strong style="color:var(--success); font-size:13px;">$${expectedBalance.toFixed(2)}</strong></span>
+                <button type="button" class="btn" id="pos-cash-drop-btn" style="padding:2px 6px; font-size:10px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#f59e0b; font-weight:700; border-radius:4px; cursor:pointer;">Retirar</button>
+                <button type="button" class="btn" id="pos-close-session-btn" style="padding:2px 6px; font-size:10px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171; font-weight:700; border-radius:4px; cursor:pointer;">Cerrar</button>
+              </div>
             </div>
           </div>
 
@@ -2916,13 +2960,21 @@ async function renderAdminPOS() {
               <div style="font-size:16px; font-weight:800; color:#f59e0b; margin-top:2px;">Bs. ${(posTotal * rateUsdToVes).toFixed(2)}</div>
             </div>
 
+            <!-- Alerta Caja Bloqueada -->
+            ${isLockedByCashLimit ? `
+              <div class="alert alert-danger" style="background:rgba(239,68,68,0.15); border:1px solid var(--danger); color:#f87171; padding:12px; border-radius:12px; font-size:12px; font-weight:700; text-align:center; margin-bottom: 8px;">
+                ⚠️ CAJA BLOQUEADA POR LÍMITE DE EFECTIVO EXCEDIDO ($${expectedBalance.toFixed(2)} > $${posCashLimit.toFixed(2)}).
+                <br>Requiere realizar una Sangría de Caja con autorización de supervisor.
+              </div>
+            ` : ''}
+
             <!-- Botón Principal de Cobro (Crear Venta) -->
             <div style="display:flex; gap:10px; align-items:center;">
               <button type="button" class="btn btn-secondary" id="pos-print-preview-btn" style="padding:14px; font-size:16px; background:rgba(255,255,255,0.06);" title="Imprimir / Vista Previa">
                 🖨️
               </button>
-              <button type="submit" class="btn btn-primary" id="pos-submit-btn" ${posCart.length === 0 ? 'disabled' : ''} style="flex-grow:1; padding:14px 18px; font-size:16px; font-weight:900; background:var(--primary); color:white; border:none; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
-                <span>🛒 Registrar Venta POS</span>
+              <button type="submit" class="btn btn-primary" id="pos-submit-btn" ${(posCart.length === 0 || isLockedByCashLimit) ? 'disabled' : ''} style="flex-grow:1; padding:14px 18px; font-size:16px; font-weight:900; background:${isLockedByCashLimit ? 'var(--danger)' : 'var(--primary)'}; color:white; border:none; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
+                <span>🛒 ${isLockedByCashLimit ? 'Caja Bloqueada' : 'Registrar Venta POS'}</span>
                 <span style="font-size:18px;">$${posTotal.toFixed(2)} ›</span>
               </button>
             </div>
@@ -3442,11 +3494,15 @@ function bindPOSEvents() {
       const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
       const item = posCart.find(i => i.product.id === id);
       if (item) {
-        item.quantity--;
-        if (item.quantity <= 0) {
-          posCart = posCart.filter(i => i.product.id !== id);
+        if (item.quantity <= 1) {
+          requestSupervisorAuth(async () => {
+            posCart = posCart.filter(i => i.product.id !== id);
+            await renderAdminPOS();
+          });
+        } else {
+          item.quantity--;
+          renderAdminPOS();
         }
-        renderAdminPOS();
       }
     });
   });
@@ -3488,10 +3544,18 @@ function bindPOSEvents() {
 
   // Descuento Fijo
   const discountInput = document.getElementById('pos-discount-input') as HTMLInputElement;
-  discountInput?.addEventListener('change', async (e) => {
+  discountInput?.addEventListener('change', (e) => {
     const val = parseFloat((e.target as HTMLInputElement).value);
-    posDiscount = isNaN(val) ? 0 : val;
-    await renderAdminPOS();
+    const newDiscount = isNaN(val) ? 0 : val;
+    if (newDiscount > 0) {
+      requestSupervisorAuth(async () => {
+        posDiscount = newDiscount;
+        await renderAdminPOS();
+      });
+    } else {
+      posDiscount = 0;
+      void renderAdminPOS();
+    }
   });
 
   // Aplicar Cupón
@@ -3654,17 +3718,21 @@ function bindPOSEvents() {
   });
 
   // Vaciar Canasta
-  document.getElementById('clear-pos-cart-btn')?.addEventListener('click', async () => {
-    posCart = [];
-    await renderAdminPOS();
+  document.getElementById('clear-pos-cart-btn')?.addEventListener('click', () => {
+    requestSupervisorAuth(async () => {
+      posCart = [];
+      await renderAdminPOS();
+    });
   });
 
   // Eliminar Item de Canasta
   document.querySelectorAll('.remove-pos-item').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
+    btn.addEventListener('click', (e) => {
       const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
-      posCart = posCart.filter(item => item.product.id !== id);
-      await renderAdminPOS();
+      requestSupervisorAuth(async () => {
+        posCart = posCart.filter(item => item.product.id !== id);
+        await renderAdminPOS();
+      });
     });
   });
 
@@ -3696,6 +3764,192 @@ function bindPOSEvents() {
     const nextId = posPaymentLines.length > 0 ? Math.max(...posPaymentLines.map(p => p.id)) + 1 : 1;
     posPaymentLines.push({ id: nextId, method: 'pago_movil', amountUsd: 0, amountVes: 0 });
     await renderAdminPOS();
+  });
+
+  // Eventos de Sangría y Cierre de Caja
+  document.getElementById('pos-cash-drop-btn')?.addEventListener('click', () => {
+    const expected = activeCashSession ? Number(activeCashSession.expected_balance) : 0;
+    const amountStr = prompt(`Retiro de efectivo (Sangría de Caja).\n\nSaldo actual esperado en caja: $${expected.toFixed(2)}\n\nIngrese el monto a retirar ($ USD):`);
+    if (amountStr === null) return;
+    
+    const amountVal = parseFloat(amountStr);
+    if (isNaN(amountVal) || amountVal <= 0) {
+      alert('Por favor ingrese un monto positivo válido.');
+      return;
+    }
+    
+    if (amountVal > expected) {
+      alert(`No puedes retirar más del efectivo esperado en caja ($${expected.toFixed(2)})`);
+      return;
+    }
+
+    // Solicitar credenciales del supervisor
+    const modalDiv = document.createElement('div');
+    modalDiv.id = 'supervisor-auth-modal-container';
+    modalDiv.innerHTML = `
+      <div class="modal-overlay open" id="supervisor-auth-modal" style="z-index: 999999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;">
+        <div class="modal-content" style="max-width: 400px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid var(--danger); background: #111827; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+          <h3 style="font-size:18px; font-weight:800; color:#ef4444; margin-bottom:8px; text-align:center;">🔑 Autorización de Supervisor</h3>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px; text-align:center;">El retiro de efectivo requiere credenciales de supervisor (administrador).</p>
+          <form id="supervisor-auth-form" style="display:flex; flex-direction:column; gap:12px;">
+            <div class="form-group">
+              <label style="font-size:11px; font-weight:700;">Correo del Administrador</label>
+              <input type="email" id="supervisor-email" class="form-control" required style="font-size:13px; padding: 8px;">
+            </div>
+            <div class="form-group">
+              <label style="font-size:11px; font-weight:700;">Contraseña</label>
+              <input type="password" id="supervisor-password" class="form-control" required style="font-size:13px; padding: 8px;">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:8px;">
+              <button type="button" class="btn btn-secondary" id="cancel-supervisor-auth" style="flex:1; padding:10px; font-size:13px; cursor: pointer;">Cancelar</button>
+              <button type="submit" class="btn btn-primary" style="flex:1; padding:10px; font-size:13px; background:#ef4444; border:none; color:white; cursor: pointer;">Autorizar Retiro</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalDiv);
+
+    const cleanUp = () => {
+      document.getElementById('supervisor-auth-modal-container')?.remove();
+    };
+
+    document.getElementById('cancel-supervisor-auth')?.addEventListener('click', cleanUp);
+
+    document.getElementById('supervisor-auth-form')?.addEventListener('submit', async (evt) => {
+      evt.preventDefault();
+      const email = (document.getElementById('supervisor-email') as HTMLInputElement).value.trim();
+      const password = (document.getElementById('supervisor-password') as HTMLInputElement).value;
+
+      const submitBtn = (evt.target as HTMLFormElement).querySelector('button[type="submit"]') as HTMLButtonElement;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Retirando...';
+      }
+
+      try {
+        const res = await api.cash.cashDrop({
+          amount: amountVal,
+          supervisorEmail: email,
+          supervisorPassword: password
+        });
+        alert(res.message || 'Sangría de caja completada con éxito.');
+        cleanUp();
+        
+        // Recargar el estado de la caja activa
+        activeCashSession = await api.cash.getActive();
+        await renderAdminPOS();
+      } catch (err: any) {
+        alert(err.message || 'Error al autorizar retiro.');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerText = 'Autorizar Retiro';
+        }
+      }
+    });
+  });
+
+  document.getElementById('pos-close-session-btn')?.addEventListener('click', () => {
+    const expected = activeCashSession ? Number(activeCashSession.expected_balance) : 0;
+    
+    const modalDiv = document.createElement('div');
+    modalDiv.id = 'close-cash-modal-container';
+    modalDiv.innerHTML = `
+      <div class="modal-overlay open" id="close-cash-modal" style="z-index: 999999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;">
+        <div class="modal-content" style="max-width: 420px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid var(--primary); background: #111827; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+          <h3 style="font-size:18px; font-weight:800; color:var(--primary); margin-bottom:12px; text-align:center;">🔒 Arqueo y Cierre de Caja</h3>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px; text-align:center;">Por favor, ingresa el saldo total en efectivo físico contado en el cajón.</p>
+          
+          <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); padding:12px; border-radius:10px; margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-secondary);">
+              <span>Saldo de apertura:</span>
+              <strong>$${activeCashSession ? Number(activeCashSession.opening_balance).toFixed(2) : '0.00'}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; color:white; font-weight:700; margin-top:4px;">
+              <span>Saldo esperado en caja:</span>
+              <strong style="color:var(--success);">$${expected.toFixed(2)}</strong>
+            </div>
+          </div>
+
+          <form id="close-cash-form" style="display:flex; flex-direction:column; gap:12px;">
+            <div class="form-group">
+              <label style="font-size:11px; font-weight:700;">Efectivo Físico Real Contado ($ USD) *</label>
+              <input type="number" step="0.01" min="0" id="close-actual-balance" class="form-control" required style="font-size:15px; padding:10px; font-weight:700; text-align:right;" placeholder="0.00">
+            </div>
+            <div id="close-difference-box" style="display:none; justify-content:space-between; font-size:13px; font-weight:700; padding:8px; border-radius:6px;">
+              <span>Discrepancia/Diferencia:</span>
+              <span id="close-difference-val">$0.00</span>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:8px;">
+              <button type="button" class="btn btn-secondary" id="cancel-close-cash" style="flex:1; padding:10px; font-size:13px; cursor: pointer;">Cancelar</button>
+              <button type="submit" class="btn btn-primary" style="flex:1; padding:10px; font-size:13px; font-weight:700; cursor: pointer;">Cerrar Turno</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalDiv);
+
+    const inputVal = document.getElementById('close-actual-balance') as HTMLInputElement;
+    const diffBox = document.getElementById('close-difference-box');
+    const diffVal = document.getElementById('close-difference-val');
+
+    inputVal?.addEventListener('input', () => {
+      const val = parseFloat(inputVal.value);
+      if (!isNaN(val)) {
+        const diff = val - expected;
+        if (diffBox) diffBox.style.display = 'flex';
+        if (diffVal) {
+          diffVal.innerText = `${diff >= 0 ? '+' : ''}$${diff.toFixed(2)}`;
+          if (diff === 0 && diffBox) {
+            diffBox.style.backgroundColor = 'rgba(16,185,129,0.1)';
+            diffBox.style.color = '#34d399';
+          } else if (diffBox) {
+            diffBox.style.backgroundColor = 'rgba(239,68,68,0.1)';
+            diffBox.style.color = '#f87171';
+          }
+        }
+      } else {
+        if (diffBox) diffBox.style.display = 'none';
+      }
+    });
+
+    const cleanUp = () => {
+      document.getElementById('close-cash-modal-container')?.remove();
+    };
+
+    document.getElementById('cancel-close-cash')?.addEventListener('click', cleanUp);
+
+    document.getElementById('close-cash-form')?.addEventListener('submit', async (evt) => {
+      evt.preventDefault();
+      const val = parseFloat(inputVal.value);
+      if (isNaN(val) || val < 0) {
+        alert('Por favor ingrese un monto válido.');
+        return;
+      }
+
+      const submitBtn = (evt.target as HTMLFormElement).querySelector('button[type="submit"]') as HTMLButtonElement;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Cerrando...';
+      }
+
+      try {
+        const res = await api.cash.close(val);
+        alert(`Turno de caja cerrado con éxito.\n\nEsperado: $${res.expectedBalance.toFixed(2)}\nFísico: $${res.actualBalance.toFixed(2)}\nDiferencia: $${res.difference.toFixed(2)}`);
+        cleanUp();
+        
+        // Limpiar sesión activa
+        activeCashSession = null;
+        await renderAdminPOS();
+      } catch (err: any) {
+        alert(err.message || 'Error al cerrar caja.');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerText = 'Cerrar Turno';
+        }
+      }
+    });
   });
 
   document.querySelectorAll('.remove-pos-payment-line').forEach(btn => {
@@ -3965,6 +4219,13 @@ function bindPOSEvents() {
         concept,
         note
       });
+
+      if (activeCashSession && result && (result as any).hasOwnProperty('newExpectedBalance')) {
+        activeCashSession.expected_balance = (result as any).newExpectedBalance;
+      }
+      if (result && (result as any).hasOwnProperty('cashDropLimit')) {
+        posCashLimit = Number((result as any).cashDropLimit);
+      }
 
       // Venta exitosa, limpiar estados
       posCart = [];
@@ -5192,7 +5453,7 @@ function renderSaleDetailModal(): string {
         </div>
 
         <div class="flex justify-between align-center" style="border-top:1px solid var(--border-glass); padding-top:16px; flex-wrap: wrap; gap: 12px;">
-          <div class="flex gap-2">
+          <div class="flex gap-2" id="detail-actions-box">
             <!-- Re-envio WhatsApp -->
             <a href="#" target="_blank" class="wa-link" id="detail-wa-btn" style="padding: 8px 12px; font-size:13px; border-radius: var(--radius-md);">
               ${icons.whatsapp} Enviar por WhatsApp
@@ -5381,6 +5642,69 @@ function showSaleDetails(details: SaleDetail) {
         newEmailBtn.innerText = '✉️ Reenviar por Correo';
       }
     });
+  }
+
+  // Enlace a Anular Factura (Supervisor Override si es vendedor)
+  // Eliminar botón previo si existía
+  document.getElementById('detail-cancel-sale-btn')?.remove();
+
+  if (sale.status !== 'cancelled') {
+    const actionsBox = document.getElementById('detail-actions-box');
+    if (actionsBox) {
+      const cancelBtn = document.createElement('button');
+      cancelBtn.id = 'detail-cancel-sale-btn';
+      cancelBtn.className = 'btn btn-danger';
+      cancelBtn.style.padding = '8px 12px';
+      cancelBtn.style.fontSize = '13px';
+      cancelBtn.style.fontWeight = '600';
+      cancelBtn.style.background = 'rgba(239,68,68,0.15)';
+      cancelBtn.style.border = '1px solid rgba(239,68,68,0.3)';
+      cancelBtn.style.color = '#f87171';
+      cancelBtn.style.cursor = 'pointer';
+      cancelBtn.style.display = 'flex';
+      cancelBtn.style.alignItems = 'center';
+      cancelBtn.style.gap = '6px';
+      cancelBtn.innerText = '🚫 Anular Factura';
+      actionsBox.appendChild(cancelBtn);
+
+      cancelBtn.addEventListener('click', () => {
+        if (!confirm(`¿Estás seguro de que deseas ANULAR la factura #${sale.id}? Esta operación devolverá los productos al inventario y marcará el comprobante como cancelado.`)) {
+          return;
+        }
+
+        const executeCancel = async (supEmail?: string, supPass?: string) => {
+          cancelBtn.disabled = true;
+          cancelBtn.innerText = 'Anulando...';
+          try {
+            await api.sales.updateStatus(sale.id, 'cancelled', undefined, supEmail, supPass);
+            alert('Venta anulada con éxito y productos devueltos al stock.');
+            document.getElementById('sale-detail-modal')?.classList.remove('open');
+            
+            // Recargar histórico o POS
+            if (activeAdminView === 'sales') {
+              await renderAdminSales(true);
+            } else if (activeAdminView === 'pos') {
+              await renderAdminPOS();
+            }
+          } catch (err: any) {
+            alert(err.message || 'Error al anular la venta.');
+            cancelBtn.disabled = false;
+            cancelBtn.innerText = '🚫 Anular Factura';
+          }
+        };
+
+        if (currentUser?.role === 'admin') {
+          void executeCancel();
+        } else {
+          // Requerir supervisor
+          requestSupervisorAuth(() => {
+            const emailInput = document.getElementById('supervisor-email') as HTMLInputElement;
+            const passInput = document.getElementById('supervisor-password') as HTMLInputElement;
+            void executeCancel(emailInput?.value, passInput?.value);
+          });
+        }
+      });
+    }
   }
 }
 
@@ -6958,3 +7282,354 @@ function bindCustomersEvents() {
     });
   });
 }
+
+// ==========================================================================
+// FUNCIONES AUXILIARES: CONTROL DE CAJA Y SUPERVISOR OVERRIDE
+// ==========================================================================
+
+function requestSupervisorAuth(action: () => void | Promise<void>) {
+  if (currentUser?.role === 'admin') {
+    void Promise.resolve(action());
+    return;
+  }
+
+  // Si es vendedor, mostrar el modal de supervisor
+  const modalDiv = document.createElement('div');
+  modalDiv.id = 'supervisor-auth-modal-container';
+  modalDiv.innerHTML = `
+    <div class="modal-overlay open" id="supervisor-auth-modal" style="z-index: 999999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;">
+      <div class="modal-content" style="max-width: 400px; width: 90%; padding: 24px; border-radius: 16px; border: 1px solid var(--danger); background: #111827; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <h3 style="font-size:18px; font-weight:800; color:#ef4444; margin-bottom:8px; text-align:center;">🔑 Autorización de Supervisor</h3>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px; text-align:center;">Esta acción requiere aprobación de administrador. Por favor, solicita a un administrador que ingrese sus credenciales.</p>
+        <form id="supervisor-auth-form" style="display:flex; flex-direction:column; gap:12px;">
+          <div class="form-group">
+            <label style="font-size:11px; font-weight:700;">Correo del Administrador</label>
+            <input type="email" id="supervisor-email" class="form-control" required style="font-size:13px; padding: 8px;">
+          </div>
+          <div class="form-group">
+            <label style="font-size:11px; font-weight:700;">Contraseña</label>
+            <input type="password" id="supervisor-password" class="form-control" required style="font-size:13px; padding: 8px;">
+          </div>
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <button type="button" class="btn btn-secondary" id="cancel-supervisor-auth" style="flex:1; padding:10px; font-size:13px; cursor: pointer;">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:1; padding:10px; font-size:13px; background:#ef4444; border:none; color:white; cursor: pointer;">Autorizar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modalDiv);
+
+  const cleanUp = () => {
+    document.getElementById('supervisor-auth-modal-container')?.remove();
+  };
+
+  document.getElementById('cancel-supervisor-auth')?.addEventListener('click', cleanUp);
+
+  document.getElementById('supervisor-auth-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = (document.getElementById('supervisor-email') as HTMLInputElement).value.trim();
+    const password = (document.getElementById('supervisor-password') as HTMLInputElement).value;
+
+    const submitBtn = (e.target as HTMLFormElement).querySelector('button[type="submit"]') as HTMLButtonElement;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Verificando...';
+    }
+
+    try {
+      await api.auth.verifySupervisor({ email, password });
+      // Se mantiene el contenedor temporal si se necesita leer valores (ej. en anulación),
+      // de lo contrario se limpia inmediatamente. El llamador decide si limpia.
+      // Limpiamos y llamamos la acción.
+      cleanUp();
+      await Promise.resolve(action());
+    } catch (err: any) {
+      alert(err.message || 'Error al validar credenciales del supervisor.');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Autorizar';
+      }
+    }
+  });
+}
+
+function renderOpenCashSessionScreen(panel: HTMLElement) {
+  panel.innerHTML = `
+    <div class="card text-center animate-on-scroll animate-fade-up visible" style="max-width: 450px; margin: 40px auto; padding: 40px; border: 1px solid var(--border-glass); background: var(--bg-secondary);">
+      <div style="font-size: 48px; margin-bottom: 20px;">🐒🔑</div>
+      <h2 class="mb-2" style="font-weight:900;">Apertura de Caja</h2>
+      <p class="mb-4" style="color:var(--text-secondary); font-size:13px;">El punto de venta está inactivo. Debes ingresar el saldo inicial en efectivo para abrir el turno.</p>
+      <form id="open-cash-form" style="display:flex; flex-direction:column; gap:16px; text-align:left;">
+        <div class="form-group">
+          <label for="opening-balance-input" style="font-weight:700; margin-bottom:6px; display:block; font-size:12px; text-transform:uppercase;">Saldo Inicial en Efectivo ($ USD):</label>
+          <input type="number" step="0.01" min="0" class="form-control" id="opening-balance-input" value="100.00" required style="font-size:16px; padding:10px 14px; font-weight:700; text-align:right;">
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding:12px; font-weight:800; font-size:15px; background:var(--primary); color:white; border:none; border-radius:10px;">Abrir Turno de Caja</button>
+      </form>
+    </div>
+  `;
+
+  document.getElementById('open-cash-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('opening-balance-input') as HTMLInputElement;
+    const val = parseFloat(input?.value || '0');
+    const btn = e.target ? (e.target as HTMLFormElement).querySelector('button') : null;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Abriendo...';
+    }
+    try {
+      activeCashSession = await api.cash.open(val);
+      if (activeCashSession && (activeCashSession as any).cash_drop_limit) {
+        posCashLimit = Number((activeCashSession as any).cash_drop_limit);
+      }
+      alert('Caja abierta con éxito.');
+      await renderAdminPOS();
+    } catch (err: any) {
+      alert(err.message || 'Error al abrir caja');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = 'Abrir Turno de Caja';
+      }
+    }
+  });
+}
+
+// ==========================================================================
+// SUB-VISTA: REPORTES AVANZADOS
+// ==========================================================================
+
+async function renderAdminReports() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando reportes del sistema...</div>`;
+
+  try {
+    // Inicializar filtros globales de reportes en window si no existen
+    if (!(window as any).hasOwnProperty('reportsPeriod')) (window as any).reportsPeriod = 'day';
+    if (!(window as any).hasOwnProperty('reportsDate')) (window as any).reportsDate = new Date().toISOString().slice(0, 10);
+    if (!(window as any).hasOwnProperty('reportsSellerId')) (window as any).reportsSellerId = '';
+
+    const period = (window as any).reportsPeriod;
+    const date = (window as any).reportsDate;
+    const sellerId = (window as any).reportsSellerId;
+
+    // Obtener lista de personal (vendedores) para filtrar
+    let staffList: User[] = [];
+    try {
+      staffList = await api.auth.getStaff();
+    } catch (e) {
+      console.error('Error al obtener staff para reportes:', e);
+    }
+
+    // Obtener data de reportes desde el backend
+    const data = await api.stats.getReports({ period, date, seller_id: sellerId });
+    const { metrics, sales, paymentMethods } = data;
+
+    panel.innerHTML = `
+      <div class="animate-on-scroll animate-fade-up visible">
+        <div class="flex justify-between align-center mb-4" style="flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 style="font-size:24px; font-weight:800; margin:0;">Informes y Reportes Avanzados 📊</h2>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Consulta el balance financiero, gastos y exporta el reporte del periodo.</p>
+          </div>
+          <button class="btn btn-success" id="export-reports-csv-btn" style="padding:10px 18px; font-weight:700; background:#10b981; border:none; display:flex; align-items:center; gap:6px; border-radius:10px; color:white; cursor:pointer;">
+            📥 Exportar Reporte a CSV
+          </button>
+        </div>
+
+        <!-- Filtros del Reporte -->
+        <div class="card mb-4" style="padding:16px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+            <div class="form-group">
+              <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Periodo:</label>
+              <select class="form-control" id="report-period-select" style="padding:8px 12px; font-size:13px; font-weight:700;">
+                <option value="day" ${period === 'day' ? 'selected' : ''}>📅 Diario</option>
+                <option value="week" ${period === 'week' ? 'selected' : ''}>📅 Semanal (Últimos 7 días)</option>
+                <option value="month" ${period === 'month' ? 'selected' : ''}>📅 Mensual</option>
+                <option value="year" ${period === 'year' ? 'selected' : ''}>📅 Anual</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Fecha Base:</label>
+              <input type="date" class="form-control" id="report-date-input" value="${date}" style="padding:8px 12px; font-size:13px;">
+            </div>
+
+            <div class="form-group">
+              <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Vendedor / Canal:</label>
+              <select class="form-control" id="report-seller-select" style="padding:8px 12px; font-size:13px; font-weight:700;">
+                <option value="" ${sellerId === '' ? 'selected' : ''}>🌐 Todos los Vendedores y Canales</option>
+                <option value="online" ${sellerId === 'online' ? 'selected' : ''}>🌐 Tienda Online (Ecommerce)</option>
+                ${staffList.map(s => `<option value="${s.id}" ${sellerId === String(s.id) ? 'selected' : ''}>👤 POS: ${s.name} (${s.role === 'admin' ? 'Admin' : 'Vendedor'})</option>`).join('')}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjetas KPIs -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
+          <!-- Ingresos -->
+          <div class="card" style="padding:20px; border-left:4px solid var(--primary); display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Total Ingresos</div>
+              <div style="font-size:24px; font-weight:900; color:white; font-family:monospace; margin-top:4px;">$${Number(metrics.totalRevenue).toFixed(2)}</div>
+              <div style="font-size:12px; color:#f59e0b; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.totalRevenue) * rateUsdToVes).toFixed(2)}</div>
+            </div>
+            <div style="font-size:32px;">💰</div>
+          </div>
+
+          <!-- Gastos -->
+          <div class="card" style="padding:20px; border-left:4px solid #ef4444; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Gastos Registrados</div>
+              <div style="font-size:24px; font-weight:900; color:white; font-family:monospace; margin-top:4px;">$${Number(metrics.totalExpenses).toFixed(2)}</div>
+              <div style="font-size:12px; color:#ef4444; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.totalExpenses) * rateUsdToVes).toFixed(2)}</div>
+            </div>
+            <div style="font-size:32px;">💸</div>
+          </div>
+
+          <!-- Ganancia -->
+          <div class="card" style="padding:20px; border-left:4px solid #10b981; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Ganancia Neta</div>
+              <div style="font-size:24px; font-weight:900; color:#10b981; font-family:monospace; margin-top:4px;">$${Number(metrics.netProfit).toFixed(2)}</div>
+              <div style="font-size:12px; color:#10b981; font-weight:600; margin-top:2px;">Bs. ${(Number(metrics.netProfit) * rateUsdToVes).toFixed(2)}</div>
+            </div>
+            <div style="font-size:32px;">📈</div>
+          </div>
+
+          <!-- Ventas & Clientes -->
+          <div class="card" style="padding:20px; border-left:4px solid #3b82f6; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <div style="font-size:11px; color:var(--text-muted); font-weight:800; text-transform:uppercase;">Ventas & Clientes</div>
+              <div style="font-size:18px; font-weight:900; color:white; margin-top:4px;">${metrics.salesCount} Ventas del Periodo</div>
+              <div style="font-size:12px; color:var(--text-secondary); font-weight:600; margin-top:2px;">👤 ${metrics.newCustomers} clientes nuevos</div>
+            </div>
+            <div style="font-size:32px;">👥</div>
+          </div>
+        </div>
+
+        <!-- Métodos de Pago y Lista de Ventas -->
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; align-items:start;">
+          <!-- Columna Métodos de Pago -->
+          <div class="card" style="padding:16px;">
+            <h3 style="font-size:14px; font-weight:800; margin-bottom:12px; text-transform:uppercase; color:var(--primary);">Distribución de Pagos</h3>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              ${paymentMethods.map((pm: any) => `
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                  <div>
+                    <div style="font-size:12px; font-weight:700; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${pm.payment_method}">${pm.payment_method}</div>
+                    <div style="font-size:10px; color:var(--text-muted);">${pm.count} transacciones</div>
+                  </div>
+                  <strong style="color:var(--primary); font-size:14px;">$${Number(pm.revenue).toFixed(2)}</strong>
+                </div>
+              `).join('')}
+              ${paymentMethods.length === 0 ? '<p style="font-size:12px; color:var(--text-secondary); text-align:center; padding: 20px;">No hay transacciones registradas.</p>' : ''}
+            </div>
+          </div>
+
+          <!-- Columna Tabla Detalle -->
+          <div class="card" style="padding:16px;">
+            <h3 style="font-size:14px; font-weight:800; margin-bottom:12px; text-transform:uppercase; color:var(--primary);">Transacciones del Periodo</h3>
+            <div class="table-responsive" style="max-height:400px; overflow-y:auto;">
+              <table class="table-custom">
+                <thead>
+                  <tr>
+                    <th>Factura</th>
+                    <th>Fecha / Hora</th>
+                    <th>Cliente</th>
+                    <th>Vendedor</th>
+                    <th>Pago</th>
+                    <th class="text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${sales.map((s: any) => `
+                    <tr style="cursor:pointer;" class="view-report-sale-details" data-id="${s.id}">
+                      <td><strong>#${s.id}</strong></td>
+                      <td style="font-size:11px; white-space:nowrap; color:var(--text-secondary);">${new Date(s.created_at).toLocaleString('es-ES')}</td>
+                      <td><strong>👤 ${s.customer_name || 'Consumidor Final'}</strong></td>
+                      <td><small style="color:var(--text-muted); font-size:11px;">${s.seller_name || 'Online (Tienda)'}</small></td>
+                      <td style="font-size:11px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${s.payment_method}">${s.payment_method}</td>
+                      <td class="text-right" style="font-weight:700; color:var(--primary);">$${s.total.toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                  ${sales.length === 0 ? '<tr><td colspan="6" class="text-center" style="padding:20px;">No hay ventas registradas en este periodo.</td></tr>' : ''}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Bind filtros interactivos
+    document.getElementById('report-period-select')?.addEventListener('change', async (e) => {
+      (window as any).reportsPeriod = (e.target as HTMLSelectElement).value;
+      await renderAdminReports();
+    });
+
+    document.getElementById('report-date-input')?.addEventListener('change', async (e) => {
+      (window as any).reportsDate = (e.target as HTMLInputElement).value;
+      await renderAdminReports();
+    });
+
+    document.getElementById('report-seller-select')?.addEventListener('change', async (e) => {
+      (window as any).reportsSellerId = (e.target as HTMLSelectElement).value;
+      await renderAdminReports();
+    });
+
+    // Clic en fila para ver factura
+    document.querySelectorAll('.view-report-sale-details').forEach(row => {
+      row.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLTableRowElement).dataset.id || '0');
+        try {
+          const details = await api.sales.getDetails(id);
+          showSaleDetails(details);
+        } catch (err: any) {
+          alert(err.message || 'Error al obtener detalles de la venta');
+        }
+      });
+    });
+
+    // Exportar CSV
+    document.getElementById('export-reports-csv-btn')?.addEventListener('click', () => {
+      if (sales.length === 0) {
+        alert('No hay datos en este periodo para exportar.');
+        return;
+      }
+
+      let csvContent = '\uFEFF'; // BOM para que Excel detecte acentos en español
+      csvContent += 'Fecha/Hora,Factura #,Cliente,Vendedor/Canal,Metodo de Pago,Total (USD),Total (Bs. equiv.)\n';
+
+      sales.forEach((s: any) => {
+        const dateStr = new Date(s.created_at).toLocaleString('es-ES').replace(/,/g, '');
+        const client = (s.customer_name || 'Consumidor Final').replace(/,/g, '');
+        const seller = (s.seller_name || 'Online (Tienda)').replace(/,/g, '');
+        const payment = s.payment_method.replace(/,/g, ' + ');
+        const totalUsd = s.total.toFixed(2);
+        const totalVes = (s.total * rateUsdToVes).toFixed(2);
+
+        csvContent += `"${dateStr}",#${s.id},"${client}","${seller}","${payment}",$${totalUsd},Bs. ${totalVes}\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Reporte_Ventas_${period}_${date}_FacilitoApp.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+  } catch (error) {
+    console.error('Error al generar reportes:', error);
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al obtener datos de los reportes del servidor.</div>`;
+  }
+}
+

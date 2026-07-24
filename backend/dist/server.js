@@ -13,6 +13,7 @@ const products_1 = __importDefault(require("./controllers/products"));
 const sales_1 = __importDefault(require("./controllers/sales"));
 const stats_1 = __importDefault(require("./controllers/stats"));
 const expenses_1 = __importDefault(require("./controllers/expenses"));
+const cash_1 = __importDefault(require("./controllers/cash"));
 const reminders_1 = require("./services/reminders");
 const rates_1 = require("./services/rates");
 dotenv_1.default.config();
@@ -29,6 +30,7 @@ app.use('/api/products', products_1.default);
 app.use('/api/sales', sales_1.default);
 app.use('/api/stats', stats_1.default);
 app.use('/api/expenses', expenses_1.default);
+app.use('/api/cash', cash_1.default);
 // Ruta raiz de prueba
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Servidor FacilitoApp funcionando correctamente 🐒' });
@@ -324,6 +326,33 @@ async function runMigrations() {
         settings_value TEXT NOT NULL
       ) ENGINE=InnoDB;
     `);
+        // Crear tablas de caja si no existen
+        await conn.query(`
+      CREATE TABLE IF NOT EXISTS cash_sessions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        closed_at TIMESTAMP NULL DEFAULT NULL,
+        status ENUM('open', 'closed') DEFAULT 'open',
+        opening_balance DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        expected_balance DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        actual_balance DECIMAL(10, 2) NULL DEFAULT NULL,
+        difference DECIMAL(10, 2) NULL DEFAULT NULL,
+        closed_by INT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
+        await conn.query(`
+      CREATE TABLE IF NOT EXISTS cash_drops (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        session_id INT NOT NULL,
+        amount DECIMAL(10, 2) NOT NULL,
+        authorized_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (session_id) REFERENCES cash_sessions(id) ON DELETE CASCADE,
+        FOREIGN KEY (authorized_by) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB;
+    `);
         // Crear tabla de gastos si no existe
         await conn.query(`
       CREATE TABLE IF NOT EXISTS expenses (
@@ -346,9 +375,10 @@ async function runMigrations() {
       ('debtor_reminder_frequency_days', '7'),
       ('debtor_reminder_email_template', 'Hola {customerName},\\n\\nTe recordamos amablemente que tienes un saldo pendiente de \${amountPending} de tu compra con factura #{saleId}.\\n\\nPor favor realiza el pago correspondiente lo antes posible para saldar tu cuenta.\\n\\n¡Muchas gracias por tu preferencia!'),
       ('usd_to_ves_rate', '40.00'),
-      ('eur_to_ves_rate', '43.50')
+      ('eur_to_ves_rate', '43.50'),
+      ('cash_drop_limit', '500.00')
     `);
-        console.log('Configuraciones iniciales de tasas y recordatorios verificadas.');
+        console.log('Configuraciones iniciales de tasas, recordatorios y límites de caja verificadas.');
         // Insertar vendedor de prueba si no existe
         const [existingSeller] = await conn.query("SELECT id FROM users WHERE email = 'vendedor@sistema.com' LIMIT 1");
         if (existingSeller.length === 0) {
