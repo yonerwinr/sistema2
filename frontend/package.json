@@ -9,7 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "chart.js": "^4.4.2"
+    "chart.js": "^4.4.2",
+    "nodemailer": "^6.9.13"
   },
   "devDependencies": {
     "typescript": "~6.0.2",

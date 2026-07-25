@@ -2,14 +2,102 @@ import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import path from 'path';
 import pool from '../config/db';
+import https from 'https';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-let transporter: nodemailer.Transporter | null = null;
+// Helper para peticiones HTTP POST nativas (con fallback de https)
+async function httpPost(url: string, headers: Record<string, string>, body: any): Promise<any> {
+  if (typeof fetch === 'function') {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { data = { message: text }; }
+    if (!response.ok) {
+      throw new Error(data.message || `HTTP Error ${response.status}`);
+    }
+    return data;
+  } else {
+    return new Promise((resolve, reject) => {
+      const parsedUrl = new URL(url);
+      const options = {
+        hostname: parsedUrl.hostname,
+        path: parsedUrl.pathname + parsedUrl.search,
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(JSON.stringify(body))
+        }
+      };
 
-// Inicializa el transportador SMTP
-async function getTransporter(): Promise<nodemailer.Transporter> {
+      const req = https.request(options, (res) => {
+        let responseData = '';
+        res.on('data', (chunk) => { responseData += chunk; });
+        res.on('end', () => {
+          let data;
+          try { data = JSON.parse(responseData); } catch (e) { data = { message: responseData }; }
+          if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+            reject(new Error(data.message || `HTTP Error ${res.statusCode}`));
+          } else {
+            resolve(data);
+          }
+        });
+      });
+
+      req.on('error', (err) => { reject(err); });
+      req.write(JSON.stringify(body));
+      req.end();
+    });
+  }
+}
+
+// Simulador de Nodemailer usando un Proxy de Vercel (para evitar bloqueos SMTP)
+class VercelProxyTransporter {
+  private proxyUrl: string;
+
+  constructor(proxyUrl: string) {
+    this.proxyUrl = proxyUrl.trim();
+  }
+
+  async verify() {
+    return true;
+  }
+
+  async sendMail(options: any) {
+    const payload = {
+      smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+      smtpPort: process.env.SMTP_PORT || '587',
+      smtpUser: process.env.SMTP_USER,
+      smtpPass: process.env.SMTP_PASS,
+      from: options.from,
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html
+    };
+
+    const res = await httpPost(this.proxyUrl, {}, payload);
+    return { messageId: res.messageId || 'vercel-proxy-msg-id' };
+  }
+}
+
+let transporter: any = null;
+
+// Inicializa el transportador SMTP o API
+export async function getTransporter(): Promise<any> {
   if (transporter) return transporter;
+
+  const proxyUrl = process.env.EMAIL_PROXY_URL;
+  if (proxyUrl) {
+    transporter = new VercelProxyTransporter(proxyUrl);
+    console.log(`Transportador de correo configurado vía Vercel Proxy: ${proxyUrl}`);
+    return transporter;
+  }
 
   const host = process.env.SMTP_HOST;
   const port = parseInt(process.env.SMTP_PORT || '587');

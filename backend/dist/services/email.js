@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getTransporter = getTransporter;
 exports.sendInvoiceEmail = sendInvoiceEmail;
 exports.sendPlainEmail = sendPlainEmail;
 exports.sendPasswordResetEmail = sendPasswordResetEmail;
@@ -10,12 +11,103 @@ const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
 const db_1 = __importDefault(require("../config/db"));
+const https_1 = __importDefault(require("https"));
 dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../../.env') });
+// Helper para peticiones HTTP POST nativas (con fallback de https)
+async function httpPost(url, headers, body) {
+    if (typeof fetch === 'function') {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body)
+        });
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        }
+        catch (e) {
+            data = { message: text };
+        }
+        if (!response.ok) {
+            throw new Error(data.message || `HTTP Error ${response.status}`);
+        }
+        return data;
+    }
+    else {
+        return new Promise((resolve, reject) => {
+            const parsedUrl = new URL(url);
+            const options = {
+                hostname: parsedUrl.hostname,
+                path: parsedUrl.pathname + parsedUrl.search,
+                method: 'POST',
+                headers: {
+                    ...headers,
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(JSON.stringify(body))
+                }
+            };
+            const req = https_1.default.request(options, (res) => {
+                let responseData = '';
+                res.on('data', (chunk) => { responseData += chunk; });
+                res.on('end', () => {
+                    let data;
+                    try {
+                        data = JSON.parse(responseData);
+                    }
+                    catch (e) {
+                        data = { message: responseData };
+                    }
+                    if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+                        reject(new Error(data.message || `HTTP Error ${res.statusCode}`));
+                    }
+                    else {
+                        resolve(data);
+                    }
+                });
+            });
+            req.on('error', (err) => { reject(err); });
+            req.write(JSON.stringify(body));
+            req.end();
+        });
+    }
+}
+// Simulador de Nodemailer usando un Proxy de Vercel (para evitar bloqueos SMTP)
+class VercelProxyTransporter {
+    proxyUrl;
+    constructor(proxyUrl) {
+        this.proxyUrl = proxyUrl.trim();
+    }
+    async verify() {
+        return true;
+    }
+    async sendMail(options) {
+        const payload = {
+            smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+            smtpPort: process.env.SMTP_PORT || '587',
+            smtpUser: process.env.SMTP_USER,
+            smtpPass: process.env.SMTP_PASS,
+            from: options.from,
+            to: options.to,
+            subject: options.subject,
+            text: options.text,
+            html: options.html
+        };
+        const res = await httpPost(this.proxyUrl, {}, payload);
+        return { messageId: res.messageId || 'vercel-proxy-msg-id' };
+    }
+}
 let transporter = null;
-// Inicializa el transportador SMTP
+// Inicializa el transportador SMTP o API
 async function getTransporter() {
     if (transporter)
         return transporter;
+    const proxyUrl = process.env.EMAIL_PROXY_URL;
+    if (proxyUrl) {
+        transporter = new VercelProxyTransporter(proxyUrl);
+        console.log(`Transportador de correo configurado vía Vercel Proxy: ${proxyUrl}`);
+        return transporter;
+    }
     const host = process.env.SMTP_HOST;
     const port = parseInt(process.env.SMTP_PORT || '587');
     const user = process.env.SMTP_USER;
