@@ -4213,8 +4213,8 @@ function bindPOSEvents() {
     }
   });
 
-  // Delegación de eventos para agregar productos al carrito en el POS
-  document.getElementById('dashboard-content-panel')?.addEventListener('click', async (e) => {
+  // Delegación de eventos para agregar productos al carrito en el POS (se enlaza al grid temporal para evitar acumulación)
+  document.querySelector('.pos-products-grid')?.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement;
     const card = target.closest('.add-to-pos-cart') as HTMLDivElement | null;
     if (card) {
