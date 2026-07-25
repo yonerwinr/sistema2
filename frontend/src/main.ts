@@ -3218,8 +3218,8 @@ async function renderAdminPOS() {
         : 0;
 
       const finalEstimatedTotal = Math.max(0, tempBaseTotal - tempCurrencyDiscount);
-      posPaymentLines[0].amountUsd = finalEstimatedTotal;
-      posPaymentLines[0].amountVes = finalEstimatedTotal * rateUsdToVes;
+      posPaymentLines[0].amountUsd = parseFloat(finalEstimatedTotal.toFixed(2));
+      posPaymentLines[0].amountVes = parseFloat((finalEstimatedTotal * rateUsdToVes).toFixed(2));
     }
 
     const totalPaidInDivisasUsd = posPaymentLines
@@ -3236,8 +3236,8 @@ async function renderAdminPOS() {
     const posTotal = taxableSubtotal + taxAmount;
 
     if (!posIsPending && posPaymentLines.length === 1) {
-      posPaymentLines[0].amountUsd = posTotal;
-      posPaymentLines[0].amountVes = posTotal * rateUsdToVes;
+      posPaymentLines[0].amountUsd = parseFloat(posTotal.toFixed(2));
+      posPaymentLines[0].amountVes = parseFloat((posTotal * rateUsdToVes).toFixed(2));
     }
 
     panel.innerHTML = `
@@ -4734,7 +4734,7 @@ function bindPOSEvents() {
       const val = parseFloat((e.currentTarget as HTMLInputElement).value);
       if (posPaymentLines[idx]) {
         posPaymentLines[idx].amountUsd = isNaN(val) ? 0 : val;
-        posPaymentLines[idx].amountVes = posPaymentLines[idx].amountUsd * rateUsdToVes;
+        posPaymentLines[idx].amountVes = parseFloat((posPaymentLines[idx].amountUsd * rateUsdToVes).toFixed(2));
       }
     });
   });
@@ -4745,7 +4745,7 @@ function bindPOSEvents() {
       const val = parseFloat((e.currentTarget as HTMLInputElement).value);
       if (posPaymentLines[idx]) {
         posPaymentLines[idx].amountVes = isNaN(val) ? 0 : val;
-        posPaymentLines[idx].amountUsd = rateUsdToVes > 0 ? (posPaymentLines[idx].amountVes / rateUsdToVes) : 0;
+        posPaymentLines[idx].amountUsd = rateUsdToVes > 0 ? parseFloat((posPaymentLines[idx].amountVes / rateUsdToVes).toFixed(2)) : 0;
       }
     });
   });
@@ -4880,8 +4880,8 @@ function bindPOSEvents() {
         : 0;
 
       const finalEstimatedTotal = Math.max(0, tempBaseTotal - tempCurrencyDiscount);
-      posPaymentLines[0].amountUsd = finalEstimatedTotal;
-      posPaymentLines[0].amountVes = finalEstimatedTotal * rateUsdToVes;
+      posPaymentLines[0].amountUsd = parseFloat(finalEstimatedTotal.toFixed(2));
+      posPaymentLines[0].amountVes = parseFloat((finalEstimatedTotal * rateUsdToVes).toFixed(2));
     }
 
     const totalPaidInDivisasUsd = posPaymentLines
@@ -4896,8 +4896,8 @@ function bindPOSEvents() {
     const posTotal = taxableSubtotal + taxAmount;
 
     if (!posIsPending && posPaymentLines.length === 1) {
-      posPaymentLines[0].amountUsd = posTotal;
-      posPaymentLines[0].amountVes = posTotal * rateUsdToVes;
+      posPaymentLines[0].amountUsd = parseFloat(posTotal.toFixed(2));
+      posPaymentLines[0].amountVes = parseFloat((posTotal * rateUsdToVes).toFixed(2));
     }
 
     const payment = posPaymentLines.map(l => {
