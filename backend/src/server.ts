@@ -47,10 +47,10 @@ async function runMigrations() {
   try {
     console.log('Iniciando migraciones de base de datos...');
 
-    // Modificar columna role para permitir 'seller'
+    // Modificar columna role para permitir 'seller' y 'billing'
     try {
-      await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'customer', 'seller') DEFAULT 'customer'");
-      console.log('Columna "role" de la tabla users modificada para incluir "seller".');
+      await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'customer', 'seller', 'billing') DEFAULT 'customer'");
+      console.log('Columna "role" de la tabla users modificada para incluir "seller" y "billing".');
     } catch (err: any) {
       console.error('Error al modificar columna role:', err.message);
     }
@@ -136,7 +136,7 @@ async function runMigrations() {
       console.error('Error al inspeccionar columnas de la tabla users:', err.message);
     }
 
-    // Verificar y agregar columna customer_ci a la tabla sales
+    // Verificar y agregar columnas de delivery, concept, note, etc. a la tabla sales
     try {
       const [salesCols]: any = await conn.query('SHOW COLUMNS FROM sales');
       const salesColNames = salesCols.map((c: any) => c.Field);
@@ -152,8 +152,24 @@ async function runMigrations() {
         await conn.query('ALTER TABLE sales ADD COLUMN note TEXT NULL');
         console.log('Columna "note" agregada a la tabla sales.');
       }
+      if (!salesColNames.includes('delivery_option')) {
+        await conn.query('ALTER TABLE sales ADD COLUMN delivery_option VARCHAR(50) NOT NULL DEFAULT "pickup"');
+        console.log('Columna "delivery_option" agregada a la tabla sales.');
+      }
+      if (!salesColNames.includes('delivery_address')) {
+        await conn.query('ALTER TABLE sales ADD COLUMN delivery_address TEXT NULL');
+        console.log('Columna "delivery_address" agregada a la tabla sales.');
+      }
+      if (!salesColNames.includes('google_maps_link')) {
+        await conn.query('ALTER TABLE sales ADD COLUMN google_maps_link TEXT NULL');
+        console.log('Columna "google_maps_link" agregada a la tabla sales.');
+      }
+      if (!salesColNames.includes('payment_attachments')) {
+        await conn.query('ALTER TABLE sales ADD COLUMN payment_attachments TEXT NULL');
+        console.log('Columna "payment_attachments" agregada a la tabla sales.');
+      }
     } catch (err: any) {
-      console.error('Error al agregar columna customer_ci a la tabla sales:', err.message);
+      console.error('Error al agregar columnas adicionales a la tabla sales:', err.message);
     }
 
     // Verificar y agregar columna seller_id a la tabla sales

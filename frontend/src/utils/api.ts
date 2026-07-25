@@ -49,7 +49,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'customer' | 'seller';
+  role: 'admin' | 'customer' | 'seller' | 'billing';
   phone?: string;
   ci?: string;
   address?: string | null;
@@ -93,6 +93,10 @@ export interface Sale {
   amount_paid?: number;
   coupon_code?: string | null;
   coupon_discount_percent?: number;
+  delivery_option?: 'pickup' | 'delivery';
+  delivery_address?: string | null;
+  google_maps_link?: string | null;
+  payment_attachments?: string | null;
 }
 
 export interface Coupon {
@@ -325,6 +329,10 @@ export const api = {
       discount?: number;
       tax?: number;
       couponCode?: string;
+      deliveryOption?: string;
+      deliveryAddress?: string;
+      googleMapsLink?: string;
+      paymentAttachments?: string;
     }) => request<SaleResult>('/sales/checkout', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -360,6 +368,18 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
     getDebtors: () => request<Sale[]>('/sales/debtors/all'),
+    getOnlinePending: () => request<Sale[]>('/sales/online-pending'),
+    uploadReceipt: async (formData: FormData) => {
+      const response = await fetch(`${API_BASE}/sales/upload-receipt`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al subir comprobante');
+      }
+      return data as { imageUrl: string };
+    },
     updateStatus: (id: number, status?: 'completed' | 'cancelled' | 'pending', abono?: number, supervisorEmail?: string, supervisorPassword?: string) => request<{ message: string; status?: string; amount_paid?: number }>(`/sales/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status, abono, supervisorEmail, supervisorPassword }),

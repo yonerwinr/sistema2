@@ -357,7 +357,7 @@ router.get('/staff', auth_1.authenticate, async (req, res) => {
         return res.status(403).json({ message: 'No autorizado' });
     }
     try {
-        const [staff] = await db_1.default.query('SELECT id, name, email, role, phone, ci, permissions FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC');
+        const [staff] = await db_1.default.query('SELECT id, name, email, role, phone, ci, permissions FROM users WHERE role IN ("admin", "seller", "billing") ORDER BY name ASC');
         res.json(staff);
     }
     catch (error) {
@@ -374,8 +374,8 @@ router.post('/staff', auth_1.authenticate, async (req, res) => {
     if (!name || !email || !password || !role) {
         return res.status(400).json({ message: 'Nombre, correo, contraseña y rol son obligatorios' });
     }
-    if (!['admin', 'seller'].includes(role)) {
-        return res.status(400).json({ message: 'Rol inválido. Debe ser admin o seller' });
+    if (!['admin', 'seller', 'billing'].includes(role)) {
+        return res.status(400).json({ message: 'Rol inválido. Debe ser admin, seller o billing' });
     }
     if (ci && !(0, validation_1.validateCi)(ci)) {
         return res.status(400).json({ message: 'Formato de Cédula o RIF del personal inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
@@ -415,7 +415,7 @@ router.put('/staff/:id', auth_1.authenticate, async (req, res) => {
     if (!name || !email || !role) {
         return res.status(400).json({ message: 'Nombre, correo y rol son obligatorios' });
     }
-    if (!['admin', 'seller'].includes(role)) {
+    if (!['admin', 'seller', 'billing'].includes(role)) {
         return res.status(400).json({ message: 'Rol inválido' });
     }
     if (ci && !(0, validation_1.validateCi)(ci)) {

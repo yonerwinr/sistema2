@@ -155,7 +155,7 @@ function smartMatch(target: string | undefined | null, query: string | undefined
 }
 
 // Vista activa dentro de Administración
-type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports' | 'suppliers';
+type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports' | 'suppliers' | 'online_billing';
 let activeAdminView: AdminSubView = 'pos';
 
 // Nuevas variables de estado para el control en POS
@@ -178,6 +178,7 @@ let rateUsdToVes = 40.00;
 let rateEurToVes = 43.50;
 let rateBinanceToVes = 44.50;
 let productsLoading = false;
+let uploadedReceipts: Record<string, string> = {};
 let productsLoaded = false;
 let posConfirmedUnregisteredWarning = false;
 let showFreeSaleModal = false;
@@ -244,9 +245,9 @@ window.addEventListener('DOMContentLoaded', async () => {
       try {
         currentUser = await api.auth.me();
 
-        // Si el usuario es administrador o vendedor, cambiar al panel cuando la sesión esté lista.
-        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller')) {
-          activeAdminView = 'pos';
+        // Si el usuario es administrador, vendedor o facturador, cambiar al panel cuando la sesión esté lista.
+        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
+          activeAdminView = currentUser.role === 'billing' ? 'online_billing' : 'pos';
           navigate('admin');
         } else {
           renderApp();
@@ -409,9 +410,9 @@ function renderNavbar(): string {
           <a class="nav-link ${currentView === 'store' ? 'active' : ''}" id="link-store">Tienda</a>
           
           ${currentUser ? `
-            ${(currentUser.role === 'admin' || currentUser.role === 'seller') ? `
+            ${(currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') ? `
               <a class="nav-link ${currentView === 'admin' ? 'active' : ''}" id="link-admin">
-                <span style="display:inline-flex; align-items:center; gap:4px;">${icons.dashboard} ${currentUser.role === 'admin' ? 'Panel Admin' : 'Caja POS'}</span>
+                <span style="display:inline-flex; align-items:center; gap:4px;">${icons.dashboard} ${currentUser.role === 'admin' ? 'Panel Admin' : (currentUser.role === 'billing' ? 'Facturación' : 'Caja POS')}</span>
               </a>
             ` : ''}
             <span class="nav-link" style="color: var(--primary); font-weight: 600; cursor: default;">
@@ -864,6 +865,34 @@ function bindCartEvents() {
     const modal = document.getElementById('checkout-modal');
     modal?.classList.add('open');
 
+    // Resetear comprobantes y opciones
+    uploadedReceipts = {};
+    if (modal) {
+      modal.querySelectorAll('.checkout-pay-method-cb').forEach((cb: any) => cb.checked = false);
+      const container = document.getElementById('checkout-payments-upload-container');
+      if (container) {
+        container.innerHTML = `<p style="color:var(--text-secondary); font-size:11px;">Seleccione al menos un método de pago para ver los datos de transferencia y adjuntar su capture.</p>`;
+      }
+      
+      const deliveryOpt = document.getElementById('checkout-delivery-option') as HTMLSelectElement;
+      if (deliveryOpt) deliveryOpt.value = 'pickup';
+      
+      const deliveryF = document.getElementById('checkout-delivery-fields');
+      if (deliveryF) deliveryF.style.display = 'none';
+      
+      const deliveryAddr = document.getElementById('checkout-delivery-address') as HTMLTextAreaElement;
+      if (deliveryAddr) {
+        deliveryAddr.required = false;
+        deliveryAddr.value = '';
+      }
+      
+      const mapsL = document.getElementById('checkout-google-maps') as HTMLInputElement;
+      if (mapsL) {
+        mapsL.required = false;
+        mapsL.value = '';
+      }
+    }
+
     // Prellenar si hay usuario logueado
     if (currentUser) {
       const nameInput = document.getElementById('checkout-name') as HTMLInputElement;
@@ -925,15 +954,59 @@ function renderCheckoutModal(): string {
             <input type="tel" class="form-control" id="checkout-phone" placeholder="Ej. +584125374589">
             <small style="color:var(--text-muted); font-size:11px;">Codigo de pais incluido (ej. +54 o +57).</small>
           </div>
-          <div class="form-group">
-            <label class="form-label">Método de Pago</label>
-            <select class="form-control" id="checkout-payment" required>
-              <option value="pago_movil">📱 Pago Móvil (Bs.)</option>
-              <option value="zelle">💸 Zelle ($)</option>
-              <option value="transferencia_ves">🏢 Transferencia Bancaria (Bs.)</option>
-              <option value="binance">🔶 Binance Pay</option>
-              <option value="paypal">🅿️ PayPal ($)</option>
+          
+          <div class="form-group mb-3">
+            <label class="form-label" for="checkout-delivery-option">Tipo de Entrega</label>
+            <select class="form-control" id="checkout-delivery-option" required>
+              <option value="pickup">🛍️ Retirar en Tienda (Gratis)</option>
+              <option value="delivery">🚀 Envío a Domicilio (Delivery)</option>
             </select>
+          </div>
+
+          <!-- Campos de Delivery (Ocultos por defecto) -->
+          <div id="checkout-delivery-fields" style="display: none; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass); margin-bottom: 16px;">
+            <div class="form-group mb-3">
+              <label class="form-label" for="checkout-delivery-address">Dirección de Entrega *</label>
+              <textarea class="form-control" id="checkout-delivery-address" rows="2" placeholder="Ej. Calle Principal, Casa #15, Sector Las Lomas..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="checkout-google-maps">Enlace de Google Maps (Ubicación) *</label>
+              <input type="url" class="form-control" id="checkout-google-maps" placeholder="Pegar enlace de ubicación de Google Maps aquí...">
+              <small style="color:var(--text-muted); font-size:11px; display:block; margin-top:4px;">
+                ¿Cómo obtenerlo? Abra Google Maps, mantenga presionado en su ubicación, presione "Compartir" y copie el enlace.
+              </small>
+            </div>
+          </div>
+
+          <!-- Métodos de Pago Múltiples y Adjuntos -->
+          <div class="form-group mb-3">
+            <label class="form-label" style="font-weight:700;">Métodos de Pago Utilizados (Seleccione uno o varios y adjunte el comprobante)</label>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:12px;">
+              <label class="payment-checkbox-card" style="display:flex; flex-direction:column; align-items:center; gap:6px; background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; border:1px solid var(--border-glass); cursor:pointer; text-align:center;">
+                <input type="checkbox" class="checkout-pay-method-cb" value="zelle" style="margin-bottom:4px;">
+                <span>💸 Zelle ($)</span>
+              </label>
+              <label class="payment-checkbox-card" style="display:flex; flex-direction:column; align-items:center; gap:6px; background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; border:1px solid var(--border-glass); cursor:pointer; text-align:center;">
+                <input type="checkbox" class="checkout-pay-method-cb" value="pago_movil" style="margin-bottom:4px;">
+                <span>📱 Pago Móvil (Bs)</span>
+              </label>
+              <label class="payment-checkbox-card" style="display:flex; flex-direction:column; align-items:center; gap:6px; background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; border:1px solid var(--border-glass); cursor:pointer; text-align:center;">
+                <input type="checkbox" class="checkout-pay-method-cb" value="binance" style="margin-bottom:4px;">
+                <span>🔶 Binance ($)</span>
+              </label>
+              <label class="payment-checkbox-card" style="display:flex; flex-direction:column; align-items:center; gap:6px; background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; border:1px solid var(--border-glass); cursor:pointer; text-align:center;">
+                <input type="checkbox" class="checkout-pay-method-cb" value="paypal" style="margin-bottom:4px;">
+                <span>🅿️ PayPal ($)</span>
+              </label>
+              <label class="payment-checkbox-card" style="display:flex; flex-direction:column; align-items:center; gap:6px; background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; border:1px solid var(--border-glass); cursor:pointer; text-align:center;">
+                <input type="checkbox" class="checkout-pay-method-cb" value="transferencia_ves" style="margin-bottom:4px;">
+                <span>🏛️ Transf. Bs (Bs)</span>
+              </label>
+            </div>
+            
+            <div id="checkout-payments-upload-container" style="display:flex; flex-direction:column; gap:10px;">
+              <p style="color:var(--text-secondary); font-size:11px;">Seleccione al menos un método de pago para ver los datos de transferencia y adjuntar su capture.</p>
+            </div>
           </div>
 
           <!-- Resumen de Pago Multimoneda -->
@@ -962,7 +1035,7 @@ function renderCheckoutModal(): string {
 
           <div style="margin-top: 32px; display:flex; justify-content:flex-end; gap:16px;">
             <button type="button" class="btn btn-secondary" id="checkout-cancel">Cancelar</button>
-            <button type="submit" class="btn btn-primary" id="checkout-submit-btn">Pagar y Enviar Factura</button>
+            <button type="submit" class="btn btn-primary" id="checkout-submit-btn">Finalizar Pedido</button>
           </div>
         </form>
       </div>
@@ -984,6 +1057,117 @@ function bindCheckoutEvents() {
 
   closeBtn?.addEventListener('click', closeModal);
   cancelBtn?.addEventListener('click', closeModal);
+
+  // Lógica de visualización de delivery
+  const deliveryOptionSelect = document.getElementById('checkout-delivery-option') as HTMLSelectElement;
+  const deliveryFields = document.getElementById('checkout-delivery-fields');
+  const deliveryAddressInput = document.getElementById('checkout-delivery-address') as HTMLTextAreaElement;
+  const googleMapsInput = document.getElementById('checkout-google-maps') as HTMLInputElement;
+
+  deliveryOptionSelect?.addEventListener('change', () => {
+    if (deliveryOptionSelect.value === 'delivery') {
+      if (deliveryFields) deliveryFields.style.display = 'block';
+      if (deliveryAddressInput) deliveryAddressInput.required = true;
+      if (googleMapsInput) googleMapsInput.required = true;
+    } else {
+      if (deliveryFields) deliveryFields.style.display = 'none';
+      if (deliveryAddressInput) {
+        deliveryAddressInput.required = false;
+        deliveryAddressInput.value = '';
+      }
+      if (googleMapsInput) {
+        googleMapsInput.required = false;
+        googleMapsInput.value = '';
+      }
+    }
+  });
+
+  // Función para renderizar los campos de subida de captura para cada método de pago seleccionado
+  const updateReceiptUploaders = () => {
+    const container = document.getElementById('checkout-payments-upload-container');
+    if (!container) return;
+
+    const checkedCBs = Array.from(document.querySelectorAll('.checkout-pay-method-cb:checked')) as HTMLInputElement[];
+    const selectedMethods = checkedCBs.map(cb => cb.value);
+    
+    if (selectedMethods.length === 0) {
+      container.innerHTML = `<p style="color:var(--text-secondary); font-size:11px;">Seleccione al menos un método de pago para ver los datos de transferencia y adjuntar su capture.</p>`;
+      return;
+    }
+
+    const instructions: Record<string, { label: string; text: string }> = {
+      zelle: { label: 'Zelle ($)', text: 'Enviar a zelle@sistema.com (Inversiones Facilito)' },
+      pago_movil: { label: 'Pago Móvil (Bs.)', text: 'Banco Banesco, Teléfono 0412-1234567, RIF J-123456789' },
+      binance: { label: 'Binance Pay ($)', text: 'Pay ID: 987654321' },
+      paypal: { label: 'PayPal ($)', text: 'Enviar a paypal@sistema.com (Neto sin comisión)' },
+      transferencia_ves: { label: 'Transferencia Bs. (Bs.)', text: 'Banco Banesco, Cuenta: 0134-1234-56-1234567890, RIF J-123456789' }
+    };
+
+    container.innerHTML = selectedMethods.map(method => {
+      const inst = instructions[method];
+      const prevUrl = uploadedReceipts[method] || '';
+      return `
+        <div class="card" style="padding:10px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass); margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:4px;">
+            <span style="font-size:12px; font-weight:700;">${inst.label}</span>
+            <span id="receipt-status-${method}" style="font-size:11px; font-weight:600; color:${prevUrl ? 'var(--success)' : 'var(--text-secondary)'};">
+              ${prevUrl ? '✅ Subido' : '❌ Falta comprobante'}
+            </span>
+          </div>
+          <p style="font-size:10px; color:var(--text-muted); margin-bottom:8px;">${inst.text}</p>
+          <input type="file" class="form-control receipt-file-input" data-method="${method}" accept="image/*,application/pdf" style="font-size:11px; padding:4px 8px;">
+        </div>
+      `;
+    }).join('');
+
+    // Escuchar el evento change de los nuevos inputs de archivo
+    container.querySelectorAll('.receipt-file-input').forEach((input: any) => {
+      input.addEventListener('change', async (e: any) => {
+        const method = e.target.dataset.method;
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const statusEl = document.getElementById(`receipt-status-${method}`);
+        if (statusEl) {
+          statusEl.style.color = 'var(--primary)';
+          statusEl.innerText = '⏳ Subiendo...';
+        }
+
+        const formData = new FormData();
+        formData.append('receipt', file);
+
+        try {
+          const res = await api.sales.uploadReceipt(formData);
+          uploadedReceipts[method] = res.imageUrl;
+          if (statusEl) {
+            statusEl.style.color = 'var(--success)';
+            statusEl.innerText = '✅ Subido';
+          }
+        } catch (err: any) {
+          if (statusEl) {
+            statusEl.style.color = 'var(--danger)';
+            statusEl.innerText = '❌ Error';
+          }
+          alert(err.message || 'Error al subir comprobante');
+        }
+      });
+    });
+  };
+
+  // Escuchar cuando se marcan los métodos de pago
+  document.querySelectorAll('.checkout-pay-method-cb').forEach((cb: any) => {
+    cb.addEventListener('change', () => {
+      // Remover de uploadedReceipts los que ya no están marcados
+      const checkedCBs = Array.from(document.querySelectorAll('.checkout-pay-method-cb:checked')) as HTMLInputElement[];
+      const currentChecked = checkedCBs.map(c => c.value);
+      Object.keys(uploadedReceipts).forEach(k => {
+        if (!currentChecked.includes(k)) {
+          delete uploadedReceipts[k];
+        }
+      });
+      updateReceiptUploaders();
+    });
+  });
 
   // Botón para aplicar cupón
   const applyCouponBtn = document.getElementById('checkout-apply-coupon');
@@ -1035,7 +1219,48 @@ function bindCheckoutEvents() {
     }
 
     const customerCi = ciNum ? `${ciPrefix}${ciNum}` : undefined;
-    const payment = (document.getElementById('checkout-payment') as HTMLSelectElement).value;
+
+    // Obtener métodos de pago marcados
+    const checkedCBs = Array.from(document.querySelectorAll('.checkout-pay-method-cb:checked')) as HTMLInputElement[];
+    const checkedMethods = checkedCBs.map(cb => cb.value);
+    
+    if (checkedMethods.length === 0) {
+      alert('Por favor, seleccione al menos un método de pago.');
+      return;
+    }
+
+    // Verificar que se hayan subido todos los captures correspondientes
+    const missing = checkedMethods.filter(method => !uploadedReceipts[method]);
+    if (missing.length > 0) {
+      alert(`Por favor, adjunte el comprobante para: ${missing.map(m => m.toUpperCase()).join(', ')}`);
+      return;
+    }
+
+    const paymentMethodStr = checkedMethods.map(m => m.toUpperCase()).join(' + ');
+    const paymentAttachmentsStr = checkedMethods.map(m => uploadedReceipts[m]).join(',');
+
+    // Obtener campos de delivery
+    const deliveryOption = deliveryOptionSelect.value;
+    let deliveryAddress: string | undefined = undefined;
+    let googleMapsLink: string | undefined = undefined;
+
+    if (deliveryOption === 'delivery') {
+      deliveryAddress = deliveryAddressInput.value.trim();
+      googleMapsLink = googleMapsInput.value.trim();
+
+      if (!deliveryAddress) {
+        alert('La dirección de entrega es obligatoria para envíos a domicilio.');
+        return;
+      }
+      if (!googleMapsLink) {
+        alert('El enlace de Google Maps es obligatorio para envíos a domicilio.');
+        return;
+      }
+      if (!googleMapsLink.toLowerCase().includes('maps') && !googleMapsLink.toLowerCase().includes('goo.gl')) {
+        alert('Por favor ingrese un enlace de ubicación de Google Maps válido.');
+        return;
+      }
+    }
 
     const checkoutBtn = document.getElementById('checkout-submit-btn') as HTMLButtonElement;
     checkoutBtn.disabled = true;
@@ -1057,11 +1282,15 @@ function bindCheckoutEvents() {
         customerEmail: email,
         customerPhone: phone,
         customerCi,
-        paymentMethod: payment,
+        paymentMethod: paymentMethodStr,
         items,
         discount,
         tax: 0,
-        couponCode: checkoutCouponCode || undefined
+        couponCode: checkoutCouponCode || undefined,
+        deliveryOption,
+        deliveryAddress,
+        googleMapsLink,
+        paymentAttachments: paymentAttachmentsStr
       });
 
       // Compra exitosa
@@ -1072,17 +1301,17 @@ function bindCheckoutEvents() {
       // Cargar productos de nuevo para actualizar stock en UI
       await loadProducts();
 
-      // Abrir modal de éxito de factura (pasando lista de items)
+      // Abrir modal de éxito de factura (pasando lista de items e indicando que es orden online)
       const itemsFormatted = items.map(item => {
         const prod = productsList.find(p => p.id === item.productId);
         return { name: prod ? prod.name : 'Producto', quantity: item.quantity, price: prod ? prod.price : 0 };
       });
-      showInvoiceSuccess(result, phone, email, itemsFormatted);
+      showInvoiceSuccess(result, phone, email, itemsFormatted, true);
 
     } catch (error: any) {
       alert(error.message || 'Error al completar la compra');
       checkoutBtn.disabled = false;
-      checkoutBtn.innerText = 'Pagar y Enviar Factura';
+      checkoutBtn.innerText = 'Finalizar Pedido';
     }
   });
 }
@@ -1622,7 +1851,7 @@ async function shareInvoiceAsImage(sale: any, items: any[], clientPhone: string,
   }
 }
 
-async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?: string, purchaseItems?: { name: string, quantity: number, price: number }[]) {
+async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?: string, purchaseItems?: { name: string, quantity: number, price: number }[], isOnline: boolean = false) {
   const modal = document.getElementById('success-modal');
   modal?.classList.add('open');
 
@@ -1632,6 +1861,23 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
   const emailStatusBox = document.getElementById('success-email-status-box');
   const emailBox = document.getElementById('success-email-box');
   const emailBtn = document.getElementById('success-email-btn') as HTMLAnchorElement;
+
+  const titleEl = modal?.querySelector('h2');
+  const descEl = modal?.querySelector('p');
+  const pngGroup = document.getElementById('success-png-container')?.parentElement;
+  const actionsGroup = modal?.querySelector('.invoice-preview-links') as HTMLElement;
+
+  if (isOnline) {
+    if (titleEl) titleEl.innerText = '¡Pedido Registrado! 🐒';
+    if (descEl) descEl.innerHTML = 'Tu pedido ha sido registrado con éxito y se encuentra en <strong>revisión manual</strong>. El encargado de facturación verificará tu pago y recibirás tu factura por correo electrónico.';
+    if (pngGroup) pngGroup.style.display = 'none';
+    if (actionsGroup) actionsGroup.style.display = 'none';
+  } else {
+    if (titleEl) titleEl.innerText = '¡Compra Realizada!';
+    if (descEl) descEl.innerHTML = 'La transacción se procesó correctamente y se ha generado la factura digital.';
+    if (pngGroup) pngGroup.style.display = 'flex';
+    if (actionsGroup) actionsGroup.style.display = 'block';
+  }
 
   if (totalEl) {
     const totalUsd = Number(result.total);
@@ -1702,6 +1948,19 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
     }
   }
 
+  // Si es pedido online, mostrar el estado pendiente en la caja
+  if (isOnline) {
+    if (emailStatusBox) {
+      emailStatusBox.style.display = 'flex';
+      emailStatusBox.style.background = 'rgba(245, 158, 11, 0.08)';
+      emailStatusBox.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+      emailStatusBox.style.color = '#f59e0b';
+      emailStatusBox.innerHTML = `⏳ En espera de verificación de pago`;
+    }
+    if (emailBox) emailBox.style.display = 'none';
+    return;
+  }
+
   // WhatsApp Link - Configurado para abrir directamente y evitar popup blocker
   const decodedText = decodeURIComponent(result.whatsappText);
   const formattedPhone = clientPhone ? clientPhone.replace(/\+/g, '').replace(/\s/g, '') : '';
@@ -1755,6 +2014,9 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
 
   // Mostrar estado del correo automático
   if (emailStatusBox) {
+    emailStatusBox.style.background = 'rgba(16, 185, 129, 0.08)';
+    emailStatusBox.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+    emailStatusBox.style.color = 'var(--success)';
     if (clientEmail && !clientEmail.endsWith('@cliente.local')) {
       emailStatusBox.style.display = 'flex';
       emailStatusBox.innerHTML = `✉️ Factura enviada automáticamente a: ${clientEmail}`;
@@ -2130,8 +2392,8 @@ function bindAuthEvents() {
       localStorage.setItem('token', res.token);
       currentUser = res.user;
 
-      if (currentUser.role === 'admin' || currentUser.role === 'seller') {
-        activeAdminView = currentUser.role === 'admin' ? 'stats' : 'pos';
+      if (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') {
+        activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'admin' ? 'stats' : 'pos');
         navigate('admin');
       } else {
         navigate('store');
@@ -2203,8 +2465,8 @@ function bindAuthEvents() {
             localStorage.setItem('token', res.token);
             currentUser = res.user;
 
-            if (currentUser.role === 'admin' || currentUser.role === 'seller') {
-              activeAdminView = currentUser.role === 'admin' ? 'stats' : 'pos';
+            if (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') {
+              activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'admin' ? 'stats' : 'pos');
               navigate('admin');
             } else {
               navigate('store');
@@ -2243,6 +2505,9 @@ function bindAuthEvents() {
 function hasPermission(perm: string): boolean {
   if (!currentUser) return false;
   if (currentUser.role === 'admin') return true;
+  if (currentUser.role === 'billing') {
+    return ['online_billing', 'sales', 'debtors', 'customers'].includes(perm);
+  }
   if (!currentUser.permissions) return perm === 'pos';
   try {
     const perms = typeof currentUser.permissions === 'string'
@@ -2255,7 +2520,7 @@ function hasPermission(perm: string): boolean {
 }
 
 function renderAdminDashboard(): string {
-  if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller')) {
+  if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller' && currentUser.role !== 'billing')) {
     return `
       <div class="card text-center animate-on-scroll animate-fade-up visible" style="max-width: 400px; margin: 40px auto; padding: 40px;">
         <h2 class="mb-4">Acceso Denegado</h2>
@@ -2267,7 +2532,8 @@ function renderAdminDashboard(): string {
 
   // Ajustar subvista activa por defecto según permisos
   if (!hasPermission(activeAdminView)) {
-    if (hasPermission('pos')) activeAdminView = 'pos';
+    if (hasPermission('online_billing')) activeAdminView = 'online_billing';
+    else if (hasPermission('pos')) activeAdminView = 'pos';
     else if (hasPermission('stats')) activeAdminView = 'stats';
     else if (hasPermission('products')) activeAdminView = 'products';
   }
@@ -2277,6 +2543,11 @@ function renderAdminDashboard(): string {
       <!-- Sidebar de Administracion -->
       <aside class="dashboard-sidebar" style="display:flex; flex-direction:column; justify-content:space-between; min-height: 500px;">
         <div class="sidebar-nav-group">
+          ${hasPermission('online_billing') ? `
+            <button class="sidebar-nav-btn ${activeAdminView === 'online_billing' ? 'active' : ''}" id="admin-tab-online-billing">
+              🔔 Facturac. Online
+            </button>
+          ` : ''}
           ${hasPermission('pos') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'pos' ? 'active' : ''}" id="admin-tab-pos">
               ${icons.pos} Punto de Venta (POS)
@@ -2393,6 +2664,7 @@ async function bindAdminEvents() {
   const tabStaff = document.getElementById('admin-tab-staff');
   const tabReports = document.getElementById('admin-tab-reports');
   const tabSuppliers = document.getElementById('admin-tab-suppliers');
+  const tabOnlineBilling = document.getElementById('admin-tab-online-billing');
 
   const clearActiveTabs = () => {
     tabStats?.classList.remove('active');
@@ -2407,6 +2679,7 @@ async function bindAdminEvents() {
     tabStaff?.classList.remove('active');
     tabReports?.classList.remove('active');
     tabSuppliers?.classList.remove('active');
+    tabOnlineBilling?.classList.remove('active');
   };
 
   tabStats?.addEventListener('click', async () => {
@@ -2505,6 +2778,14 @@ async function bindAdminEvents() {
     await renderAdminSuppliers();
   });
 
+  tabOnlineBilling?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabOnlineBilling.classList.add('active');
+    activeAdminView = 'online_billing';
+    destroyCharts();
+    await renderOnlineBilling();
+  });
+
   // Renderizar la subvista por defecto al cargar
   if (activeAdminView === 'stats') {
     await renderAdminStats();
@@ -2530,6 +2811,8 @@ async function bindAdminEvents() {
     await renderAdminReports();
   } else if (activeAdminView === 'suppliers') {
     await renderAdminSuppliers();
+  } else if (activeAdminView === 'online_billing') {
+    await renderOnlineBilling();
   }
 
   // Guardar Tasas de Cambio Manuales (BCV & Binance)
@@ -7327,6 +7610,7 @@ async function renderAdminStaff() {
               <select class="form-control" id="staff-role" required>
                 <option value="seller">Vendedor / Cajero (Permisos Seleccionados)</option>
                 <option value="admin">Administrador (Acceso Total)</option>
+                <option value="billing">Facturación (Revisión de pagos y clientes)</option>
               </select>
             </div>
 
@@ -7395,8 +7679,8 @@ async function renderAdminStaff() {
                     <td>${member.email}</td>
                     <td>${member.phone || 'N/D'}</td>
                     <td>
-                      <span class="badge-status" style="background:${member.role === 'admin' ? 'rgba(99,102,241,0.15)' : 'rgba(16,185,129,0.15)'}; color:${member.role === 'admin' ? 'var(--primary)' : 'var(--success)'}; font-size:11px; text-transform:uppercase; font-weight:700;">
-                        ${member.role === 'admin' ? 'Administrador' : 'Vendedor'}
+                      <span class="badge-status" style="background:${member.role === 'admin' ? 'rgba(99,102,241,0.15)' : (member.role === 'billing' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)')}; color:${member.role === 'admin' ? 'var(--primary)' : (member.role === 'billing' ? '#f59e0b' : 'var(--success)')}; font-size:11px; text-transform:uppercase; font-weight:700;">
+                        ${member.role === 'admin' ? 'Administrador' : (member.role === 'billing' ? 'Facturación' : 'Vendedor')}
                       </span>
                     </td>
                     <td class="text-right">
@@ -7454,6 +7738,8 @@ function bindStaffEvents() {
     document.querySelectorAll('.staff-perm-checkbox').forEach((cb: any) => {
       if (roleVal === 'admin') {
         cb.checked = true;
+      } else if (roleVal === 'billing') {
+        cb.checked = (cb.value === 'sales' || cb.value === 'debtors');
       } else {
         cb.checked = (cb.value === 'pos');
       }
@@ -7539,7 +7825,7 @@ function bindStaffEvents() {
             perms = [];
           }
         } else {
-          perms = member.role === 'admin' ? ['pos', 'products', 'sales', 'debtors', 'quotations', 'coupons', 'staff'] : ['pos'];
+          perms = member.role === 'admin' ? ['pos', 'products', 'sales', 'debtors', 'quotations', 'coupons', 'staff'] : (member.role === 'billing' ? ['sales', 'debtors'] : ['pos']);
         }
 
         document.querySelectorAll('.staff-perm-checkbox').forEach((cb: any) => {
@@ -8746,4 +9032,190 @@ function bindSupplierEvents() {
       }
     });
   });
+}
+
+async function renderOnlineBilling() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  panel.innerHTML = `<div class="text-center" style="padding:40px;">Cargando facturas y pagos online pendientes...</div>`;
+
+  try {
+    const pendingSales = await api.sales.getOnlinePending();
+
+    const rowsHtml = pendingSales.map(sale => {
+      const attachments = sale.payment_attachments ? sale.payment_attachments.split(',') : [];
+      const attachmentsHtml = attachments.map(url => {
+        const cleanUrl = url.trim();
+        if (!cleanUrl) return '';
+        // Si es PDF muestra ícono, si es imagen muestra thumbnail
+        const isPdf = cleanUrl.toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+          return `<a href="${cleanUrl}" target="_blank" class="btn btn-secondary" style="padding:4px 8px; font-size:10px; display:inline-flex; align-items:center; gap:4px; margin-right:4px;">📄 PDF Recibo</a>`;
+        }
+        return `
+          <a href="${cleanUrl}" target="_blank" style="display:inline-block; margin-right:6px; position:relative; border: 1px solid var(--border-glass); border-radius:4px; overflow:hidden;">
+            <img src="${cleanUrl}" style="width:60px; height:60px; object-fit:cover; display:block;" alt="Comprobante">
+          </a>
+        `;
+      }).join('');
+
+      const deliveryInfoHtml = sale.delivery_option === 'delivery' ? `
+        <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); padding:8px; border-radius:6px; font-size:11px; margin-top:4px;">
+          <strong>🚀 Delivery:</strong> ${sale.delivery_address || 'Sin dirección'}<br>
+          <a href="${sale.google_maps_link}" target="_blank" style="color:var(--primary); font-weight:700; text-decoration:underline; display:inline-block; margin-top:3px;">
+            🗺️ Ubicación en Google Maps
+          </a>
+        </div>
+      ` : `
+        <div style="background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.15); padding:8px; border-radius:6px; font-size:11px; margin-top:4px;">
+          <strong>🛍️ Retiro en Tienda:</strong> Cliente retira en tienda.
+        </div>
+      `;
+
+      return `
+        <tr data-sale-id="${sale.id}">
+          <td>
+            <strong>#${sale.id}</strong><br>
+            <small style="color:var(--text-muted);">${new Date(sale.created_at).toLocaleString('es-ES')}</small>
+          </td>
+          <td>
+            <strong>👤 ${sale.customer_name}</strong><br>
+            <small style="color:var(--text-secondary); display:block; margin-top:2px;">
+              CI: ${sale.customer_ci || 'N/D'}<br>
+              Tlf: ${sale.customer_phone || 'N/D'}<br>
+              Email: ${sale.customer_email || 'N/D'}
+            </small>
+          </td>
+          <td>
+            ${deliveryInfoHtml}
+          </td>
+          <td>
+            <span class="badge" style="background:rgba(99,102,241,0.15); color:var(--primary); font-weight:700; font-size:10px;">
+              ${sale.payment_method}
+            </span>
+            <div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">
+              ${attachmentsHtml || '<span style="color:var(--danger); font-size:11px;">⚠️ Sin captures</span>'}
+            </div>
+          </td>
+          <td>
+            <strong style="font-size:14px; color:var(--primary); display:block;">$${Number(sale.total).toFixed(2)}</strong>
+            <small style="color:#f59e0b; font-weight:600;">Bs. ${(Number(sale.total) * rateUsdToVes).toFixed(2)}</small>
+          </td>
+          <td class="text-right">
+            <div style="display:inline-flex; gap:6px; align-items:center;">
+              <button class="btn btn-secondary view-online-sale-btn" style="padding:6px 10px; font-size:11px;" data-id="${sale.id}">
+                🔍 Ver
+              </button>
+              <button class="btn btn-success approve-online-pay-btn" style="padding:6px 12px; font-size:11px; background:#10b981; border-color:#10b981; color:white; font-weight:700;" data-id="${sale.id}">
+                ✓ Aprobar
+              </button>
+              <button class="btn btn-danger reject-online-pay-btn" style="padding:6px 12px; font-size:11px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;" data-id="${sale.id}">
+                Anular
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    panel.innerHTML = `
+      <div class="animate-on-scroll animate-fade-up visible">
+        <div class="flex justify-between align-center mb-4">
+          <div>
+            <h2 style="font-size:24px; font-weight:800; margin-bottom:4px;">Facturación & Revisión Online 🔔</h2>
+            <p style="font-size:12px; color:var(--text-secondary);">Revisión manual de capturas de pago y aprobación de facturas (Rol Facturación)</p>
+          </div>
+          <button class="btn btn-secondary refresh-online-billing-btn" style="padding:10px 16px; font-weight:700; border-radius:50px;">
+            🔄 Actualizar Lista
+          </button>
+        </div>
+
+        <div class="card" style="border-radius: var(--radius-md);">
+          <div class="table-responsive">
+            <table class="table-custom">
+              <thead>
+                <tr>
+                  <th>Pedido ID</th>
+                  <th>Cliente</th>
+                  <th>Tipo Entrega / Dirección</th>
+                  <th>Método & Comprobantes</th>
+                  <th>Total</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+                ${pendingSales.length === 0 ? '<tr><td colspan="6" class="text-center" style="padding:30px; color:var(--text-secondary);">No hay pedidos online pendientes de verificación.</td></tr>' : ''}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Bind refresh list
+    document.querySelector('.refresh-online-billing-btn')?.addEventListener('click', () => {
+      void renderOnlineBilling();
+    });
+
+    // Bind view order details
+    document.querySelectorAll('.view-online-sale-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        try {
+          const details = await api.sales.getDetails(id);
+          showSaleDetails(details);
+        } catch (err: any) {
+          alert(err.message || 'Error al obtener detalles del pedido');
+        }
+      });
+    });
+
+    // Bind approve pay
+    document.querySelectorAll('.approve-online-pay-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        if (confirm(`¿Está seguro de APROBAR el pago para el pedido #${id}?\n\nAl aprobarlo, la factura pasará a estado completado y se enviará automáticamente al correo del cliente.`)) {
+          const targetBtn = e.currentTarget as HTMLButtonElement;
+          targetBtn.disabled = true;
+          targetBtn.innerText = 'Aprobando...';
+          try {
+            await api.sales.updateStatus(id, 'completed');
+            alert('¡Pago aprobado con éxito! Factura completada y enviada por correo.');
+            void renderOnlineBilling();
+          } catch (err: any) {
+            alert(err.message || 'Error al aprobar el pago.');
+            targetBtn.disabled = false;
+            targetBtn.innerText = '✓ Aprobar';
+          }
+        }
+      });
+    });
+
+    // Bind reject pay
+    document.querySelectorAll('.reject-online-pay-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+        if (confirm(`¿Está seguro de RECHAZAR/ANULAR el pedido #${id}?\n\nLos productos correspondientes se devolverán al inventario.`)) {
+          const targetBtn = e.currentTarget as HTMLButtonElement;
+          targetBtn.disabled = true;
+          targetBtn.innerText = 'Anulando...';
+          try {
+            await api.sales.updateStatus(id, 'cancelled');
+            alert('Pedido cancelado con éxito.');
+            void renderOnlineBilling();
+          } catch (err: any) {
+            alert(err.message || 'Error al anular el pedido.');
+            targetBtn.disabled = false;
+            targetBtn.innerText = 'Anular';
+          }
+        }
+      });
+    });
+
+  } catch (error: any) {
+    console.error('Error al cargar online billing:', error);
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al obtener pedidos online del servidor: ${error.message}</div>`;
+  }
 }

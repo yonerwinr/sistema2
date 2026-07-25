@@ -469,7 +469,7 @@ router.get('/staff', authenticate, async (req: AuthRequest, res: Response) => {
 
   try {
     const [staff]: any = await pool.query(
-      'SELECT id, name, email, role, phone, ci, permissions FROM users WHERE role IN ("admin", "seller") ORDER BY name ASC'
+      'SELECT id, name, email, role, phone, ci, permissions FROM users WHERE role IN ("admin", "seller", "billing") ORDER BY name ASC'
     );
     res.json(staff);
   } catch (error) {
@@ -490,8 +490,8 @@ router.post('/staff', authenticate, async (req: AuthRequest, res: Response) => {
     return res.status(400).json({ message: 'Nombre, correo, contraseña y rol son obligatorios' });
   }
 
-  if (!['admin', 'seller'].includes(role)) {
-    return res.status(400).json({ message: 'Rol inválido. Debe ser admin o seller' });
+  if (!['admin', 'seller', 'billing'].includes(role)) {
+    return res.status(400).json({ message: 'Rol inválido. Debe ser admin, seller o billing' });
   }
 
   if (ci && !validateCi(ci)) {
@@ -543,7 +543,7 @@ router.put('/staff/:id', authenticate, async (req: AuthRequest, res: Response) =
     return res.status(400).json({ message: 'Nombre, correo y rol son obligatorios' });
   }
 
-  if (!['admin', 'seller'].includes(role)) {
+  if (!['admin', 'seller', 'billing'].includes(role)) {
     return res.status(400).json({ message: 'Rol inválido' });
   }
 

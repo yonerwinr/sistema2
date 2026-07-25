@@ -8,7 +8,31 @@ import { syncExchangeRatesFromBCV } from '../services/rates';
 import { logAuditEvent } from '../services/audit';
 import { validateCi } from '../utils/validation';
 
+import multer from 'multer';
+import path from 'path';
+
 const router = Router();
+
+// Configuración de almacenamiento para comprobantes de pago online
+const receiptStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, path.join(__dirname, '../../uploads')); // backend/uploads
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, 'receipt-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const uploadReceipt = multer({ storage: receiptStorage });
+
+// Subida pública de comprobante de pago (para checkout de clientes)
+router.post('/upload-receipt', uploadReceipt.single('receipt'), (req: any, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: 'No se subió ningún comprobante' });
+  }
+  const imageUrl = `/uploads/${req.file.filename}`;
+  res.json({ imageUrl });
+});
 
 // GET /sales/audit-logs: Obtener audit_logs y ventas para el histórico global
 router.get('/audit-logs', authenticate, async (req: AuthRequest, res: Response) => {
@@ -48,7 +72,22 @@ router.get('/audit-logs', authenticate, async (req: AuthRequest, res: Response) 
 
 // Registrar Venta Online (Cliente / Invitado)
 router.post('/checkout', async (req: AuthRequest, res) => {
-  const { userId, customerName, customerEmail, customerPhone, customerCi, paymentMethod, items, discount, tax, couponCode } = req.body;
+  const {
+    userId,
+    customerName,
+    customerEmail,
+    customerPhone,
+    customerCi,
+    paymentMethod,
+    items,
+    discount,
+    tax,
+    couponCode,
+    deliveryOption,
+    deliveryAddress,
+    googleMapsLink,
+    paymentAttachments
+  } = req.body;
 
   if (customerCi && !validateCi(customerCi)) {
     return res.status(400).json({ message: 'Formato de Cédula o RIF del cliente inválido. Debe comenzar con V-, E-, J- o G- seguido de los dígitos correspondientes.' });
@@ -146,11 +185,17 @@ router.post('/checkout', async (req: AuthRequest, res) => {
     // Calcular total final neto: total original menos descuento más tax
     const finalTotal = total - (discount || 0) + (tax || 0);
 
-    const initialPaid = paymentMethod === 'transfer' ? 0.00 : finalTotal;
+    // Las ventas online empiezan siempre con estado 'pending' (bajo revisión manual) y amount_paid = 0.00
+    const initialPaid = 0.00;
 
     // Registrar la venta
     const [saleResult]: any = await conn.query(
-      'INSERT INTO sales (user_id, customer_name, customer_email, customer_phone, customer_ci, total, payment_method, type, status, discount, tax, is_quotation, amount_paid, coupon_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)',
+      `INSERT INTO sales (
+        user_id, customer_name, customer_email, customer_phone, customer_ci, 
+        total, payment_method, type, status, discount, tax, 
+        is_quotation, amount_paid, coupon_code,
+        delivery_option, delivery_address, google_maps_link, payment_attachments
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, 0, ?, ?, ?, ?, ?, ?)`,
       [
         userId || null,
         customerName || 'Cliente Online',
@@ -158,13 +203,16 @@ router.post('/checkout', async (req: AuthRequest, res) => {
         customerPhone || null,
         customerCi || null,
         finalTotal,
-        paymentMethod || 'card',
+        paymentMethod || 'transfer',
         'online',
-        paymentMethod === 'transfer' ? 'pending' : 'completed', // Transferencia empieza como pendiente (Deudor)
         discount || 0,
         tax || 0,
         initialPaid,
-        couponCode ? couponCode.toUpperCase().trim() : null
+        couponCode ? couponCode.toUpperCase().trim() : null,
+        deliveryOption || 'pickup',
+        deliveryAddress || null,
+        googleMapsLink || null,
+        paymentAttachments || null
       ]
     );
 
@@ -202,13 +250,6 @@ router.post('/checkout', async (req: AuthRequest, res) => {
 
     // Generar texto para WhatsApp
     const waText = generateWhatsAppText(saleInfo, saleItemsToInsert);
-
-    // Intentar enviar correo de factura en segundo plano para no bloquear el checkout
-    if (customerEmail && !customerEmail.endsWith('@cliente.local')) {
-      sendInvoiceEmail(customerEmail, saleInfo, saleItemsToInsert).catch(err => {
-        console.error('Error enviando correo en checkout:', err);
-      });
-    }
 
     // Intentar respaldar en Google Sheets en segundo plano
     syncSaleToSheets(saleInfo, saleItemsToInsert).catch(err => {
@@ -722,13 +763,34 @@ router.get('/debtors/all', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
+// Obtener ventas online pendientes de facturación (Admin, Vendedor o Facturador)
+router.get('/online-pending', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin' && req.user?.role !== 'seller' && req.user?.role !== 'billing') {
+    return res.status(403).json({ message: 'No autorizado' });
+  }
+
+  try {
+    const [sales]: any = await pool.query(
+      `SELECT s.*, u.name as registered_by 
+       FROM sales s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       WHERE s.status = 'pending' AND s.type = 'online' AND s.is_quotation = 0
+       ORDER BY s.created_at DESC`
+    );
+    res.json(sales);
+  } catch (error) {
+    console.error('Error al obtener ventas online pendientes:', error);
+    res.status(500).json({ message: 'Error al obtener ventas online pendientes' });
+  }
+});
+
 // Modificar estado de una Venta (Solo Admin o Cajero con Autorización de Supervisor)
 router.put('/:id/status', authenticate, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const { status, abono, supervisorEmail, supervisorPassword } = req.body; // 'completed' | 'cancelled' | 'pending', abono: number (opcional)
 
   let isAuthorized = false;
-  if (req.user?.role === 'admin') {
+  if (req.user?.role === 'admin' || req.user?.role === 'billing') {
     isAuthorized = true;
   } else if (req.user?.role === 'seller' && status === 'cancelled') {
     // Si es cajero/vendedor, requiere credenciales de supervisor (admin)
@@ -806,9 +868,19 @@ router.put('/:id/status', authenticate, async (req: AuthRequest, res: Response) 
         [id]
       );
       if (updatedSales.length > 0) {
-        syncSaleToSheets(updatedSales[0], saleItems).catch(err => {
+        const updatedSale = updatedSales[0];
+        syncSaleToSheets(updatedSale, saleItems).catch(err => {
           console.error('[SHEETS SYNC] Error al re-sincronizar en Google Sheets:', err);
         });
+
+        // Si el estado original era 'pending' y pasó a 'completed' para una orden online, se envía el correo con la factura
+        if (sale.status === 'pending' && newStatus === 'completed' && updatedSale.type === 'online') {
+          if (updatedSale.customer_email && !updatedSale.customer_email.endsWith('@cliente.local')) {
+            sendInvoiceEmail(updatedSale.customer_email, updatedSale, saleItems).catch(err => {
+              console.error('Error enviando correo al completar la orden pendiente:', err);
+            });
+          }
+        }
       }
     } catch (sheetErr) {
       console.error('[SHEETS SYNC] Error obteniendo datos para re-sincronización:', sheetErr);

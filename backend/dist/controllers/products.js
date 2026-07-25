@@ -30,8 +30,8 @@ const storage = multer_1.default.diskStorage({
     }
 });
 const upload = (0, multer_1.default)({ storage });
-// Subida de imagen local (Solo Admin)
-router.post('/upload', auth_1.authenticate, auth_1.isAdmin, upload.single('image'), (req, res) => {
+// Subida de imagen local (Admin y Vendedor)
+router.post('/upload', auth_1.authenticate, canManageProducts, upload.single('image'), (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: 'No se subió ninguna imagen' });
     }

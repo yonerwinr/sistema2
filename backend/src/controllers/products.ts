@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import pool from '../config/db';
-import { authenticate, isAdmin, AuthRequest } from '../middleware/auth';
+import { authenticate, AuthRequest } from '../middleware/auth';
 import { logAuditEvent } from '../services/audit';
 
 const router = Router();
@@ -30,8 +30,8 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Subida de imagen local (Solo Admin)
-router.post('/upload', authenticate, isAdmin, upload.single('image'), (req: any, res) => {
+// Subida de imagen local (Admin y Vendedor)
+router.post('/upload', authenticate, canManageProducts, upload.single('image'), (req: any, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'No se subió ninguna imagen' });
   }
