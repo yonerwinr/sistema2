@@ -1515,14 +1515,20 @@ router.post('/test-smtp', authenticate, async (req: AuthRequest, res: Response) 
   const transportConfig = isGmail 
     ? {
         service: 'gmail',
-        auth: { user, pass }
+        auth: { user, pass },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000
       }
     : {
         host,
         port,
         secure: port === 465,
         auth: { user, pass },
-        tls: { rejectUnauthorized: false }
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000
       };
 
   diagnostics.push(`Configuración de Nodemailer: ${JSON.stringify({ ...transportConfig, auth: { user, pass: '***' } })}`);
