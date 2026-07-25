@@ -4,6 +4,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://sistema2-backend-1rlw.onrender.com/api/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "https://sistema2-backend-1rlw.onrender.com/uploads/:path*"
     }
   ]
 }
