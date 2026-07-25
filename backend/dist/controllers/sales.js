@@ -566,34 +566,6 @@ router.get('/history', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ message: 'Error al obtener historial de ventas' });
     }
 });
-// Detalle de una Venta específica con sus productos (Autenticado)
-router.get('/:id', auth_1.authenticate, async (req, res) => {
-    const { id } = req.params;
-    try {
-        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by, seller.name as seller_name, c.discount_percent AS coupon_discount_percent 
-       FROM sales s 
-       LEFT JOIN users u ON s.user_id = u.id 
-       LEFT JOIN users seller ON s.seller_id = seller.id
-       LEFT JOIN coupons c ON s.coupon_code = c.code
-       WHERE s.id = ?`, [id]);
-        if (sales.length === 0) {
-            return res.status(404).json({ message: 'Venta no encontrada' });
-        }
-        const sale = sales[0];
-        // Verificar seguridad: solo el propio cliente, vendedor o admin puede ver el detalle
-        if (req.user?.role !== 'admin' && req.user?.role !== 'seller' && sale.user_id !== req.user?.id) {
-            return res.status(403).json({ message: 'No autorizado' });
-        }
-        const [items] = await db_1.default.query(`SELECT si.*, p.name FROM sale_items si 
-       JOIN products p ON si.product_id = p.id 
-       WHERE si.sale_id = ?`, [id]);
-        res.json({ sale, items });
-    }
-    catch (error) {
-        console.error('Error al obtener detalle de venta:', error);
-        res.status(500).json({ message: 'Error al obtener detalles de la venta' });
-    }
-});
 // Obtener todas las Cotizaciones (Solo Admin)
 router.get('/quotations/all', auth_1.authenticate, async (req, res) => {
     if (req.user?.role !== 'admin') {
@@ -648,6 +620,34 @@ router.get('/online-pending', auth_1.authenticate, async (req, res) => {
     catch (error) {
         console.error('Error al obtener ventas online pendientes:', error);
         res.status(500).json({ message: 'Error al obtener ventas online pendientes' });
+    }
+});
+// Detalle de una Venta específica con sus productos (Autenticado)
+router.get('/:id', auth_1.authenticate, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [sales] = await db_1.default.query(`SELECT s.*, u.name as registered_by, seller.name as seller_name, c.discount_percent AS coupon_discount_percent 
+       FROM sales s 
+       LEFT JOIN users u ON s.user_id = u.id 
+       LEFT JOIN users seller ON s.seller_id = seller.id
+       LEFT JOIN coupons c ON s.coupon_code = c.code
+       WHERE s.id = ?`, [id]);
+        if (sales.length === 0) {
+            return res.status(404).json({ message: 'Venta no encontrada' });
+        }
+        const sale = sales[0];
+        // Verificar seguridad: solo el propio cliente, vendedor o admin puede ver el detalle
+        if (req.user?.role !== 'admin' && req.user?.role !== 'seller' && sale.user_id !== req.user?.id) {
+            return res.status(403).json({ message: 'No autorizado' });
+        }
+        const [items] = await db_1.default.query(`SELECT si.*, p.name FROM sale_items si 
+       JOIN products p ON si.product_id = p.id 
+       WHERE si.sale_id = ?`, [id]);
+        res.json({ sale, items });
+    }
+    catch (error) {
+        console.error('Error al obtener detalle de venta:', error);
+        res.status(500).json({ message: 'Error al obtener detalles de la venta' });
     }
 });
 // Modificar estado de una Venta (Solo Admin o Cajero con Autorización de Supervisor)
