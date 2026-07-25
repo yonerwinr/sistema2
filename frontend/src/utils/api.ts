@@ -38,7 +38,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    throw new Error(data?.message || `Error ${response.status} en la petición`);
+    const errorObj = new Error(data?.message || `Error ${response.status} en la petición`);
+    if (data && typeof data === 'object') {
+      Object.assign(errorObj, data);
+    }
+    throw errorObj;
   }
 
   return data as T;
@@ -369,6 +373,10 @@ export const api = {
     }),
     getDebtors: () => request<Sale[]>('/sales/debtors/all'),
     getOnlinePending: () => request<Sale[]>('/sales/online-pending'),
+    testSMTP: (testEmail: string) => request<{ success: boolean; message: string; diagnostics: string[] }>('/sales/test-smtp', {
+      method: 'POST',
+      body: JSON.stringify({ testEmail }),
+    }),
     uploadReceipt: async (formData: FormData) => {
       const response = await fetch(`${API_BASE}/sales/upload-receipt`, {
         method: 'POST',

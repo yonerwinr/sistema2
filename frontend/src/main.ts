@@ -2054,8 +2054,13 @@ async function showInvoiceSuccess(result: any, clientPhone: string, clientEmail?
       newManualEmailBtn.innerText = 'Enviando...';
 
       try {
-        await api.sales.resendEmail(result.saleId, inputEmail);
-        alert(`¡Factura enviada con éxito a ${inputEmail}!`);
+        const res = await api.sales.resendEmail(result.saleId, inputEmail);
+        if (res.emailPreviewUrl && res.emailPreviewUrl.startsWith('http')) {
+          alert(`¡Factura enviada en modo de prueba (Ethereal)!\nPuedes visualizarla en: ${res.emailPreviewUrl}`);
+          window.open(res.emailPreviewUrl, '_blank');
+        } else {
+          alert(`¡Factura enviada con éxito a ${inputEmail}!`);
+        }
       } catch (err: any) {
         console.error(err);
         alert(err.message || 'Error al enviar la factura por correo.');
@@ -2636,6 +2641,19 @@ function renderAdminDashboard(): string {
                 </button>
               </div>
             </div>
+            
+            <!-- Diagnóstico SMTP Widget -->
+            <div class="card smtp-widget-sidebar" style="margin-top: 14px; padding: 12px; font-size:11px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
+              <div style="font-weight:700; margin-bottom: 8px; display:flex; align-items:center; gap:4px; color:#10b981;">
+                ✉️ Diagnóstico SMTP
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <input type="email" id="smtp-test-email-input" placeholder="correo@test.com" style="width:100%; padding:4px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; font-size:11px;">
+                <button type="button" class="btn btn-primary" id="run-smtp-diag-btn" style="padding:4px 6px; font-size:10px; margin-top:2px; width:100%; background:#10b981; border:none; color:white; font-weight:700; cursor:pointer;">
+                  Probar Correo
+                </button>
+              </div>
+            </div>
           </div>
         ` : ''}
       </aside>
@@ -2875,6 +2893,37 @@ async function bindAdminEvents() {
       btn.disabled = false;
       saveBtn.disabled = false;
       btn.innerText = '🔄 Auto';
+    }
+  });
+
+  // Diagnóstico SMTP
+  document.getElementById('run-smtp-diag-btn')?.addEventListener('click', async () => {
+    const emailInput = document.getElementById('smtp-test-email-input') as HTMLInputElement;
+    const testEmail = emailInput?.value?.trim();
+    if (!testEmail || !testEmail.includes('@')) {
+      alert('Por favor ingrese un correo válido de destino para la prueba.');
+      return;
+    }
+
+    const btn = document.getElementById('run-smtp-diag-btn') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.innerText = 'Probando...';
+
+    try {
+      const res = await api.sales.testSMTP(testEmail);
+      let logsText = res.diagnostics.join('\n');
+      alert(`${res.message}\n\nDetalles del Diagnóstico:\n${logsText}`);
+    } catch (err: any) {
+      console.error(err);
+      let errMsg = err.message || 'Error desconocido';
+      let diagnosticsText = '';
+      if (err.diagnostics && Array.isArray(err.diagnostics)) {
+        diagnosticsText = '\n\nDetalles del Diagnóstico:\n' + err.diagnostics.join('\n');
+      }
+      alert(`Error al probar SMTP: ${errMsg}${diagnosticsText}`);
+    } finally {
+      btn.disabled = false;
+      btn.innerText = 'Probar Correo';
     }
   });
 }
@@ -6565,8 +6614,13 @@ function showSaleDetails(details: SaleDetail) {
       newEmailBtn.innerText = 'Reenviando...';
 
       try {
-        await api.sales.resendEmail(sale.id, inputEmail);
-        alert(`¡Factura reenviada con éxito a ${inputEmail}!`);
+        const res = await api.sales.resendEmail(sale.id, inputEmail);
+        if (res.emailPreviewUrl && res.emailPreviewUrl.startsWith('http')) {
+          alert(`¡Factura enviada en modo de prueba (Ethereal)!\nPuedes visualizarla en: ${res.emailPreviewUrl}`);
+          window.open(res.emailPreviewUrl, '_blank');
+        } else {
+          alert(`¡Factura reenviada con éxito a ${inputEmail}!`);
+        }
       } catch (err: any) {
         console.error(err);
         alert(err.message || 'Error al reenviar la factura por correo.');

@@ -7,6 +7,7 @@ import { syncSaleToSheets } from '../services/sheets';
 import { syncExchangeRatesFromBCV } from '../services/rates';
 import { logAuditEvent } from '../services/audit';
 import { validateCi } from '../utils/validation';
+import nodemailer from 'nodemailer';
 
 import multer from 'multer';
 import path from 'path';
@@ -1480,6 +1481,87 @@ router.delete('/coupons/:id', authenticate, async (req: AuthRequest, res: Respon
   } catch (error: any) {
     console.error('Error al eliminar cupón:', error);
     res.status(500).json({ message: 'Error al eliminar cupón' });
+  }
+});
+
+// POST /sales/test-smtp: Diagnosticar la conexión y enviar correo de prueba
+router.post('/test-smtp', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'No autorizado. Solo el administrador puede probar el SMTP.' });
+  }
+
+  const { testEmail } = req.body;
+  if (!testEmail || !testEmail.includes('@')) {
+    return res.status(400).json({ message: 'Por favor, ingrese un correo válido de prueba.' });
+  }
+
+  const host = process.env.SMTP_HOST;
+  const port = parseInt(process.env.SMTP_PORT || '587');
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  const diagnostics: string[] = [];
+  diagnostics.push(`Variables cargadas en servidor: HOST=${host || 'no configurado'}, PORT=${port}, USER=${user || 'no configurado'}, PASSWORD length=${pass ? pass.length : 0}`);
+
+  if (!host || !user || !pass) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Faltan variables de entorno SMTP (SMTP_HOST, SMTP_USER, SMTP_PASS) en el servidor.',
+      diagnostics
+    });
+  }
+
+  const isGmail = host.toLowerCase().includes('gmail.com');
+  const transportConfig = isGmail 
+    ? {
+        service: 'gmail',
+        auth: { user, pass }
+      }
+    : {
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false }
+      };
+
+  diagnostics.push(`Configuración de Nodemailer: ${JSON.stringify({ ...transportConfig, auth: { user, pass: '***' } })}`);
+
+  const testTransporter = nodemailer.createTransport(transportConfig);
+
+  try {
+    diagnostics.push('Verificando conexión SMTP...');
+    await testTransporter.verify();
+    diagnostics.push('✅ Conexión SMTP verificada correctamente.');
+
+    diagnostics.push(`Enviando correo de prueba a ${testEmail}...`);
+    const info = await testTransporter.sendMail({
+      from: `"FacilitoApp Diagnóstico" <${user}>`,
+      to: testEmail,
+      subject: 'Prueba de Diagnóstico SMTP - FacilitoApp 🐒',
+      text: 'Este correo confirma que el servidor de FacilitoApp se conecta y envía correos correctamente con tus credenciales configuradas.',
+      html: '<h2>¡Conexión Exitosa!</h2><p>Este correo confirma que la configuración de correo SMTP en tu servidor está funcionando correctamente.</p>'
+    });
+    diagnostics.push(`✅ Correo enviado con éxito. Message ID: ${info.messageId}`);
+    
+    const testUrl = nodemailer.getTestMessageUrl(info);
+    if (testUrl) {
+      diagnostics.push(`🔗 URL de Vista Previa (Ethereal): ${testUrl}`);
+    }
+
+    res.json({
+      success: true,
+      message: '¡Prueba de correo SMTP exitosa! Revisa la bandeja de entrada del correo provisto.',
+      diagnostics
+    });
+  } catch (err: any) {
+    diagnostics.push(`❌ Error al conectar o enviar: ${err.message}`);
+    console.error('Error en diagnóstico SMTP:', err);
+    res.status(500).json({
+      success: false,
+      message: `Error al probar SMTP: ${err.message}`,
+      diagnostics
+    });
   }
 });
 
