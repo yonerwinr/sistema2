@@ -3,6 +3,7 @@ import cors from 'cors';
 import compression from 'compression';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import pool from './config/db';
 import authRoutes from './controllers/auth';
 import productRoutes from './controllers/products';
@@ -18,6 +19,16 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Asegurar que la carpeta de subidas y sus subcarpetas existan al iniciar
+const uploadsDir = path.join(__dirname, '../uploads');
+const invoicesDir = path.join(uploadsDir, 'invoices');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(invoicesDir)) {
+  fs.mkdirSync(invoicesDir, { recursive: true });
+}
 
 // Middlewares
 app.use(compression());
@@ -39,6 +50,14 @@ app.use('/api/suppliers', supplierRoutes);
 // Ruta raiz de prueba
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', message: 'Servidor FacilitoApp funcionando correctamente 🐒' });
+});
+
+// Middleware de manejo de errores global
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Error no manejado en el servidor:', err);
+  res.status(err.status || 500).json({
+    message: err.message || 'Ocurrió un error interno en el servidor'
+  });
 });
 
 // Función de migraciones automáticas

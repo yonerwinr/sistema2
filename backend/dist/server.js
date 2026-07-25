@@ -8,6 +8,7 @@ const cors_1 = __importDefault(require("cors"));
 const compression_1 = __importDefault(require("compression"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const db_1 = __importDefault(require("./config/db"));
 const auth_1 = __importDefault(require("./controllers/auth"));
 const products_1 = __importDefault(require("./controllers/products"));
@@ -21,6 +22,15 @@ const rates_1 = require("./services/rates");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
+// Asegurar que la carpeta de subidas y sus subcarpetas existan al iniciar
+const uploadsDir = path_1.default.join(__dirname, '../uploads');
+const invoicesDir = path_1.default.join(uploadsDir, 'invoices');
+if (!fs_1.default.existsSync(uploadsDir)) {
+    fs_1.default.mkdirSync(uploadsDir, { recursive: true });
+}
+if (!fs_1.default.existsSync(invoicesDir)) {
+    fs_1.default.mkdirSync(invoicesDir, { recursive: true });
+}
 // Middlewares
 app.use((0, compression_1.default)());
 app.use((0, cors_1.default)());
@@ -38,6 +48,13 @@ app.use('/api/suppliers', suppliers_1.default);
 // Ruta raiz de prueba
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', message: 'Servidor FacilitoApp funcionando correctamente 🐒' });
+});
+// Middleware de manejo de errores global
+app.use((err, _req, res, _next) => {
+    console.error('Error no manejado en el servidor:', err);
+    res.status(err.status || 500).json({
+        message: err.message || 'Ocurrió un error interno en el servidor'
+    });
 });
 // Función de migraciones automáticas
 async function runMigrations() {
