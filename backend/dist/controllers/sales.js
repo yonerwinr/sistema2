@@ -1252,56 +1252,31 @@ router.post('/test-smtp', auth_1.authenticate, async (req, res) => {
     const port = parseInt(process.env.SMTP_PORT || '587');
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
+    const proxyUrl = process.env.EMAIL_PROXY_URL;
     const diagnostics = [];
-    diagnostics.push(`Variables cargadas en servidor: HOST=${host || 'no configurado'}, PORT=${port}, USER=${user || 'no configurado'}, PASSWORD length=${pass ? pass.length : 0}`);
-    if (!host || !user || !pass) {
-        return res.status(400).json({
-            success: false,
-            message: 'Faltan variables de entorno SMTP (SMTP_HOST, SMTP_USER, SMTP_PASS) en el servidor.',
-            diagnostics
-        });
-    }
-    const isGmail = host.toLowerCase().includes('gmail.com');
-    const transportConfig = isGmail
-        ? {
-            service: 'gmail',
-            auth: { user, pass },
-            connectionTimeout: 8000,
-            greetingTimeout: 8000,
-            socketTimeout: 10000
-        }
-        : {
-            host,
-            port,
-            secure: port === 465,
-            auth: { user, pass },
-            tls: { rejectUnauthorized: false },
-            connectionTimeout: 8000,
-            greetingTimeout: 8000,
-            socketTimeout: 10000
-        };
-    diagnostics.push(`Configuración de Nodemailer: ${JSON.stringify({ ...transportConfig, auth: { user, pass: '***' } })}`);
-    const testTransporter = nodemailer_1.default.createTransport(transportConfig);
+    diagnostics.push(`Variables cargadas en servidor: HOST=${host || 'no configurado'}, PORT=${port}, USER=${user || 'no configurado'}, PASSWORD length=${pass ? pass.length : 0}, PROXY=${proxyUrl || 'no configurado'}`);
     try {
-        diagnostics.push('Verificando conexión SMTP...');
-        await testTransporter.verify();
-        diagnostics.push('✅ Conexión SMTP verificada correctamente.');
+        diagnostics.push('Obteniendo transportador activo...');
+        const activeTransporter = await (0, email_1.getTransporter)();
+        diagnostics.push('Verificando conexión / transportador...');
+        await activeTransporter.verify();
+        diagnostics.push('✅ Transportador verificado correctamente.');
         diagnostics.push(`Enviando correo de prueba a ${testEmail}...`);
-        const info = await testTransporter.sendMail({
-            from: `"FacilitoApp Diagnóstico" <${user}>`,
+        const info = await activeTransporter.sendMail({
+            from: `"FacilitoApp Diagnóstico" <${user || 'no-reply@facilitoapp.com'}>`,
             to: testEmail,
             subject: 'Prueba de Diagnóstico SMTP - FacilitoApp 🐒',
-            text: 'Este correo confirma que el servidor de FacilitoApp se conecta y envía correos correctamente con tus credenciales configuradas.',
-            html: '<h2>¡Conexión Exitosa!</h2><p>Este correo confirma que la configuración de correo SMTP en tu servidor está funcionando correctamente.</p>'
+            text: 'Este correo confirma que el servidor de FacilitoApp se conecta y envía correos correctamente.',
+            html: '<h2>¡Conexión Exitosa!</h2><p>Este correo confirma que la configuración de correo en tu servidor está funcionando correctamente.</p>'
         });
-        diagnostics.push(`✅ Correo enviado con éxito. Message ID: ${info.messageId}`);
+        diagnostics.push(`✅ Correo enviado con éxito. Message ID: ${info.messageId || 'N/D'}`);
         const testUrl = nodemailer_1.default.getTestMessageUrl(info);
         if (testUrl) {
             diagnostics.push(`🔗 URL de Vista Previa (Ethereal): ${testUrl}`);
         }
         res.json({
             success: true,
-            message: '¡Prueba de correo SMTP exitosa! Revisa la bandeja de entrada del correo provisto.',
+            message: '¡Prueba de correo exitosa! Revisa la bandeja de entrada del correo provisto.',
             diagnostics
         });
     }
@@ -1310,7 +1285,7 @@ router.post('/test-smtp', auth_1.authenticate, async (req, res) => {
         console.error('Error en diagnóstico SMTP:', err);
         res.status(500).json({
             success: false,
-            message: `Error al probar SMTP: ${err.message}`,
+            message: `Error al probar correo: ${err.message}`,
             diagnostics
         });
     }
