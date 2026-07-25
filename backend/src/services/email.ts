@@ -11,7 +11,10 @@ async function httpPost(url: string, headers: Record<string, string>, body: any)
   if (typeof fetch === 'function') {
     const response = await fetch(url, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
       body: JSON.stringify(body)
     });
     const text = await response.text();
