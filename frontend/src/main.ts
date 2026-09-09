@@ -282,7 +282,7 @@ function hydrateStateFromCache() {
     }
   } catch (e) {}
 
-  // 5. Restaurar usuario y vista anterior para evitar saltos o parpadeos
+  // 5. Restaurar usuario: Administradores y Vendedores SIEMPRE abren en el sistema Admin
   const token = localStorage.getItem('token');
   if (token) {
     try {
@@ -290,15 +290,17 @@ function hydrateStateFromCache() {
       if (cachedUser) {
         currentUser = JSON.parse(cachedUser);
         if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
-          const lastView = localStorage.getItem('facilito_last_view');
-          currentView = (lastView === 'store' || lastView === 'admin' || lastView === 'auth') ? lastView : 'admin';
+          // Administradores y Vendedores SIEMPRE abren en el sistema Admin
+          currentView = 'admin';
           const lastAdminView = localStorage.getItem('facilito_last_admin_view') as AdminSubView;
           if (currentUser.role === 'billing') {
             activeAdminView = 'online_billing';
+          } else if (currentUser.role === 'seller') {
+            activeAdminView = 'pos'; // Vendedores directo a Caja POS
           } else if (lastAdminView) {
             activeAdminView = lastAdminView;
           } else {
-            activeAdminView = currentUser.role === 'admin' ? 'stats' : 'pos';
+            activeAdminView = 'pos'; // Administradores por defecto a Caja POS
           }
         }
       }
@@ -339,8 +341,16 @@ window.addEventListener('DOMContentLoaded', async () => {
         localStorage.setItem('user', JSON.stringify(freshUser));
 
         if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
-          if (currentView !== 'admin' && currentView !== 'store') {
-            activeAdminView = currentUser.role === 'billing' ? 'online_billing' : 'pos';
+          // Administradores y Vendedores siempre en la vista Admin
+          if (currentView !== 'admin') {
+            currentView = 'admin';
+            if (currentUser.role === 'billing') {
+              activeAdminView = 'online_billing';
+            } else if (currentUser.role === 'seller') {
+              activeAdminView = 'pos';
+            } else {
+              activeAdminView = (localStorage.getItem('facilito_last_admin_view') as AdminSubView) || 'pos';
+            }
             navigate('admin');
           } else {
             renderApp();
@@ -353,13 +363,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         currentUser = null;
-        renderApp();
+        navigate('store');
       }
     })();
   } else {
-    if (currentView !== 'store') {
-      navigate('store');
-    }
+    navigate('store');
   }
 
   // Sincronización en segundo plano: Catálogo de productos frescos
@@ -572,7 +580,11 @@ function bindGeneralEvents() {
 
   document.getElementById('nav-logo')?.addEventListener('click', (e) => {
     e.preventDefault();
-    navigate('store');
+    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
+      navigate('admin');
+    } else {
+      navigate('store');
+    }
   });
 
   document.getElementById('link-store')?.addEventListener('click', () => navigate('store'));
@@ -2513,7 +2525,8 @@ function bindAuthEvents() {
       } catch (e) {}
 
       if (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') {
-        activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'admin' ? 'stats' : 'pos');
+        const lastAdmin = (localStorage.getItem('facilito_last_admin_view') as AdminSubView);
+        activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'seller' ? 'pos' : (lastAdmin || 'pos'));
         navigate('admin');
       } else {
         navigate('store');
@@ -2592,7 +2605,8 @@ function bindAuthEvents() {
             } catch (e) {}
 
             if (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') {
-              activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'admin' ? 'stats' : 'pos');
+              const lastAdmin = (localStorage.getItem('facilito_last_admin_view') as AdminSubView);
+              activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'seller' ? 'pos' : (lastAdmin || 'pos'));
               navigate('admin');
             } else {
               navigate('store');
