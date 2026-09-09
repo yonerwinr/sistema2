@@ -576,7 +576,7 @@ function renderFooter(): string {
   return `
     <footer style="background: var(--bg-secondary); border-top: 1px solid var(--border-glass); padding: 24px 0; text-align: center; font-size: 13px; color: var(--text-secondary); margin-top: auto;">
       <div class="container">
-        <p>&copy; ${new Date().getFullYear()} FacilitoApp 🐒. La forma más fácil de gestionar tu negocio. ¡Tan fácil que hasta un monito puede usarlo! 💻📱</p>
+        <p>&copy; ${new Date().getFullYear()} FacilitoApp 🛍️. Tu tienda online de confianza. Calidad garantizada, ofertas exclusivas y envíos rápidos a todo el país.</p>
       </div>
     </footer>
   `;
@@ -665,7 +665,7 @@ function renderStoreView(): string {
           <div style="width: min(100%, 540px); height: 22px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
           <div style="width: min(100%, 360px); height: 18px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
           <div style="margin-top: 10px; font-size: 15px; color: var(--text-secondary); font-weight: 600; display:flex; align-items:center; gap:8px;">
-            <span class="pulsing-dot"></span> Sincronizando catálogo oficial y tasas de cambio...
+            <span class="pulsing-dot"></span> Cargando los mejores productos para ti...
           </div>
         </div>
       </section>
@@ -746,106 +746,106 @@ function renderStoreView(): string {
     <!-- HERO SECTION SPLIT & 3D STAGE -->
     <section class="store-hero-epic animate-on-scroll animate-zoom-in">
       <div class="hero-grid-split">
-        <!-- Columna Izquierda: Mensaje de Marca, Tasas y CTA -->
+        <!-- Columna Izquierda: Mensaje de Tienda, Tasas y CTA -->
         <div>
           <div class="hero-badge-pill">
             <span class="pulsing-dot"></span>
-            <span>EXPERIENCIA OFICIAL 2026 • COMPRAS INTELIGENTES</span>
+            <span>🔥 LO ÚLTIMO EN TECNOLOGÍA • OFERTAS EXCLUSIVAS</span>
           </div>
           
           <h1 class="hero-title-epic">
-            Tu tienda favorita con <span class="brand-text-facilito">Facilito</span><span class="brand-text-app">App</span> 🐒
+            Descubre y compra en <span class="brand-text-facilito">Facilito</span><span class="brand-text-app">App</span> 🛍️
           </h1>
           
           <p class="hero-subtitle-epic">
-            Tecnología y productos al mejor precio con transparencia absoluta. Cada artículo cuenta con conversión exacta en <strong>Dólares ($)</strong> y <strong>Bolívares (Bs.)</strong> sincronizado al <strong>BCV</strong> en tiempo real.
+            Los mejores smartphones, computadoras y accesorios a precios inmejorables. Visualiza cada precio en <strong>Dólares ($)</strong> o <strong>Bolívares (Bs.)</strong>, paga con tu método favorito y recibe tu pedido rápido y seguro.
           </p>
 
           <div class="hero-actions-row">
             <a href="#store-catalog-anchor" class="btn-hero-primary" id="hero-cta-explore">
-              🛍️ Explorar Catálogo
+              🛍️ Ver Todos los Productos
             </a>
             <button class="btn-hero-secondary" id="hero-btn-promos">
-              🔥 Solo Disponibles
+              🔥 Solo en Stock
             </button>
             <div class="hero-rate-ticker">
-              <span>🇻🇪 BCV: <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
+              <span>🇻🇪 Tasa del Día (BCV): <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
             </div>
           </div>
 
-          <!-- Métricas de Confianza -->
+          <!-- Métricas de Confianza del Cliente -->
           <div class="hero-trust-row">
             <div class="hero-trust-item">
               <span style="font-size:16px;">⭐</span>
-              <span><strong>4.9 / 5</strong> Calificación</span>
+              <span><strong>4.9 / 5</strong> Clientes Satisfechos</span>
             </div>
             <div class="hero-trust-item">
               <span style="font-size:16px;">🚀</span>
-              <span>Despachos en <strong>24 Horas</strong></span>
+              <span>Entregas <strong>Express 24h</strong></span>
             </div>
             <div class="hero-trust-item">
-              <span style="font-size:16px;">🧾</span>
-              <span>Factura Digital <strong>QR</strong></span>
+              <span style="font-size:16px;">🛡️</span>
+              <span>Garantía <strong>100% Oficial</strong></span>
             </div>
           </div>
         </div>
 
-        <!-- Columna Derecha: Escenario 3D con Logo y Chips Flotantes -->
+        <!-- Columna Derecha: Escenario 3D con Logo y Chips de Beneficios para el Comprador -->
         <div class="hero-mascot-stage">
           <div class="mascot-glow-backdrop"></div>
           
           <!-- Chip Flotante Superior -->
           <div class="floating-chip top-right">
             <span class="pulsing-dot"></span>
-            <span>⚡ Pago Móvil Inmediato</span>
+            <span>⚡ Pagos Rápidos & Seguros</span>
           </div>
 
           <!-- Pod Central con Logo Oficial -->
           <div class="mascot-card-core animate-float">
-            <img src="/logo.png" class="mascot-logo-img" alt="FacilitoApp Logo Oficial">
+            <img src="/logo.png" class="mascot-logo-img" alt="FacilitoApp Tienda Online">
           </div>
 
           <!-- Chip Flotante Inferior Izquierdo -->
           <div class="floating-chip bottom-left">
-            <span>🧾 Factura Digital con QR</span>
+            <span>📦 Envíos a Todo el País</span>
           </div>
 
           <!-- Chip Flotante Inferior Derecho -->
           <div class="floating-chip bottom-right">
-            <span>💱 Doble Moneda ($ y Bs.)</span>
+            <span>⭐ Productos 100% Originales</span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 4 PILARES DE VALOR / BENEFICIOS (BENTO GRID) -->
+    <!-- 4 PILARES DE VALOR PARA EL CLIENTE (BENTO GRID) -->
     <div class="pillars-grid animate-on-scroll animate-fade-up">
       <div class="pillar-card">
         <div class="pillar-icon-box blue">🚚</div>
         <div>
-          <div class="pillar-title">Envíos Rápidos & Retiro</div>
-          <div class="pillar-desc">Entregas el mismo día en tu zona o retira sin colas en tienda física.</div>
+          <div class="pillar-title">Envíos a Domicilio & Retiro</div>
+          <div class="pillar-desc">Recibe tus compras rápido en tu dirección o retira en nuestra sede física.</div>
         </div>
       </div>
       <div class="pillar-card">
-        <div class="pillar-icon-box orange">💱</div>
+        <div class="pillar-icon-box orange">💰</div>
         <div>
-          <div class="pillar-title">Doble Moneda en Vivo</div>
-          <div class="pillar-desc">Precios en USD y Bolívares según la tasa oficial del día sin sobreprecios.</div>
+          <div class="pillar-title">Precios Claros en $ y Bs.</div>
+          <div class="pillar-desc">Siempre sabrás el monto exacto en tu moneda favorita antes de comprar.</div>
         </div>
       </div>
       <div class="pillar-card">
         <div class="pillar-icon-box green">🔒</div>
         <div>
-          <div class="pillar-title">Pagos 100% Protegidos</div>
-          <div class="pillar-desc">Aceptamos Pago Móvil, Efectivo, Binance Pay USDT y Tarjetas de débito.</div>
+          <div class="pillar-title">Compra Fácil & Protegida</div>
+          <div class="pillar-desc">Paga cómodamente con Pago Móvil, Efectivo, Binance o Tarjetas.</div>
         </div>
       </div>
       <div class="pillar-card">
-        <div class="pillar-icon-box gold">🧾</div>
+        <div class="pillar-icon-box gold">⭐</div>
         <div>
-          <div class="pillar-title">Factura Digital con QR</div>
-          <div class="pillar-desc">Recibe comprobante fiscal digital descargable y verificable de inmediato.</div>
+          <div class="pillar-title">Garantía & Soporte Directo</div>
+          <div class="pillar-desc">Todos nuestros artículos cuentan con respaldo oficial y asesoría personalizada.</div>
         </div>
       </div>
     </div>
@@ -963,7 +963,7 @@ function renderStoreView(): string {
           </div>
           <div class="payment-method-pill" style="border-color:rgba(16,185,129,0.3); color:#34d399;">
             <span>🛡️</span>
-            <span>Facturación Inmediata QR</span>
+            <span>Garantía & Envíos Seguros</span>
           </div>
         </div>
       </div>
