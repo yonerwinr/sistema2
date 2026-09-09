@@ -528,7 +528,7 @@ function renderNavbar(): string {
     <nav class="navbar">
       <div class="container navbar-container">
         <a class="logo" href="#" id="nav-logo" style="display:flex; align-items:center; gap:8px;">
-          <img src="/logofacilito.png" style="height:36px; width:36px; object-fit:contain; border-radius:50%; background:rgba(255,255,255,0.1); padding:2px;" class="animate-float" alt="FacilitoApp Logo">
+          <img src="/logo.png" style="height:36px; width:36px; object-fit:contain; border-radius:50%; background:rgba(255,255,255,0.1); padding:2px;" class="animate-float" alt="FacilitoApp Logo">
           <span style="font-weight:900; letter-spacing:-0.5px;">FacilitoApp</span>
         </a>
         
@@ -744,7 +744,7 @@ function renderStoreView(): string {
         </div>
         <div style="flex: 0 0 auto; margin: 0 auto; display:flex; justify-content:center; align-items:center;" class="animate-float">
           <div style="position:relative; width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, rgba(255,122,0,0.2) 0%, transparent 70%); display:flex; justify-content:center; align-items:center;">
-            <img src="/logofacilito.png" style="width:110px; height:110px; object-fit:contain; border-radius: 50%; border: 3px solid var(--primary); box-shadow: 0 8px 24px rgba(255,122,0,0.3); background: var(--bg-secondary);" alt="Mascota FacilitoApp">
+            <img src="/logo.png" style="width:110px; height:110px; object-fit:contain; border-radius: 50%; border: 3px solid var(--primary); box-shadow: 0 8px 24px rgba(255,122,0,0.3); background: var(--bg-secondary);" alt="Logo FacilitoApp">
             <span style="position:absolute; bottom:-5px; right:-5px; font-size:24px;">👋</span>
           </div>
         </div>
@@ -1615,7 +1615,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
   return new Promise((resolve, reject) => {
     // Cargar la imagen del logotipo
     const logoImg = new Image();
-    logoImg.src = '/logofacilito.png';
+    logoImg.src = '/logo.png';
 
     const onLogoLoaded = (loaded: boolean) => {
       const canvas = document.createElement('canvas');
@@ -2335,7 +2335,7 @@ function renderAuthView(): string {
     <div class="auth-container">
       <div class="card auth-card animate-on-scroll animate-zoom-in">
         <div style="text-align:center; margin-bottom: 20px;">
-          <img src="/logofacilito.png" class="animate-float" style="width: 76px; height: 76px; border-radius:50%; border:2px solid var(--primary); box-shadow: 0 4px 15px rgba(255,122,0,0.25); background:var(--bg-secondary); object-fit:contain;" alt="Logo">
+          <img src="/logo.png" class="animate-float" style="width: 76px; height: 76px; border-radius:50%; border:2px solid var(--primary); box-shadow: 0 4px 15px rgba(255,122,0,0.25); background:var(--bg-secondary); object-fit:contain;" alt="Logo">
           <h2 style="font-weight:900; margin-top:10px; font-size: 24px; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing:-0.5px;">FacilitoApp</h2>
           <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">¡Ingresa y disfruta del control total de tus ventas! 🐒</p>
         </div>
