@@ -685,8 +685,8 @@ function renderStoreView(): string {
     displayedProducts.sort((a, b) => Number(b.price) - Number(a.price));
   }
 
-  // Agrupar HTML de tarjetas de producto ultra-modernas con doble moneda
-  const productsHtml = displayedProducts.map(prod => {
+  // Agrupar HTML de tarjetas de producto ultra-modernas con doble moneda y animación en cascada
+  const productsHtml = displayedProducts.map((prod, index) => {
     const isLowStock = prod.stock > 0 && prod.stock < 5;
     const isOutOfStock = prod.stock <= 0;
     
@@ -705,7 +705,7 @@ function renderStoreView(): string {
     const cartQty = cartItem ? cartItem.quantity : 0;
 
     return `
-      <div class="product-card-premium animate-on-scroll animate-fade-up visible">
+      <div class="product-card-premium cascade-item" style="animation-delay: ${Math.min(index * 45, 800)}ms;">
         <div class="product-image-container">
           <img class="product-image" src="${prod.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=600&auto=format&fit=crop'}" alt="${prod.name}" loading="lazy">
           ${isOutOfStock ? `<span class="product-badge-premium danger">Agotado</span>` : (isLowStock ? `<span class="product-badge-premium warning">¡Últimos!</span>` : '')}
@@ -4132,8 +4132,8 @@ async function renderAdminPOS() {
           </div>
 
           <div class="pos-products-grid stagger-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:12px;">
-            ${posProductsToShow.map(prod => `
-              <div class="card pos-product-card add-to-pos-cart" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease;">
+            ${posProductsToShow.map((prod, index) => `
+              <div class="card pos-product-card add-to-pos-cart cascade-item" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease; animation-delay: ${Math.min(index * 35, 700)}ms;">
                 <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:90px; object-fit:cover; border-radius:8px; margin-bottom:6px;">
                 <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.name}</div>
                 <div style="font-weight:800; color:var(--primary); font-size:13px; margin-top:2px;">$${Number(prod.price).toFixed(2)}</div>
@@ -4898,8 +4898,8 @@ function bindPOSEvents() {
           smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, val)
         );
 
-        grid.innerHTML = filtered.map(prod => `
-          <div class="card pos-product-card add-to-pos-cart" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease;">
+        grid.innerHTML = filtered.map((prod, index) => `
+          <div class="card pos-product-card add-to-pos-cart cascade-item" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease; animation-delay: ${Math.min(index * 35, 700)}ms;">
             <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:90px; object-fit:cover; border-radius:8px; margin-bottom:6px;">
             <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.name}</div>
             <div style="font-weight:800; color:var(--primary); font-size:13px; margin-top:2px;">$${Number(prod.price).toFixed(2)}</div>
@@ -5920,8 +5920,8 @@ function getAdminFilteredProducts(): Product[] {
 }
 
 function renderAdminProductsRows(products: Product[]): string {
-  return products.map(prod => `
-    <tr>
+  return products.map((prod, index) => `
+    <tr class="cascade-item" style="animation-delay: ${Math.min(index * 30, 600)}ms;">
       <td>
         <img src="${prod.image_url}" style="width:48px; height:48px; object-fit:cover; border-radius:8px;" alt="${prod.name}">
       </td>
