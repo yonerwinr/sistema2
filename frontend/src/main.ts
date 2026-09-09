@@ -519,17 +519,22 @@ function renderNavbar(): string {
   const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return `
-    <div class="exchange-rate-banner" style="background: rgba(16,185,129,0.06); border-bottom: 1px solid var(--border-glass); padding: 6px 0; font-size: 11px; font-weight: 600; text-align: center; color: var(--success); display: flex; justify-content: center; gap: 16px; align-items:center;">
-      <span>💵 Tasa Oficial (BCV):</span>
-      <span>Dólar $: <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
+    <div class="exchange-rate-banner" style="background: rgba(16,185,129,0.06); border-bottom: 1px solid var(--border-glass); padding: 6px 0; font-size: 11px; font-weight: 600; text-align: center; color: var(--success); display: flex; justify-content: center; gap: 16px; align-items:center; flex-wrap: wrap;">
+      <span>💵 BCV: <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
       <span style="color:var(--text-muted);">|</span>
       <span>Euro €: <strong>Bs. ${formatRate(rateEurToVes)}</strong></span>
+      <span style="color:var(--text-muted);">|</span>
+      <span style="color:#f59e0b;">🟡 Binance P2P: <strong>Bs. ${formatRate(rateBinanceToVes)}</strong></span>
+      <span style="color:var(--text-muted);">|</span>
+      <span style="color:var(--text-secondary);">⚡ Envíos Express & Retiro en Tienda</span>
     </div>
     <nav class="navbar">
       <div class="container navbar-container">
-        <a class="logo" href="#" id="nav-logo" style="display:flex; align-items:center; gap:8px;">
-          <img src="/logo.png" style="height:36px; width:36px; object-fit:contain; border-radius:50%; background:rgba(255,255,255,0.1); padding:2px;" class="animate-float" alt="FacilitoApp Logo">
-          <span style="font-weight:900; letter-spacing:-0.5px;">FacilitoApp</span>
+        <a class="logo" href="#" id="nav-logo" style="display:flex; align-items:center; gap:10px; text-decoration:none;">
+          <img src="/logo.png" style="height:38px; width:38px; object-fit:contain; border-radius:50%; background:rgba(255,255,255,0.06); padding:2px; box-shadow: 0 4px 12px rgba(0, 119, 246, 0.25);" class="animate-float" alt="FacilitoApp Logo">
+          <span style="font-weight:900; font-size:20px; letter-spacing:-0.5px;">
+            <span style="color:#0084ff;">Facilito</span><span style="color:#ff7300;">App</span>
+          </span>
         </a>
         
         <!-- Botón Toggle Menú Hamburguesa Móvil -->
@@ -637,10 +642,11 @@ function bindGeneralEvents() {
 }
 
 // ==========================================================================
-// VISTA: TIENDA ONLINE (E-COMMERCE)
+// ==========================================================================
+// VISTA: TIENDA ONLINE (E-COMMERCE) - REDISEÑO MODERNO & VIBRANTE
 // ==========================================================================
 function renderStoreView(): string {
-  // Categorías estáticas
+  // Categorías estáticas con iconos temáticos
   const categories = ['Todas', 'Smartphones', 'Laptops', 'Accesorios', 'Tablets', 'Smartwatches'];
   const categoryIcons: Record<string, string> = {
     'Todas': '🌐',
@@ -653,12 +659,14 @@ function renderStoreView(): string {
 
   if (productsLoading && productsList.length === 0) {
     return `
-      <section class="hero-section animate-on-scroll animate-zoom-in" style="position:relative; overflow:hidden; padding: 60px 0; background: linear-gradient(135deg, rgba(255,122,0,0.1) 0%, rgba(139,92,246,0.1) 100%); border-radius: var(--radius-lg); border: 1px solid var(--border-glass); margin-bottom: 30px;">
-        <div class="container" style="min-height:240px; display:flex; flex-direction:column; justify-content:center; gap:14px;">
-          <div style="width: 220px; height: 20px; border-radius: 999px; background: rgba(255,255,255,0.08);"></div>
-          <div style="width: min(100%, 520px); height: 18px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
-          <div style="width: min(100%, 340px); height: 18px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
-          <div style="margin-top: 8px; font-size: 14px; color: var(--text-secondary); font-weight: 600;">Cargando productos y tasas...</div>
+      <section class="store-hero-epic animate-on-scroll animate-zoom-in">
+        <div class="container" style="min-height:260px; display:flex; flex-direction:column; justify-content:center; gap:16px;">
+          <div style="width: 240px; height: 24px; border-radius: 999px; background: rgba(255,255,255,0.08);"></div>
+          <div style="width: min(100%, 540px); height: 22px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
+          <div style="width: min(100%, 360px); height: 18px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
+          <div style="margin-top: 10px; font-size: 15px; color: var(--text-secondary); font-weight: 600; display:flex; align-items:center; gap:8px;">
+            <span class="pulsing-dot"></span> Sincronizando catálogo oficial y tasas de cambio...
+          </div>
         </div>
       </section>
     `;
@@ -677,15 +685,20 @@ function renderStoreView(): string {
     displayedProducts.sort((a, b) => Number(b.price) - Number(a.price));
   }
 
-  // Agrupar HTML de tarjetas de producto rediseñadas
+  // Agrupar HTML de tarjetas de producto ultra-modernas con doble moneda
   const productsHtml = displayedProducts.map(prod => {
     const isLowStock = prod.stock > 0 && prod.stock < 5;
     const isOutOfStock = prod.stock <= 0;
     
-    // Calcular porcentaje de stock para la barra de progreso (por ejemplo, max 20)
+    // Porcentaje de stock para la barra de progreso
     const stockPercent = Math.min(100, (prod.stock / 20) * 100);
     const stockClass = isOutOfStock ? 'empty' : (isLowStock ? 'medium' : 'high');
-    const stockLabel = isOutOfStock ? 'Agotado 😢' : (isLowStock ? 'Pocas unidades 🐒' : 'Disponible');
+    const stockLabel = isOutOfStock ? 'Agotado' : (isLowStock ? `¡Solo ${prod.stock} disp.!` : 'En Stock');
+
+    // Doble moneda: Cálculo en Bolívares según tasa oficial
+    const priceUsd = Number(prod.price) || 0;
+    const priceVes = priceUsd * rateUsdToVes;
+    const formattedVes = priceVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Verificar si el producto ya está en el carrito
     const cartItem = cart.find(item => item.product.id === prod.id);
@@ -694,19 +707,18 @@ function renderStoreView(): string {
     return `
       <div class="product-card-premium animate-on-scroll animate-fade-up visible">
         <div class="product-image-container">
-          <img class="product-image" src="${prod.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=600&auto=format&fit=crop'}" alt="${prod.name}">
-          ${isLowStock ? `<span class="product-badge-premium danger">¡Últimos!</span>` : ''}
-          ${isOutOfStock ? `<span class="product-badge-premium danger" style="background:rgba(239, 68, 68, 0.4); border-color:#ef4444; color:#fff;">Agotado</span>` : ''}
-          ${prod.code ? `<span class="product-badge-premium info" style="right: 12px;">${prod.code}</span>` : ''}
+          <img class="product-image" src="${prod.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=600&auto=format&fit=crop'}" alt="${prod.name}" loading="lazy">
+          ${isOutOfStock ? `<span class="product-badge-premium danger">Agotado</span>` : (isLowStock ? `<span class="product-badge-premium warning">¡Últimos!</span>` : '')}
+          ${prod.code ? `<span class="product-badge-premium info" style="right: 12px; left: auto;">SKU: ${prod.code}</span>` : ''}
         </div>
         <div class="product-info">
           <div class="product-category">${prod.category || 'General'}</div>
           <h3 class="product-title" title="${prod.name}">${prod.name}</h3>
-          <p class="product-description" title="${prod.description || 'Sin descripción.'}">${prod.description || 'Sin descripción.'}</p>
+          <p class="product-description" title="${prod.description || 'Producto original con garantía oficial.'}">${prod.description || 'Producto original con garantía oficial.'}</p>
           
           <!-- Indicador de Stock Visual -->
           <div class="stock-progress-container">
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700; color: ${isOutOfStock ? 'var(--danger)' : (isLowStock ? 'var(--warning)' : 'var(--success)')};">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700; color: ${isOutOfStock ? 'var(--danger)' : (isLowStock ? 'var(--brand-orange)' : 'var(--success)')};">
               <span>Disponibilidad:</span>
               <span>${stockLabel}</span>
             </div>
@@ -715,10 +727,14 @@ function renderStoreView(): string {
             </div>
           </div>
 
+          <!-- Footer con Doble Moneda y Botón de Compra -->
           <div class="product-footer">
-            <div class="price-badge-premium">$${Number(prod.price).toFixed(2)}</div>
-            <button class="btn btn-primary add-to-cart-btn" data-id="${prod.id}" ${isOutOfStock ? 'disabled style="background:rgba(255,255,255,0.05); color:var(--text-muted); cursor:not-allowed;"' : ''} style="padding: 10px 18px; border-radius: 50px; font-size: 13px; font-weight:700; display:flex; align-items:center; gap:6px; transition: all 0.3s ease;">
-              ${cartQty > 0 ? `🛒 Agregado (${cartQty})` : `${icons.plus} Agregar`}
+            <div class="product-price-block">
+              <div class="price-main-usd">$${priceUsd.toFixed(2)}</div>
+              <div class="price-sub-ves">≈ Bs. ${formattedVes}</div>
+            </div>
+            <button class="add-to-cart-btn add-to-cart-btn-glow ${cartQty > 0 ? 'added' : ''}" data-id="${prod.id}" ${isOutOfStock ? 'disabled style="background:rgba(255,255,255,0.05); color:var(--text-muted); cursor:not-allowed; box-shadow:none;"' : ''}>
+              ${isOutOfStock ? 'Agotado' : (cartQty > 0 ? `🛒 En Carrito (${cartQty})` : `${icons.plus} Agregar`)}
             </button>
           </div>
         </div>
@@ -727,41 +743,142 @@ function renderStoreView(): string {
   }).join('');
 
   return `
-    <section class="hero-section animate-on-scroll animate-zoom-in" style="position:relative; overflow:hidden; padding: 60px 0; background: linear-gradient(135deg, rgba(255,122,0,0.1) 0%, rgba(139,92,246,0.1) 100%); border-radius: var(--radius-lg); border: 1px solid var(--border-glass); margin-bottom: 30px;">
-      <div class="container" style="display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap-reverse;">
-        <div style="flex: 1; min-width: 300px;">
-          <h1 class="hero-title" style="font-size: 38px; line-height: 1.1; margin-bottom: 12px; font-weight:900; text-align:left;">
-            ¡Todo es más fácil en <span style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">FacilitoApp</span>! 🐒
+    <!-- HERO SECTION SPLIT & 3D STAGE -->
+    <section class="store-hero-epic animate-on-scroll animate-zoom-in">
+      <div class="hero-grid-split">
+        <!-- Columna Izquierda: Mensaje de Marca, Tasas y CTA -->
+        <div>
+          <div class="hero-badge-pill">
+            <span class="pulsing-dot"></span>
+            <span>EXPERIENCIA OFICIAL 2026 • COMPRAS INTELIGENTES</span>
+          </div>
+          
+          <h1 class="hero-title-epic">
+            Tu tienda favorita con <span class="brand-text-facilito">Facilito</span><span class="brand-text-app">App</span> 🐒
           </h1>
-          <p class="hero-subtitle" style="font-size: 15px; color: var(--text-secondary); max-width: 550px; margin-bottom: 20px; text-align:left;">
-            Tu solución inteligente para compras en línea y punto de venta. Tan rápido, interactivo y automático... ¡que hasta nuestra mascota sabe usarlo! 💻📱
+          
+          <p class="hero-subtitle-epic">
+            Tecnología y productos al mejor precio con transparencia absoluta. Cada artículo cuenta con conversión exacta en <strong>Dólares ($)</strong> y <strong>Bolívares (Bs.)</strong> sincronizado al <strong>BCV</strong> en tiempo real.
           </p>
-          <div style="display:flex; gap:12px;">
-            <span class="badge" style="background: rgba(255,122,0,0.15); color: var(--primary); padding: 6px 12px; border-radius: 50px; font-weight:700; font-size:11px; border: 1px solid rgba(255,122,0,0.25);">🐒 Rápido</span>
-            <span class="badge" style="background: rgba(139,92,246,0.15); color: var(--secondary); padding: 6px 12px; border-radius: 50px; font-weight:700; font-size:11px; border: 1px solid rgba(139,92,246,0.25);">💻 Automático</span>
-            <span class="badge" style="background: rgba(6,182,212,0.15); color: var(--accent); padding: 6px 12px; border-radius: 50px; font-weight:700; font-size:11px; border: 1px solid rgba(6,182,212,0.25);">📱 Divertido</span>
+
+          <div class="hero-actions-row">
+            <a href="#store-catalog-anchor" class="btn-hero-primary" id="hero-cta-explore">
+              🛍️ Explorar Catálogo
+            </a>
+            <button class="btn-hero-secondary" id="hero-btn-promos">
+              🔥 Solo Disponibles
+            </button>
+            <div class="hero-rate-ticker">
+              <span>🇻🇪 BCV: <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
+            </div>
+          </div>
+
+          <!-- Métricas de Confianza -->
+          <div class="hero-trust-row">
+            <div class="hero-trust-item">
+              <span style="font-size:16px;">⭐</span>
+              <span><strong>4.9 / 5</strong> Calificación</span>
+            </div>
+            <div class="hero-trust-item">
+              <span style="font-size:16px;">🚀</span>
+              <span>Despachos en <strong>24 Horas</strong></span>
+            </div>
+            <div class="hero-trust-item">
+              <span style="font-size:16px;">🧾</span>
+              <span>Factura Digital <strong>QR</strong></span>
+            </div>
           </div>
         </div>
-        <div style="flex: 0 0 auto; margin: 0 auto; display:flex; justify-content:center; align-items:center;" class="animate-float">
-          <div style="position:relative; width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, rgba(255,122,0,0.2) 0%, transparent 70%); display:flex; justify-content:center; align-items:center;">
-            <img src="/logo.png" style="width:110px; height:110px; object-fit:contain; border-radius: 50%; border: 3px solid var(--primary); box-shadow: 0 8px 24px rgba(255,122,0,0.3); background: var(--bg-secondary);" alt="Logo FacilitoApp">
-            <span style="position:absolute; bottom:-5px; right:-5px; font-size:24px;">👋</span>
+
+        <!-- Columna Derecha: Escenario 3D con Logo y Chips Flotantes -->
+        <div class="hero-mascot-stage">
+          <div class="mascot-glow-backdrop"></div>
+          
+          <!-- Chip Flotante Superior -->
+          <div class="floating-chip top-right">
+            <span class="pulsing-dot"></span>
+            <span>⚡ Pago Móvil Inmediato</span>
+          </div>
+
+          <!-- Pod Central con Logo Oficial -->
+          <div class="mascot-card-core animate-float">
+            <img src="/logo.png" class="mascot-logo-img" alt="FacilitoApp Logo Oficial">
+          </div>
+
+          <!-- Chip Flotante Inferior Izquierdo -->
+          <div class="floating-chip bottom-left">
+            <span>🧾 Factura Digital con QR</span>
+          </div>
+
+          <!-- Chip Flotante Inferior Derecho -->
+          <div class="floating-chip bottom-right">
+            <span>💱 Doble Moneda ($ y Bs.)</span>
           </div>
         </div>
       </div>
     </section>
 
-    <div class="container store-container" style="display:flex; flex-direction:column; gap:24px;">
-      <!-- Dashboard de Búsqueda y Filtros Premium -->
+    <!-- 4 PILARES DE VALOR / BENEFICIOS (BENTO GRID) -->
+    <div class="pillars-grid animate-on-scroll animate-fade-up">
+      <div class="pillar-card">
+        <div class="pillar-icon-box blue">🚚</div>
+        <div>
+          <div class="pillar-title">Envíos Rápidos & Retiro</div>
+          <div class="pillar-desc">Entregas el mismo día en tu zona o retira sin colas en tienda física.</div>
+        </div>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon-box orange">💱</div>
+        <div>
+          <div class="pillar-title">Doble Moneda en Vivo</div>
+          <div class="pillar-desc">Precios en USD y Bolívares según la tasa oficial del día sin sobreprecios.</div>
+        </div>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon-box green">🔒</div>
+        <div>
+          <div class="pillar-title">Pagos 100% Protegidos</div>
+          <div class="pillar-desc">Aceptamos Pago Móvil, Efectivo, Binance Pay USDT y Tarjetas de débito.</div>
+        </div>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon-box gold">🧾</div>
+        <div>
+          <div class="pillar-title">Factura Digital con QR</div>
+          <div class="pillar-desc">Recibe comprobante fiscal digital descargable y verificable de inmediato.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BANNER DE CUPÓN / PROMOCIÓN -->
+    <div class="promo-coupon-strip animate-on-scroll animate-fade-up">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:22px;">🎁</span>
+        <div>
+          <span style="font-size:13.5px; font-weight:700; color:#f8fafc;">¡Ahorra en tu compra de hoy!</span>
+          <span style="font-size:12.5px; color:#94a3b8; margin-left:6px;">Usa el código de bienvenida en tu carrito:</span>
+        </div>
+        <span class="promo-coupon-badge" id="promo-code-display">BIENVENIDO</span>
+      </div>
+      <button class="promo-copy-btn" id="copy-coupon-btn" title="Copiar código al portapapeles">
+        📋 Copiar Cupón
+      </button>
+    </div>
+
+    <!-- ANCLAJE PARA DESPLAZAMIENTO SUAVE -->
+    <div id="store-catalog-anchor" style="position:relative; top:-20px;"></div>
+
+    <div class="container store-container" style="display:flex; flex-direction:column; gap:24px; padding:0;">
+      <!-- DASHBOARD DE BÚSQUEDA Y FILTROS PREMIUM -->
       <div class="store-filter-dashboard animate-on-scroll animate-fade-up visible">
-        <!-- Fila Superior: Categorías en Horizontal (Sin Envoltura) -->
+        <!-- Fila Superior: Categorías en Horizontal con Iconos -->
         <div style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 10px; overflow-x: auto; width: 100%; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); -webkit-overflow-scrolling: touch; scrollbar-width: none;">
           ${categories.map(cat => {
             const icon = categoryIcons[cat] || '📦';
             const isActive = selectedCategory === (cat === 'Todas' ? '' : cat);
             return `
               <button class="filter-category-btn-premium ${isActive ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}" style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
-                <span>${icon}</span>
+                <span style="font-size:16px;">${icon}</span>
                 <span>${cat}</span>
               </button>
             `;
@@ -771,21 +888,21 @@ function renderStoreView(): string {
         <!-- Fila Inferior: Buscador, Ordenamiento, Disponibilidad y Contador -->
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
           <!-- Buscador con icono y limpiador -->
-          <div style="position: relative; flex: 1; min-width: 260px; max-width: 400px;">
-            <input type="text" class="form-control store-search-glow" id="store-search" placeholder="🔍 Buscar productos..." value="${searchQuery}" style="padding-left: 16px; padding-right: 40px; border-radius: 50px; height: 42px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 13.5px; font-weight: 500; width: 100%;">
+          <div style="position: relative; flex: 1; min-width: 260px; max-width: 420px;">
+            <input type="text" class="form-control store-search-glow" id="store-search" placeholder="🔍 Buscar por nombre, categoría o código..." value="${searchQuery}" style="padding-left: 18px; padding-right: 40px; border-radius: 50px; height: 42px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 13.5px; font-weight: 500; width: 100%;">
             ${searchQuery ? `
               <button id="store-search-clear" class="search-clear-btn" title="Limpiar búsqueda">&times;</button>
             ` : ''}
           </div>
 
           <!-- Controles de ordenamiento y disponibilidad -->
-          <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Ordenar:</span>
               <select id="store-sort-select" class="select-premium" style="height: 38px; padding: 0 16px !important;">
                 <option value="default" ${storeSortOrder === 'default' ? 'selected' : ''}>Relevancia</option>
-                <option value="price_asc" ${storeSortOrder === 'price_asc' ? 'selected' : ''}>Menor Precio</option>
-                <option value="price_desc" ${storeSortOrder === 'price_desc' ? 'selected' : ''}>Mayor Precio</option>
+                <option value="price_asc" ${storeSortOrder === 'price_asc' ? 'selected' : ''}>Menor Precio ($)</option>
+                <option value="price_desc" ${storeSortOrder === 'price_desc' ? 'selected' : ''}>Mayor Precio ($)</option>
               </select>
             </div>
 
@@ -795,28 +912,113 @@ function renderStoreView(): string {
             </label>
             
             <!-- Contador de Resultados -->
-            <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); background: rgba(255,255,255,0.03); padding: 8px 14px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.05); white-space: nowrap;">
+            <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); background: rgba(255,255,255,0.04); padding: 8px 14px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.06); white-space: nowrap;">
               🛒 ${displayedProducts.length} ${displayedProducts.length === 1 ? 'producto' : 'productos'}
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Grid de Productos (Ancho Completo) -->
+      <!-- GRID DE PRODUCTOS (ANCHO COMPLETO) -->
       <section style="width: 100%;">
         <div class="products-grid stagger-container">
           ${productsHtml.length > 0 ? productsHtml : `
-            <div class="card text-center" style="grid-column: 1 / -1; padding: 60px; text-align: center; color: var(--text-secondary);">
-              <span style="font-size: 48px; display:block; margin-bottom:12px;">🐒🔍</span>
-              No se encontraron productos en esta categoría.
+            <div class="card text-center" style="grid-column: 1 / -1; padding: 60px 20px; text-align: center; color: var(--text-secondary); background: rgba(18,24,39,0.5); border-radius:24px; border:1px solid rgba(255,255,255,0.06);">
+              <span style="font-size: 52px; display:block; margin-bottom:14px;">🐒🔍</span>
+              <h3 style="color:#ffffff; font-size:18px; font-weight:700; margin-bottom:6px;">No encontramos productos con esos filtros</h3>
+              <p style="font-size:13px; color:var(--text-muted); max-width:400px; margin:0 auto 16px;">Prueba ajustando el término de búsqueda o cambiando la categoría seleccionada.</p>
+              <button class="btn btn-secondary" id="reset-store-filters-btn" style="border-radius:50px; padding:8px 20px; font-size:13px;">
+                Ver todos los productos
+              </button>
             </div>
           `}
         </div>
       </section>
+
+      <!-- RIBBON DE MÉTODOS DE PAGO Y CONFIANZA -->
+      <div class="payment-trust-ribbon animate-on-scroll animate-fade-up">
+        <div style="font-size:14px; font-weight:700; color:#f8fafc; letter-spacing:0.3px;">
+          Aceptamos tus métodos de pago preferidos con total seguridad:
+        </div>
+        <div class="payment-badges-row">
+          <div class="payment-method-pill">
+            <span>💵</span>
+            <span>Efectivo ($ / € / Bs.)</span>
+          </div>
+          <div class="payment-method-pill">
+            <span>📲</span>
+            <span>Pago Móvil (Todos los Bancos)</span>
+          </div>
+          <div class="payment-method-pill">
+            <span>🟡</span>
+            <span>Binance Pay USDT</span>
+          </div>
+          <div class="payment-method-pill">
+            <span>💳</span>
+            <span>Tarjetas de Débito / Crédito</span>
+          </div>
+          <div class="payment-method-pill">
+            <span>🏦</span>
+            <span>Transferencias Inmediatas</span>
+          </div>
+          <div class="payment-method-pill" style="border-color:rgba(16,185,129,0.3); color:#34d399;">
+            <span>🛡️</span>
+            <span>Facturación Inmediata QR</span>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 }
+
 function bindStoreEvents() {
+  // Desplazamiento suave al catálogo desde el botón hero
+  document.getElementById('hero-cta-explore')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const target = document.getElementById('store-catalog-anchor');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+
+  // Botón "Solo Disponibles" en el hero
+  document.getElementById('hero-btn-promos')?.addEventListener('click', () => {
+    storeOnlyAvailable = !storeOnlyAvailable;
+    renderApp();
+    document.getElementById('store-catalog-anchor')?.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  // Copiar cupón promocional con feedback visual
+  document.getElementById('copy-coupon-btn')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText('BIENVENIDO');
+      const btn = document.getElementById('copy-coupon-btn');
+      if (btn) {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✅ ¡Copiado!';
+        btn.style.background = '#10b981';
+        btn.style.borderColor = '#10b981';
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          btn.style.background = '';
+          btn.style.borderColor = '';
+        }, 2000);
+      }
+    } catch {
+      alert('Código del cupón: BIENVENIDO (Escríbelo en tu carrito para obtener tu descuento)');
+    }
+  });
+
+  // Resetear filtros si no hay resultados
+  document.getElementById('reset-store-filters-btn')?.addEventListener('click', async () => {
+    searchQuery = '';
+    selectedCategory = '';
+    storeOnlyAvailable = false;
+    storeSortOrder = 'default';
+    await loadProducts();
+    renderApp();
+  });
+
   // Buscador con debounce
   let searchTimeout: any;
   const searchInput = document.getElementById('store-search') as HTMLInputElement;
