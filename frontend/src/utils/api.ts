@@ -178,11 +178,15 @@ export interface StatsData {
     profitMargin?: number;
     averageOrderValue: number;
     lowStockCount: number;
+    totalCustomers?: number;
+    debtorsCount?: number;
+    pendingDebt?: number;
   };
   dailySales: { date: string; count: number; revenue: number }[];
   paymentMethods: { payment_method: string; count: number; revenue: number }[];
   salesTypes: { type: string; count: number; revenue: number }[];
-  topProducts: { name: string; total_quantity: number; total_revenue: number }[];
+  topProducts: { name: string; category?: string; total_quantity: number; total_revenue: number }[];
+  categorySales?: { category: string; order_count: number; total_quantity: number; total_revenue: number }[];
   lowStockProducts: Product[];
 }
 

@@ -32,14 +32,14 @@ router.get('/', authenticate, isAdmin, async (_req: AuthRequest, res: Response) 
     const totalProfit = totalRevenue - totalExpenses;
     const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0;
 
-    // 2. Ventas por los últimos 7 días
+    // 2. Ventas por los últimos 14 días
     const [dailySales]: any = await pool.query(`
       SELECT 
         DATE_FORMAT(created_at, '%Y-%m-%d') as date,
         COUNT(*) as count,
-        SUM(total) as revenue
+        COALESCE(SUM(total), 0) as revenue
       FROM sales
-      WHERE status = 'completed' AND created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      WHERE status = 'completed' AND created_at >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
       GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
       ORDER BY date ASC
     `);
@@ -49,7 +49,7 @@ router.get('/', authenticate, isAdmin, async (_req: AuthRequest, res: Response) 
       SELECT 
         payment_method,
         COUNT(*) as count,
-        SUM(total) as revenue
+        COALESCE(SUM(total), 0) as revenue
       FROM sales
       WHERE status = 'completed'
       GROUP BY payment_method
@@ -60,46 +60,83 @@ router.get('/', authenticate, isAdmin, async (_req: AuthRequest, res: Response) 
       SELECT 
         type,
         COUNT(*) as count,
-        SUM(total) as revenue
+        COALESCE(SUM(total), 0) as revenue
       FROM sales
       WHERE status = 'completed'
       GROUP BY type
     `);
 
-    // 5. Los 5 productos más vendidos
+    // 5. Los 6 productos más vendidos con su categoría
     const [topProducts]: any = await pool.query(`
       SELECT 
         p.name,
+        COALESCE(p.category, 'General') as category,
         SUM(si.quantity) as total_quantity,
         SUM(si.quantity * si.price) as total_revenue
       FROM sale_items si
       JOIN products p ON si.product_id = p.id
       JOIN sales s ON si.sale_id = s.id
       WHERE s.status = 'completed'
-      GROUP BY p.id
-      ORDER BY total_quantity DESC
-      LIMIT 5
+      GROUP BY p.id, p.name, p.category
+      ORDER BY total_revenue DESC
+      LIMIT 6
     `);
 
-    // 6. Alertas de productos con stock bajo (detalle)
+    // 6. Ventas por categoría
+    const [categorySales]: any = await pool.query(`
+      SELECT 
+        COALESCE(p.category, 'General') as category,
+        COUNT(DISTINCT s.id) as order_count,
+        SUM(si.quantity) as total_quantity,
+        COALESCE(SUM(si.quantity * si.price), 0) as total_revenue
+      FROM sale_items si
+      JOIN products p ON si.product_id = p.id
+      JOIN sales s ON si.sale_id = s.id
+      WHERE s.status = 'completed'
+      GROUP BY p.category
+      ORDER BY total_revenue DESC
+      LIMIT 6
+    `);
+
+    // 7. Resumen de clientes y cuentas por cobrar (deudores)
+    const [custResult]: any = await pool.query(`
+      SELECT COUNT(*) as total_customers FROM users WHERE role = 'customer'
+    `);
+    const totalCustomers = Number(custResult[0]?.total_customers || 0);
+
+    const [debtResult]: any = await pool.query(`
+      SELECT 
+        COUNT(*) as debtors_count,
+        COALESCE(SUM(total - amount_paid), 0) as total_pending_debt
+      FROM sales 
+      WHERE status = 'pending' AND is_quotation = 0 AND amount_paid < total
+    `);
+    const debtorsCount = Number(debtResult[0]?.debtors_count || 0);
+    const pendingDebt = Number(debtResult[0]?.total_pending_debt || 0);
+
+    // 8. Alertas de productos con stock bajo (detalle)
     const [lowStockProducts]: any = await pool.query(`
       SELECT id, name, stock, price, category FROM products WHERE stock < 5 ORDER BY stock ASC LIMIT 10
     `);
 
     res.json({
       metrics: {
-        totalOrders: summary.total_orders,
+        totalOrders: Number(summary.total_orders || 0),
         totalRevenue,
         totalExpenses,
         totalProfit,
         profitMargin,
-        averageOrderValue: Number(summary.average_order_value),
-        lowStockCount
+        averageOrderValue: Number(summary.average_order_value || 0),
+        lowStockCount,
+        totalCustomers,
+        debtorsCount,
+        pendingDebt
       },
       dailySales,
       paymentMethods,
       salesTypes,
       topProducts,
+      categorySales,
       lowStockProducts
     });
   } catch (error) {

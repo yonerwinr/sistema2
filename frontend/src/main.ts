@@ -213,6 +213,9 @@ let posPaymentLines: POSPaymentLine[] = [
 // Instancias de Chart.js para destruirlas al cambiar de pestaña
 let revenueChartInstance: Chart | null = null;
 let paymentChartInstance: Chart | null = null;
+let salesChannelChartInstance: Chart | null = null;
+let topProductsChartInstance: Chart | null = null;
+let categoryChartInstance: Chart | null = null;
 
 // ==========================================================================
 // ICONOS SVG COMPARTIDOS (Premium & Sleek)
@@ -453,6 +456,18 @@ function destroyCharts() {
   if (paymentChartInstance) {
     paymentChartInstance.destroy();
     paymentChartInstance = null;
+  }
+  if (salesChannelChartInstance) {
+    salesChannelChartInstance.destroy();
+    salesChannelChartInstance = null;
+  }
+  if (topProductsChartInstance) {
+    topProductsChartInstance.destroy();
+    topProductsChartInstance = null;
+  }
+  if (categoryChartInstance) {
+    categoryChartInstance.destroy();
+    categoryChartInstance = null;
   }
 }
 
@@ -3073,144 +3088,348 @@ async function bindAdminEvents() {
 // ==========================================================================
 // SUB-VISTA: ESTADÍSTICAS DEL DASHBOARD (CHART.JS)
 // ==========================================================================
+// SUB-VISTA: ESTADÍSTICAS Y ANALÍTICA EJECUTIVA (DASHBOARD ADMIN)
+// ==========================================================================
 async function renderAdminStats() {
   const panel = document.getElementById('dashboard-content-panel');
   if (!panel) return;
 
+  destroyCharts();
+
   try {
+    panel.innerHTML = `
+      <div class="text-center" style="padding: 60px 20px;">
+        <div class="animate-spin" style="display: inline-block; width: 36px; height: 36px; border: 3px solid rgba(255,122,0,0.2); border-top-color: var(--primary); border-radius: 50%;"></div>
+        <div style="margin-top: 14px; font-weight: 600; color: var(--text-muted); font-size: 14px;">Cargando analítica y gráficos en tiempo real...</div>
+      </div>
+    `;
+
     const data = await api.stats.getDashboard();
+
+    const revUsd = Number(data.metrics.totalRevenue || 0);
+    const revVes = revUsd * (rateUsdToVes || 40);
+    const profitUsd = Number(data.metrics.totalProfit || 0);
+    const profitVes = profitUsd * (rateUsdToVes || 40);
+    const expUsd = Number(data.metrics.totalExpenses || 0);
+    const expVes = expUsd * (rateUsdToVes || 40);
+    const aovUsd = Number(data.metrics.averageOrderValue || 0);
+    const aovVes = aovUsd * (rateUsdToVes || 40);
+    const margin = Number(data.metrics.profitMargin || 0);
+    const pendingDebtUsd = Number(data.metrics.pendingDebt || 0);
+    const pendingDebtVes = pendingDebtUsd * (rateUsdToVes || 40);
+
+    // Cálculos para canales de venta (POS vs Online)
+    const posType = data.salesTypes.find(t => t.type === 'pos');
+    const onlineType = data.salesTypes.find(t => t.type === 'online');
+    const posRevenue = Number(posType?.revenue || 0);
+    const onlineRevenue = Number(onlineType?.revenue || 0);
+    const posCount = Number(posType?.count || 0);
+    const onlineCount = Number(onlineType?.count || 0);
+    const totalChannelRev = (posRevenue + onlineRevenue) || 1;
+    const posPct = ((posRevenue / totalChannelRev) * 100).toFixed(1);
+    const onlinePct = ((onlineRevenue / totalChannelRev) * 100).toFixed(1);
+
+    // Categorías con ventas
+    const categories = data.categorySales || [];
+    const maxProdRev = Math.max(...data.topProducts.map(p => Number(p.total_revenue || 0)), 1);
 
     panel.innerHTML = `
       <div class="animate-on-scroll animate-fade-up visible">
-        <h2 class="mb-4" style="font-size:26px; font-weight:800;">Estadisticas de Ventas</h2>
-
-        <!-- Cards Metricas -->
-        <div class="metrics-grid stagger-container" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-          <div class="card metric-card">
-            <div class="metric-header">
-              <span>Ingresos Totales</span>
-              <span>💰</span>
+        <!-- Header Ejecutivo del Dashboard -->
+        <div class="dashboard-executive-header">
+          <div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <h2 style="font-size:24px; font-weight:800; letter-spacing:-0.5px; margin:0;">Panel de Control y Analítica 🚀</h2>
+              <span class="kpi-badge" style="background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3);">
+                <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
+                EN VIVO
+              </span>
             </div>
-            <div class="metric-value">$${Number(data.metrics.totalRevenue || 0).toFixed(2)}</div>
-            <div class="metric-footer">Facturado en ventas completadas</div>
+            <p style="font-size:12px; color:var(--text-muted); margin-top:4px; margin-bottom:0;">
+              Métricas consolidadas de facturación • Tasas del día: <strong>USD: Bs. ${formatRate(rateUsdToVes)}</strong> | <strong>Binance: Bs. ${formatRate(rateBinanceToVes)}</strong>
+            </p>
           </div>
 
-          <div class="card metric-card" style="border-color: rgba(16, 185, 129, 0.4);">
-            <div class="metric-header">
-              <span style="color:#10b981;">Ganancia Neta Est.</span>
-              <span>📈</span>
-            </div>
-            <div class="metric-value" style="color:#10b981;">$${Number(data.metrics.totalProfit || 0).toFixed(2)}</div>
-            <div class="metric-footer" style="display:flex; justify-content:space-between; align-items:center;">
-              <span>Ingresos - Gastos</span>
-              <span class="badge" style="background:rgba(16, 185, 129, 0.15); color:#34d399; font-weight:800; font-size:10px;">${Number(data.metrics.profitMargin || 0).toFixed(1)}% Margen</span>
-            </div>
-          </div>
-
-          <div class="card metric-card" style="border-color: rgba(239, 68, 68, 0.3);">
-            <div class="metric-header">
-              <span style="color:#f87171;">Gastos Totales</span>
-              <span>💼</span>
-            </div>
-            <div class="metric-value" style="color:#f87171;">$${Number(data.metrics.totalExpenses || 0).toFixed(2)}</div>
-            <div class="metric-footer">Egresos operativos registrados</div>
-          </div>
-
-          <div class="card metric-card">
-            <div class="metric-header">
-              <span>Transacciones</span>
-              <span>📦</span>
-            </div>
-            <div class="metric-value">${data.metrics.totalOrders}</div>
-            <div class="metric-footer">Ventas exitosas registradas</div>
-          </div>
-
-          <div class="card metric-card">
-            <div class="metric-header">
-              <span>Ticket Promedio</span>
-              <span>📊</span>
-            </div>
-            <div class="metric-value">$${Number(data.metrics.averageOrderValue || 0).toFixed(2)}</div>
-            <div class="metric-footer">Promedio por cliente</div>
-          </div>
-
-          <div class="card metric-card" style="${data.metrics.lowStockCount > 0 ? 'border-color: rgba(239, 68, 68, 0.4);' : ''}">
-            <div class="metric-header">
-              <span>Alertas Stock Bajo</span>
-              <span style="color:var(--danger)">⚠</span>
-            </div>
-            <div class="metric-value" style="${data.metrics.lowStockCount > 0 ? 'color:var(--danger)' : ''}">
-              ${data.metrics.lowStockCount}
-            </div>
-            <div class="metric-footer">Productos con menos de 5 unid.</div>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <button class="btn btn-secondary" id="refresh-dashboard-btn" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; font-size:12px; font-weight:600; cursor:pointer;">
+              <svg id="refresh-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span>Actualizar</span>
+            </button>
+            <button class="btn btn-primary" id="goto-reports-btn" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; font-size:12px; font-weight:700; cursor:pointer;">
+              <span>📑 Reportes Filtrables</span>
+            </button>
           </div>
         </div>
 
-        <!-- Graficos -->
-        <div class="charts-grid">
-          <div class="card chart-card">
-            <h3 class="mb-4" style="font-size: 16px; font-weight:700;">Ingresos en los últimos 7 días</h3>
+        <!-- 6 Tarjetas KPIs Principales -->
+        <div class="metrics-grid stagger-container" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 24px;">
+          <!-- 1. Ingresos Totales -->
+          <div class="card metric-card" style="border-top: 3px solid #6366f1;">
+            <div class="metric-header">
+              <span>Ingresos Brutos</span>
+              <span style="font-size:18px;">💵</span>
+            </div>
+            <div class="metric-value" style="color:#ffffff;">$${revUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div style="font-size:11px; font-weight:600; color:var(--text-muted); margin-top:2px;">≈ Bs. ${revVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div class="metric-footer" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <span>${data.metrics.totalOrders} ventas completadas</span>
+              <span class="badge" style="background:rgba(99,102,241,0.15); color:#818cf8; font-size:10px; font-weight:700;">Bruto</span>
+            </div>
+          </div>
+
+          <!-- 2. Ganancia Neta -->
+          <div class="card metric-card" style="border-top: 3px solid #10b981;">
+            <div class="metric-header">
+              <span style="color:#10b981;">Ganancia Neta</span>
+              <span style="font-size:18px;">📈</span>
+            </div>
+            <div class="metric-value" style="color:#34d399;">$${profitUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div style="font-size:11px; font-weight:600; color:var(--text-muted); margin-top:2px;">≈ Bs. ${profitVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div class="metric-footer" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <span>Ingresos - Gastos</span>
+              <span class="badge" style="background:rgba(16, 185, 129, 0.15); color:#34d399; font-weight:800; font-size:10px;">${margin.toFixed(1)}% Margen</span>
+            </div>
+          </div>
+
+          <!-- 3. Gastos Operativos -->
+          <div class="card metric-card" style="border-top: 3px solid #ef4444;">
+            <div class="metric-header">
+              <span style="color:#f87171;">Gastos Totales</span>
+              <span style="font-size:18px;">💼</span>
+            </div>
+            <div class="metric-value" style="color:#f87171;">$${expUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div style="font-size:11px; font-weight:600; color:var(--text-muted); margin-top:2px;">≈ Bs. ${expVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div class="metric-footer" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <span>${revUsd > 0 ? ((expUsd / revUsd) * 100).toFixed(1) : 0}% del ingreso</span>
+              <span class="badge" style="background:rgba(239, 68, 68, 0.15); color:#f87171; font-size:10px; font-weight:700;">Egresos</span>
+            </div>
+          </div>
+
+          <!-- 4. Ticket Promedio (AOV) -->
+          <div class="card metric-card" style="border-top: 3px solid #f59e0b;">
+            <div class="metric-header">
+              <span>Ticket Promedio</span>
+              <span style="font-size:18px;">🎯</span>
+            </div>
+            <div class="metric-value">$${aovUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div style="font-size:11px; font-weight:600; color:var(--text-muted); margin-top:2px;">≈ Bs. ${aovVes.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div class="metric-footer" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <span>Gasto medio por cliente</span>
+              <span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; font-size:10px; font-weight:700;">AOV</span>
+            </div>
+          </div>
+
+          <!-- 5. Clientes y Cuentas por Cobrar -->
+          <div class="card metric-card" style="border-top: 3px solid #06b6d4;">
+            <div class="metric-header">
+              <span>Clientes y Créditos</span>
+              <span style="font-size:18px;">👥</span>
+            </div>
+            <div class="metric-value">${data.metrics.totalCustomers || 0} <span style="font-size:14px; font-weight:500; color:var(--text-muted);">registrados</span></div>
+            <div style="font-size:11px; font-weight:600; color:${pendingDebtUsd > 0 ? '#f87171' : 'var(--text-muted)'}; margin-top:2px;">
+              ${pendingDebtUsd > 0 ? `⚠️ Por cobrar: $${pendingDebtUsd.toFixed(2)} (Bs. ${pendingDebtVes.toFixed(2)})` : '✓ Sin cuentas pendientes'}
+            </div>
+            <div class="metric-footer" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <span>${data.metrics.debtorsCount || 0} facturas a crédito</span>
+              ${pendingDebtUsd > 0 ? `<a href="#" id="goto-debtors-link" style="color:#38bdf8; font-weight:700; font-size:11px; text-decoration:none;">Cobrar →</a>` : ''}
+            </div>
+          </div>
+
+          <!-- 6. Alertas de Inventario -->
+          <div class="card metric-card" style="border-top: 3px solid ${data.metrics.lowStockCount > 0 ? '#ef4444' : '#10b981'};">
+            <div class="metric-header">
+              <span style="color:${data.metrics.lowStockCount > 0 ? 'var(--danger)' : '#10b981'};">Inventario Crítico</span>
+              <span style="font-size:18px;">${data.metrics.lowStockCount > 0 ? '⚠️' : '✅'}</span>
+            </div>
+            <div class="metric-value" style="color:${data.metrics.lowStockCount > 0 ? 'var(--danger)' : '#34d399'};">
+              ${data.metrics.lowStockCount} <span style="font-size:14px; font-weight:500; color:var(--text-muted);">alertas</span>
+            </div>
+            <div style="font-size:11px; font-weight:600; color:var(--text-muted); margin-top:2px;">
+              ${data.metrics.lowStockCount > 0 ? 'Menos de 5 unidades en stock' : 'Stock en niveles óptimos'}
+            </div>
+            <div class="metric-footer" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <span>Salud del catálogo</span>
+              <span class="badge" style="background:${data.metrics.lowStockCount > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'}; color:${data.metrics.lowStockCount > 0 ? '#f87171' : '#34d399'}; font-size:10px; font-weight:700;">
+                ${data.metrics.lowStockCount > 0 ? 'Reponer' : 'Óptimo'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fila 1 de Gráficos: Tendencia Diaria (2fr) + Canales POS vs Online (1fr) -->
+        <div class="charts-executive-grid">
+          <!-- Gráfico 1: Evolución Temporal de Ingresos -->
+          <div class="chart-card-executive">
+            <div class="chart-card-header">
+              <div>
+                <div class="chart-card-title">
+                  <span>📈 Evolución de Ingresos y Tendencia Diaria</span>
+                </div>
+                <div class="chart-card-subtitle">Histórico de facturación en los últimos 14 días</div>
+              </div>
+              <span class="kpi-badge" style="background:rgba(99,102,241,0.15); color:#818cf8; border:1px solid rgba(99,102,241,0.3);">
+                ${data.dailySales.length} Días activos
+              </span>
+            </div>
             <div class="chart-container" style="position: relative; height: 280px; width: 100%;">
               <canvas id="revenueChart"></canvas>
             </div>
           </div>
-          <div class="card chart-card">
-            <h3 class="mb-4" style="font-size: 16px; font-weight:700;">Metodos de Pago</h3>
-            <div class="chart-container" style="position: relative; height: 280px; width: 100%;">
-              <canvas id="paymentChart"></canvas>
+
+          <!-- Gráfico 2: Canales de Venta (POS vs Tienda Online) -->
+          <div class="chart-card-executive">
+            <div class="chart-card-header">
+              <div>
+                <div class="chart-card-title">
+                  <span>🏬 Canales de Venta</span>
+                </div>
+                <div class="chart-card-subtitle">Caja Mostrador (POS) vs Tienda Online</div>
+              </div>
+            </div>
+            <div class="chart-container" style="position: relative; height: 220px; width: 100%;">
+              <canvas id="salesChannelChart"></canvas>
+            </div>
+            <div style="display:flex; justify-content:space-around; align-items:center; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.06); font-size:12px;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#6366f1;"></span>
+                <span><strong>POS:</strong> $${posRevenue.toFixed(2)} (${posCount} ped. - ${posPct}%)</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#06b6d4;"></span>
+                <span><strong>Online:</strong> $${onlineRevenue.toFixed(2)} (${onlineCount} ped. - ${onlinePct}%)</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Secciones Inferiores (Tablas Rápidas) -->
-        <div class="grid-2">
-          <!-- Top Productos -->
-          <div class="card">
-            <h3 class="mb-2" style="font-size: 16px; font-weight:700;">Top 5 Productos Mas Vendidos</h3>
-            <div class="table-responsive">
-              <table class="table-custom">
-                <thead>
-                  <tr>
-                    <th>Producto</th>
-                    <th class="text-center">Cantidad</th>
-                    <th class="text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${data.topProducts.map(prod => `
-                    <tr>
-                      <td><strong>${prod.name}</strong></td>
-                      <td class="text-center">${prod.total_quantity}</td>
-                      <td class="text-right" style="color: var(--primary); font-weight:600;">$${Number(prod.total_revenue).toFixed(2)}</td>
-                    </tr>
-                  `).join('')}
-                  ${data.topProducts.length === 0 ? '<tr><td colspan="3" class="text-center">Sin datos de ventas</td></tr>' : ''}
-                </tbody>
-              </table>
+        <!-- Fila 2 de Gráficos: Métodos de Pago + Top Productos + Categorías -->
+        <div class="charts-row-secondary">
+          <!-- Gráfico 3: Métodos de Pago -->
+          <div class="chart-card-executive">
+            <div class="chart-card-header">
+              <div>
+                <div class="chart-card-title">
+                  <span>💳 Métodos de Pago</span>
+                </div>
+                <div class="chart-card-subtitle">Volumen recaudado por método</div>
+              </div>
+            </div>
+            <div class="chart-container" style="position: relative; height: 260px; width: 100%;">
+              <canvas id="paymentChart"></canvas>
             </div>
           </div>
 
-          <!-- Alertas Stock Bajo -->
-          <div class="card">
-            <h3 class="mb-2" style="font-size: 16px; font-weight:700; color:var(--warning);">Inventario Stock Bajo</h3>
+          <!-- Gráfico 4: Top Productos Líderes -->
+          <div class="chart-card-executive">
+            <div class="chart-card-header">
+              <div>
+                <div class="chart-card-title">
+                  <span>⭐ Productos Más Vendidos</span>
+                </div>
+                <div class="chart-card-subtitle">Recaudación en dólares por producto</div>
+              </div>
+            </div>
+            <div class="chart-container" style="position: relative; height: 260px; width: 100%;">
+              <canvas id="topProductsChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico 5: Ventas por Categoría -->
+          <div class="chart-card-executive">
+            <div class="chart-card-header">
+              <div>
+                <div class="chart-card-title">
+                  <span>🏷️ Demanda por Categoría</span>
+                </div>
+                <div class="chart-card-subtitle">Facturación por departamento</div>
+              </div>
+            </div>
+            <div class="chart-container" style="position: relative; height: 260px; width: 100%;">
+              <canvas id="categoryChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tablas de Detalle y Monitoreo -->
+        <div class="grid-2" style="margin-top:24px;">
+          <!-- Podio de Productos Estrella -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <div>
+                <h3 style="font-size:16px; font-weight:800; margin:0;">🏆 Ranking de Productos Estrella</h3>
+                <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Top artículos con mayor impacto en ventas</div>
+              </div>
+              <button class="btn btn-secondary" id="goto-products-btn" style="padding:4px 10px; font-size:11px; font-weight:600; cursor:pointer;">Ver Catálogo</button>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              ${data.topProducts.map((prod, idx) => {
+                const pct = Math.min(100, Math.round((Number(prod.total_revenue) / maxProdRev) * 100));
+                const rankClass = idx === 0 ? 'rank-1' : (idx === 1 ? 'rank-2' : (idx === 2 ? 'rank-3' : 'rank-other'));
+                return `
+                  <div style="display:flex; flex-direction:column; padding:10px 12px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <span class="rank-badge ${rankClass}">${idx + 1}</span>
+                        <div>
+                          <div style="font-weight:700; font-size:13px; color:var(--text-primary);">${prod.name}</div>
+                          <div style="font-size:11px; color:var(--text-muted);">${prod.category || 'General'} • <strong>${prod.total_quantity}</strong> unid. vendidas</div>
+                        </div>
+                      </div>
+                      <div style="text-align:right;">
+                        <div style="font-weight:800; color:var(--primary); font-size:14px;">$${Number(prod.total_revenue).toFixed(2)}</div>
+                        <div style="font-size:10px; color:var(--text-muted);">≈ Bs. ${(Number(prod.total_revenue) * (rateUsdToVes || 40)).toFixed(2)}</div>
+                      </div>
+                    </div>
+                    <div class="bar-progress-container">
+                      <div class="bar-progress-fill" style="width: ${pct}%;"></div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+              ${data.topProducts.length === 0 ? '<div class="text-center" style="padding:20px; color:var(--text-muted);">No hay ventas registradas todavía</div>' : ''}
+            </div>
+          </div>
+
+          <!-- Alertas de Stock Crítico -->
+          <div class="card" style="padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <div>
+                <h3 style="font-size:16px; font-weight:800; margin:0; color:${data.metrics.lowStockCount > 0 ? '#f87171' : 'var(--text-primary)'};">
+                  ⚠️ Inventario Crítico por Reabastecer
+                </h3>
+                <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Artículos que requieren reposición inmediata</div>
+              </div>
+              <span class="badge" style="background:${data.metrics.lowStockCount > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'}; color:${data.metrics.lowStockCount > 0 ? '#f87171' : '#34d399'}; font-weight:700; font-size:11px;">
+                ${data.metrics.lowStockCount} por reponer
+              </span>
+            </div>
+
             <div class="table-responsive">
               <table class="table-custom">
                 <thead>
                   <tr>
                     <th>Producto</th>
-                    <th>Categoria</th>
+                    <th>Categoría</th>
                     <th class="text-center">Stock</th>
+                    <th class="text-right">Precio</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${data.lowStockProducts.map(prod => `
                     <tr>
                       <td><strong>${prod.name}</strong></td>
-                      <td>${prod.category || 'General'}</td>
-                      <td class="text-center" style="color:var(--danger); font-weight:700;">${prod.stock}</td>
+                      <td><span style="font-size:11px; padding:2px 8px; border-radius:4px; background:rgba(255,255,255,0.05);">${prod.category || 'General'}</span></td>
+                      <td class="text-center">
+                        <span style="display:inline-flex; align-items:center; gap:4px; font-weight:800; color:${prod.stock <= 2 ? '#ef4444' : '#f59e0b'};">
+                          <span style="width:6px; height:6px; border-radius:50%; background:${prod.stock <= 2 ? '#ef4444' : '#f59e0b'};"></span>
+                          ${prod.stock} unid.
+                        </span>
+                      </td>
+                      <td class="text-right" style="font-weight:700; color:var(--text-primary);">$${Number(prod.price).toFixed(2)}</td>
                     </tr>
                   `).join('')}
-                  ${data.lowStockProducts.length === 0 ? '<tr><td colspan="3" class="text-center" style="color:var(--success)">Todo el inventario esta al dia</td></tr>' : ''}
+                  ${data.lowStockProducts.length === 0 ? '<tr><td colspan="4" class="text-center" style="color:#10b981; padding:24px 0;">🎉 Todo el inventario se encuentra al día. No hay productos críticos.</td></tr>' : ''}
                 </tbody>
               </table>
             </div>
@@ -3219,64 +3438,297 @@ async function renderAdminStats() {
       </div>
     `;
 
-    // Inicializar Gráfico de Ingresos (Línea)
-    const ctxRevenue = document.getElementById('revenueChart') as HTMLCanvasElement;
-    if (ctxRevenue) {
-      const dates = data.dailySales.map(d => d.date);
-      const revenues = data.dailySales.map(d => Number(d.revenue));
-      
-      revenueChartInstance = new Chart(ctxRevenue, {
+    // ========================================================================
+    // INICIALIZACIÓN DE LOS 5 GRÁFICOS (CHART.JS)
+    // ========================================================================
+
+    // 1. Gráfico de Evolución de Ingresos (Línea con Gradiente Luminoso)
+    const ctxRevCanvas = document.getElementById('revenueChart') as HTMLCanvasElement;
+    if (ctxRevCanvas) {
+      const dates = data.dailySales.map(d => {
+        const p = d.date.split('-');
+        return p.length === 3 ? `${p[2]}/${p[1]}` : d.date;
+      });
+      const revenues = data.dailySales.map(d => Number(d.revenue || 0));
+      const orderCounts = data.dailySales.map(d => Number(d.count || 0));
+
+      const ctx = ctxRevCanvas.getContext('2d');
+      let gradient: any = 'rgba(99, 102, 241, 0.15)';
+      if (ctx) {
+        gradient = ctx.createLinearGradient(0, 0, 0, 260);
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.45)');
+        gradient.addColorStop(0.7, 'rgba(139, 92, 246, 0.12)');
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+      }
+
+      revenueChartInstance = new Chart(ctxRevCanvas, {
         type: 'line',
         data: {
-          labels: dates.length > 0 ? dates : ['Sin Datos'],
+          labels: dates.length > 0 ? dates : ['Hoy'],
           datasets: [{
             label: 'Ingresos ($)',
             data: revenues.length > 0 ? revenues : [0],
-            borderColor: '#6366f1',
-            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            borderColor: '#818cf8',
+            borderWidth: 3,
+            backgroundColor: gradient,
             fill: true,
-            tension: 0.4,
-            borderWidth: 3
+            tension: 0.35,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#ffffff',
+            pointBorderColor: '#6366f1',
+            pointBorderWidth: 2
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              titleColor: '#ffffff',
+              bodyColor: '#e2e8f0',
+              borderColor: 'rgba(99, 102, 241, 0.3)',
+              borderWidth: 1,
+              padding: 12,
+              displayColors: false,
+              callbacks: {
+                label: (context) => {
+                  const val = context.parsed.y || 0;
+                  const idx = context.dataIndex;
+                  const cnt = orderCounts[idx] || 0;
+                  return [`Facturado: $${val.toFixed(2)} USD`, `Ventas: ${cnt} pedidos`];
+                }
+              }
+            }
+          },
           scales: {
-            y: { grid: { color: 'rgba(255, 255, 255, 0.05)' } },
-            x: { grid: { display: false } }
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: {
+                color: '#94a3b8',
+                callback: (v) => `$${v}`
+              }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8' }
+            }
           }
         }
       });
     }
 
-    // Inicializar Gráfico de Métodos de Pago (Doughnut)
-    const ctxPayment = document.getElementById('paymentChart') as HTMLCanvasElement;
-    if (ctxPayment) {
-      const methods = data.paymentMethods.map(m => m.payment_method.toUpperCase());
-      const counts = data.paymentMethods.map(m => m.count);
-
-      paymentChartInstance = new Chart(ctxPayment, {
+    // 2. Gráfico de Canales de Venta (POS vs Tienda Online - Donut)
+    const ctxChannelCanvas = document.getElementById('salesChannelChart') as HTMLCanvasElement;
+    if (ctxChannelCanvas) {
+      salesChannelChartInstance = new Chart(ctxChannelCanvas, {
         type: 'doughnut',
         data: {
-          labels: methods.length > 0 ? methods : ['Efectivo', 'Tarjeta', 'Transferencia'],
+          labels: ['Caja Mostrador (POS)', 'Tienda Online (Web)'],
           datasets: [{
-            data: counts.length > 0 ? counts : [0, 0, 0],
-            backgroundColor: ['#10b981', '#6366f1', '#a855f7'],
+            data: (posRevenue > 0 || onlineRevenue > 0) ? [posRevenue, onlineRevenue] : [1, 0],
+            backgroundColor: ['#6366f1', '#06b6d4'],
+            hoverBackgroundColor: ['#4f46e5', '#0891b2'],
             borderWidth: 0
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom' } }
+          cutout: '72%',
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#e2e8f0', font: { size: 11 } } },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              padding: 10,
+              callbacks: {
+                label: (context) => {
+                  const val = context.parsed || 0;
+                  const total = (posRevenue + onlineRevenue) || 1;
+                  const pct = ((val / total) * 100).toFixed(1);
+                  return ` $${val.toFixed(2)} (${pct}%)`;
+                }
+              }
+            }
+          }
         }
       });
     }
 
-  } catch (error) {
-    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar estadisticas del servidor.</div>`;
+    // 3. Gráfico de Métodos de Pago (Donut Multicolor)
+    const ctxPaymentCanvas = document.getElementById('paymentChart') as HTMLCanvasElement;
+    if (ctxPaymentCanvas) {
+      const methodLabelsMap: Record<string, string> = {
+        'cash': 'Efectivo $',
+        'card': 'Tarjeta / Débito',
+        'transfer': 'Transferencia / Móvil',
+        'binance': 'Binance Pay',
+        'pos': 'Caja Directa',
+        'online': 'Pago Web'
+      };
+
+      const labels = data.paymentMethods.map(m => methodLabelsMap[m.payment_method.toLowerCase()] || m.payment_method.toUpperCase());
+      const revenues = data.paymentMethods.map(m => Number(m.revenue || 0));
+      const palette = ['#10b981', '#6366f1', '#a855f7', '#f59e0b', '#06b6d4', '#ec4899', '#3b82f6'];
+
+      paymentChartInstance = new Chart(ctxPaymentCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: labels.length > 0 ? labels : ['Sin Datos'],
+          datasets: [{
+            data: revenues.length > 0 ? revenues : [1],
+            backgroundColor: palette.slice(0, Math.max(labels.length, 1)),
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '68%',
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#e2e8f0', font: { size: 11 } } },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              padding: 10,
+              callbacks: {
+                label: (context) => ` $${(context.parsed || 0).toFixed(2)}`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 4. Gráfico de Top Productos (Barras Horizontales)
+    const ctxTopCanvas = document.getElementById('topProductsChart') as HTMLCanvasElement;
+    if (ctxTopCanvas) {
+      const prodLabels = data.topProducts.map(p => p.name.length > 18 ? `${p.name.substring(0, 18)}...` : p.name);
+      const prodRevenues = data.topProducts.map(p => Number(p.total_revenue || 0));
+
+      topProductsChartInstance = new Chart(ctxTopCanvas, {
+        type: 'bar',
+        data: {
+          labels: prodLabels.length > 0 ? prodLabels : ['Sin Ventas'],
+          datasets: [{
+            label: 'Ingresos ($)',
+            data: prodRevenues.length > 0 ? prodRevenues : [0],
+            backgroundColor: 'rgba(255, 122, 0, 0.8)',
+            hoverBackgroundColor: '#ff7a00',
+            borderRadius: 6,
+            borderSkipped: false
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              padding: 10,
+              callbacks: {
+                label: (context) => ` Total: $${(context.parsed.x || 0).toFixed(2)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8', callback: (v) => `$${v}` }
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: '#e2e8f0', font: { size: 11, weight: 'bold' } }
+            }
+          }
+        }
+      });
+    }
+
+    // 5. Gráfico de Ventas por Categoría (Barras Verticales)
+    const ctxCatCanvas = document.getElementById('categoryChart') as HTMLCanvasElement;
+    if (ctxCatCanvas) {
+      const catLabels = categories.map(c => c.category || 'General');
+      const catRevenues = categories.map(c => Number(c.total_revenue || 0));
+      const catPalette = ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#06b6d4'];
+
+      categoryChartInstance = new Chart(ctxCatCanvas, {
+        type: 'bar',
+        data: {
+          labels: catLabels.length > 0 ? catLabels : ['General'],
+          datasets: [{
+            label: 'Ingresos ($)',
+            data: catRevenues.length > 0 ? catRevenues : [0],
+            backgroundColor: catPalette.slice(0, Math.max(catLabels.length, 1)),
+            borderRadius: 6,
+            borderSkipped: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              padding: 10,
+              callbacks: {
+                label: (context) => ` Total: $${(context.parsed.y || 0).toFixed(2)}`
+              }
+            }
+          },
+          scales: {
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8', callback: (v) => `$${v}` }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8', font: { size: 11 } }
+            }
+          }
+        }
+      });
+    }
+
+    // ========================================================================
+    // ENLACE DE EVENTOS Y ACCIONES DEL DASHBOARD
+    // ========================================================================
+    document.getElementById('refresh-dashboard-btn')?.addEventListener('click', async () => {
+      const icon = document.getElementById('refresh-icon');
+      if (icon) icon.classList.add('animate-spin');
+      await renderAdminStats();
+    });
+
+    document.getElementById('goto-reports-btn')?.addEventListener('click', () => {
+      const tab = document.getElementById('admin-tab-reports');
+      if (tab) tab.click();
+    });
+
+    document.getElementById('goto-products-btn')?.addEventListener('click', () => {
+      const tab = document.getElementById('admin-tab-products');
+      if (tab) tab.click();
+    });
+
+    document.getElementById('goto-debtors-link')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const tab = document.getElementById('admin-tab-debtors');
+      if (tab) tab.click();
+    });
+
+  } catch (error: any) {
+    console.error('Error al renderizar estadísticas del dashboard:', error);
+    panel.innerHTML = `
+      <div class="card text-center" style="padding: 40px 20px;">
+        <div style="font-size: 32px; margin-bottom: 12px;">⚠️</div>
+        <h3 style="color: var(--danger); font-weight: 700; margin-bottom: 8px;">Error al cargar analítica</h3>
+        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 16px;">${error.message || 'No se pudo conectar con el servidor para consultar las métricas.'}</p>
+        <button class="btn btn-primary" onclick="void renderAdminStats();">Reintentar</button>
+      </div>
+    `;
   }
 }
 
