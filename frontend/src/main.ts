@@ -233,33 +233,85 @@ const icons = {
 };
 
 // ==========================================================================
+// HIDRATACIÓN INSTANTÁNEA DESDE CACHÉ (Arranque Inmediato a 0ms en F5)
+// ==========================================================================
+function hydrateStateFromCache() {
+  // 1. Restaurar tasas de cambio oficiales y paralelas
+  try {
+    const cachedRates = localStorage.getItem('facilito_rates_cache');
+    if (cachedRates) {
+      const parsed = JSON.parse(cachedRates);
+      if (parsed.usdToVes) rateUsdToVes = Number(parsed.usdToVes);
+      if (parsed.eurToVes) rateEurToVes = Number(parsed.eurToVes);
+      if (parsed.binanceUsdToVes) rateBinanceToVes = Number(parsed.binanceUsdToVes);
+    }
+  } catch (e) {}
+
+  // 2. Restaurar catálogo de productos para Tienda y POS
+  try {
+    const cachedProducts = localStorage.getItem('facilito_products_cache');
+    if (cachedProducts) {
+      const parsed = JSON.parse(cachedProducts);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        productsList = parsed;
+        posProductsCache = parsed;
+        productsLoaded = true;
+      }
+    }
+  } catch (e) {}
+
+  // 3. Restaurar clientes para POS
+  try {
+    const cachedCusts = localStorage.getItem('facilito_customers_cache');
+    if (cachedCusts) {
+      const parsed = JSON.parse(cachedCusts);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        posCustomersList = parsed;
+      }
+    }
+  } catch (e) {}
+
+  // 4. Restaurar sesión de caja activa
+  try {
+    const cachedCash = sessionStorage.getItem('facilito_cash_session');
+    if (cachedCash) {
+      activeCashSession = JSON.parse(cachedCash);
+      if (activeCashSession && (activeCashSession as any).cash_drop_limit) {
+        posCashLimit = Number((activeCashSession as any).cash_drop_limit);
+      }
+    }
+  } catch (e) {}
+
+  // 5. Restaurar usuario y vista anterior para evitar saltos o parpadeos
+  const token = localStorage.getItem('token');
+  if (token) {
+    try {
+      const cachedUser = localStorage.getItem('user');
+      if (cachedUser) {
+        currentUser = JSON.parse(cachedUser);
+        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
+          const lastView = localStorage.getItem('facilito_last_view');
+          currentView = (lastView === 'store' || lastView === 'admin' || lastView === 'auth') ? lastView : 'admin';
+          const lastAdminView = localStorage.getItem('facilito_last_admin_view') as AdminSubView;
+          if (currentUser.role === 'billing') {
+            activeAdminView = 'online_billing';
+          } else if (lastAdminView) {
+            activeAdminView = lastAdminView;
+          } else {
+            activeAdminView = currentUser.role === 'admin' ? 'stats' : 'pos';
+          }
+        }
+      }
+    } catch (e) {}
+  }
+}
+
+// ==========================================================================
 // INICIALIZACIÓN
 // ==========================================================================
 window.addEventListener('DOMContentLoaded', async () => {
-  renderApp();
-
-  // Cargar sesión del almacenamiento local si existe
-  const token = localStorage.getItem('token');
-  if (token) {
-    void (async () => {
-      try {
-        currentUser = await api.auth.me();
-
-        // Si el usuario es administrador, vendedor o facturador, cambiar al panel cuando la sesión esté lista.
-        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
-          activeAdminView = currentUser.role === 'billing' ? 'online_billing' : 'pos';
-          navigate('admin');
-        } else {
-          renderApp();
-        }
-      } catch (e) {
-        // Token corrupto o expirado
-        localStorage.removeItem('token');
-        currentUser = null;
-        renderApp();
-      }
-    })();
-  }
+  // Cargar estado instantáneo de la memoria antes de renderizar
+  hydrateStateFromCache();
 
   // Cargar carrito del almacenamiento local
   const savedCart = localStorage.getItem('cart');
@@ -271,20 +323,65 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Load exchange rates (tasas de cambio) as it's needed everywhere
+  // Pintar de inmediato la aplicación sin esperar respuestas de red (0.01s)
+  renderApp();
+
+  // Sincronización en segundo plano: Tasas de cambio
   void loadExchangeRates();
 
-  // Si no hay sesión válida, mostrar la tienda inmediatamente mientras los datos llegan.
-  if (!token) {
-    navigate('store');
+  // Sincronización en segundo plano: Sesión de usuario
+  const token = localStorage.getItem('token');
+  if (token) {
+    void (async () => {
+      try {
+        const freshUser = await api.auth.me();
+        currentUser = freshUser;
+        localStorage.setItem('user', JSON.stringify(freshUser));
+
+        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
+          if (currentView !== 'admin' && currentView !== 'store') {
+            activeAdminView = currentUser.role === 'billing' ? 'online_billing' : 'pos';
+            navigate('admin');
+          } else {
+            renderApp();
+          }
+        } else {
+          renderApp();
+        }
+      } catch (e) {
+        // Token corrupto o expirado
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        currentUser = null;
+        renderApp();
+      }
+    })();
+  } else {
+    if (currentView !== 'store') {
+      navigate('store');
+    }
   }
+
+  // Sincronización en segundo plano: Catálogo de productos frescos
+  void loadProducts(true);
 });
 
-async function loadProducts() {
-  productsLoading = true;
+async function loadProducts(isSilent: boolean = false) {
+  if (!isSilent || productsList.length === 0) {
+    productsLoading = true;
+  }
   try {
-    productsList = await api.products.getAll(selectedCategory || undefined, searchQuery || undefined);
+    const fetched = await api.products.getAll(selectedCategory || undefined, searchQuery || undefined);
+    productsList = fetched;
+    posProductsCache = fetched;
     productsLoaded = true;
+
+    // Solo persistir en caché local cuando no hay filtros aplicados
+    if (!selectedCategory && !searchQuery) {
+      try {
+        localStorage.setItem('facilito_products_cache', JSON.stringify(fetched));
+      } catch (e) {}
+    }
   } catch (error) {
     console.error('Error al cargar productos:', error);
   } finally {
@@ -302,6 +399,14 @@ async function loadExchangeRates() {
     rateEurToVes = rates.eurToVes;
     rateBinanceToVes = rates.binanceUsdToVes || (rates.usdToVes * 1.08);
 
+    try {
+      localStorage.setItem('facilito_rates_cache', JSON.stringify({
+        usdToVes: rateUsdToVes,
+        eurToVes: rateEurToVes,
+        binanceUsdToVes: rateBinanceToVes,
+      }));
+    } catch (e) {}
+
     if (currentView === 'store' || currentView === 'admin') {
       renderApp();
     }
@@ -315,13 +420,16 @@ async function loadExchangeRates() {
 // ==========================================================================
 function navigate(view: 'store' | 'auth' | 'admin') {
   currentView = view;
+  try {
+    localStorage.setItem('facilito_last_view', view);
+  } catch (e) {}
   
   // Destruir gráficos previos si salimos de admin
   if (currentView !== 'admin') {
     destroyCharts();
   }
 
-  // Carga perezosa (lazy load) de productos para la tienda
+  // Carga perezosa (lazy load) de productos para la tienda si aún no estuvieran en memoria
   if (currentView === 'store' && !productsLoaded) {
     void loadProducts();
   }
@@ -477,6 +585,10 @@ function bindGeneralEvents() {
 
   document.getElementById('link-logout')?.addEventListener('click', () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('facilito_last_view');
+    localStorage.removeItem('facilito_last_admin_view');
+    sessionStorage.removeItem('facilito_cash_session');
     currentUser = null;
     cart = [];
     localStorage.removeItem('cart');
@@ -2396,6 +2508,9 @@ function bindAuthEvents() {
       const res = await api.auth.login({ email, password });
       localStorage.setItem('token', res.token);
       currentUser = res.user;
+      try {
+        localStorage.setItem('user', JSON.stringify(res.user));
+      } catch (e) {}
 
       if (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') {
         activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'admin' ? 'stats' : 'pos');
@@ -2436,6 +2551,9 @@ function bindAuthEvents() {
       const res = await api.auth.register({ name, email, password, phone, ci });
       localStorage.setItem('token', res.token);
       currentUser = res.user;
+      try {
+        localStorage.setItem('user', JSON.stringify(res.user));
+      } catch (e) {}
       navigate('store');
     } catch (error: any) {
       alert(error.message || 'Error en el registro');
@@ -2469,6 +2587,9 @@ function bindAuthEvents() {
             const res = await api.auth.loginGoogle(credential);
             localStorage.setItem('token', res.token);
             currentUser = res.user;
+            try {
+              localStorage.setItem('user', JSON.stringify(res.user));
+            } catch (e) {}
 
             if (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') {
               activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'admin' ? 'stats' : 'pos');
@@ -2700,10 +2821,17 @@ async function bindAdminEvents() {
     tabOnlineBilling?.classList.remove('active');
   };
 
+  const switchAdminSubView = (view: AdminSubView) => {
+    activeAdminView = view;
+    try {
+      localStorage.setItem('facilito_last_admin_view', view);
+    } catch (e) {}
+  };
+
   tabStats?.addEventListener('click', async () => {
     clearActiveTabs();
     tabStats.classList.add('active');
-    activeAdminView = 'stats';
+    switchAdminSubView('stats');
     destroyCharts();
     await renderAdminStats();
   });
@@ -2711,7 +2839,7 @@ async function bindAdminEvents() {
   tabPOS?.addEventListener('click', async () => {
     clearActiveTabs();
     tabPOS.classList.add('active');
-    activeAdminView = 'pos';
+    switchAdminSubView('pos');
     destroyCharts();
     await renderAdminPOS();
   });
@@ -2719,7 +2847,7 @@ async function bindAdminEvents() {
   tabReports?.addEventListener('click', async () => {
     clearActiveTabs();
     tabReports.classList.add('active');
-    activeAdminView = 'reports';
+    switchAdminSubView('reports');
     destroyCharts();
     await renderAdminReports();
   });
@@ -2727,7 +2855,7 @@ async function bindAdminEvents() {
   tabProducts?.addEventListener('click', async () => {
     clearActiveTabs();
     tabProducts.classList.add('active');
-    activeAdminView = 'products';
+    switchAdminSubView('products');
     destroyCharts();
     await renderAdminProducts();
   });
@@ -2735,7 +2863,7 @@ async function bindAdminEvents() {
   tabSales?.addEventListener('click', async () => {
     clearActiveTabs();
     tabSales.classList.add('active');
-    activeAdminView = 'sales';
+    switchAdminSubView('sales');
     destroyCharts();
     await renderAdminSales();
   });
@@ -2743,7 +2871,7 @@ async function bindAdminEvents() {
   tabDebtors?.addEventListener('click', async () => {
     clearActiveTabs();
     tabDebtors?.classList.add('active');
-    activeAdminView = 'debtors';
+    switchAdminSubView('debtors');
     destroyCharts();
     await renderAdminDebtors();
   });
@@ -2751,7 +2879,7 @@ async function bindAdminEvents() {
   tabQuotations?.addEventListener('click', async () => {
     clearActiveTabs();
     tabQuotations?.classList.add('active');
-    activeAdminView = 'quotations';
+    switchAdminSubView('quotations');
     destroyCharts();
     await renderAdminQuotations();
   });
@@ -2759,7 +2887,7 @@ async function bindAdminEvents() {
   tabCoupons?.addEventListener('click', async () => {
     clearActiveTabs();
     tabCoupons?.classList.add('active');
-    activeAdminView = 'coupons';
+    switchAdminSubView('coupons');
     destroyCharts();
     await renderAdminCoupons();
   });
@@ -2767,7 +2895,7 @@ async function bindAdminEvents() {
   tabCustomers?.addEventListener('click', async () => {
     clearActiveTabs();
     tabCustomers?.classList.add('active');
-    activeAdminView = 'customers';
+    switchAdminSubView('customers');
     destroyCharts();
     await renderAdminCustomers();
   });
@@ -2775,7 +2903,7 @@ async function bindAdminEvents() {
   tabExpenses?.addEventListener('click', async () => {
     clearActiveTabs();
     tabExpenses?.classList.add('active');
-    activeAdminView = 'expenses';
+    switchAdminSubView('expenses');
     destroyCharts();
     await renderAdminExpenses();
   });
@@ -2783,7 +2911,7 @@ async function bindAdminEvents() {
   tabStaff?.addEventListener('click', async () => {
     clearActiveTabs();
     tabStaff.classList.add('active');
-    activeAdminView = 'staff';
+    switchAdminSubView('staff');
     destroyCharts();
     await renderAdminStaff();
   });
@@ -2791,7 +2919,7 @@ async function bindAdminEvents() {
   tabSuppliers?.addEventListener('click', async () => {
     clearActiveTabs();
     tabSuppliers.classList.add('active');
-    activeAdminView = 'suppliers';
+    switchAdminSubView('suppliers');
     destroyCharts();
     await renderAdminSuppliers();
   });
@@ -2799,7 +2927,7 @@ async function bindAdminEvents() {
   tabOnlineBilling?.addEventListener('click', async () => {
     clearActiveTabs();
     tabOnlineBilling.classList.add('active');
-    activeAdminView = 'online_billing';
+    switchAdminSubView('online_billing');
     destroyCharts();
     await renderOnlineBilling();
   });
@@ -3145,16 +3273,46 @@ async function renderAdminPOS() {
   const panel = document.getElementById('dashboard-content-panel');
   if (!panel) return;
 
-  // Verificar si hay una sesión de caja activa
+  // Restaurar sesión de caja activa desde caché si está disponible
+  if (!activeCashSession) {
+    try {
+      const cachedCash = sessionStorage.getItem('facilito_cash_session');
+      if (cachedCash) {
+        activeCashSession = JSON.parse(cachedCash);
+        if (activeCashSession && (activeCashSession as any).cash_drop_limit) {
+          posCashLimit = Number((activeCashSession as any).cash_drop_limit);
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Si aún no tenemos sesión o para verificar en background
   if (!activeCashSession) {
     try {
       activeCashSession = await api.cash.getActive();
-      if (activeCashSession && (activeCashSession as any).cash_drop_limit) {
-        posCashLimit = Number((activeCashSession as any).cash_drop_limit);
+      if (activeCashSession) {
+        sessionStorage.setItem('facilito_cash_session', JSON.stringify(activeCashSession));
+        if ((activeCashSession as any).cash_drop_limit) {
+          posCashLimit = Number((activeCashSession as any).cash_drop_limit);
+        }
+      } else {
+        sessionStorage.removeItem('facilito_cash_session');
       }
     } catch (err) {
       console.error('Error al obtener sesión de caja activa:', err);
     }
+  } else {
+    // Validar silenciosamente en segundo plano sin congelar la pantalla
+    void api.cash.getActive().then(sess => {
+      if (sess) {
+        activeCashSession = sess;
+        sessionStorage.setItem('facilito_cash_session', JSON.stringify(sess));
+      } else {
+        activeCashSession = null;
+        sessionStorage.removeItem('facilito_cash_session');
+        void renderAdminPOS();
+      }
+    }).catch(() => {});
   }
 
   if (!activeCashSession) {
@@ -3166,24 +3324,46 @@ async function renderAdminPOS() {
   const isLockedByCashLimit = expectedBalance > posCashLimit;
 
   try {
-    // Cargar lista de clientes para el POS si está vacía
+    // Cargar lista de clientes para el POS desde caché/memoria
     if (!Array.isArray(posCustomersList) || posCustomersList.length === 0) {
       try {
-        const custs = await api.auth.getCustomers();
-        posCustomersList = Array.isArray(custs) ? custs : [];
-      } catch (err) {
-        console.error('Error al cargar lista de clientes para POS:', err);
-        posCustomersList = [];
-      }
+        const cachedCusts = localStorage.getItem('facilito_customers_cache');
+        if (cachedCusts) {
+          posCustomersList = JSON.parse(cachedCusts);
+        }
+      } catch (e) {}
+
+      // Sincronizar clientes en segundo plano
+      void api.auth.getCustomers().then(custs => {
+        if (Array.isArray(custs)) {
+          posCustomersList = custs;
+          try {
+            localStorage.setItem('facilito_customers_cache', JSON.stringify(custs));
+          } catch (e) {}
+        }
+      }).catch(err => console.error('Error al sincronizar clientes POS:', err));
     }
     
+    // Cargar productos para el POS desde caché/memoria de forma inmediata
     if (!Array.isArray(posProductsCache) || posProductsCache.length === 0) {
       try {
-        const prods = await api.products.getAll();
-        posProductsCache = Array.isArray(prods) ? prods : [];
-      } catch (err) {
-        console.error('Error al cargar lista de productos para POS:', err);
-        posProductsCache = [];
+        const cachedProds = localStorage.getItem('facilito_products_cache');
+        if (cachedProds) {
+          posProductsCache = JSON.parse(cachedProds);
+        }
+      } catch (e) {}
+
+      if (!Array.isArray(posProductsCache) || posProductsCache.length === 0) {
+        try {
+          const prods = await api.products.getAll();
+          posProductsCache = Array.isArray(prods) ? prods : [];
+          try {
+            localStorage.setItem('facilito_products_cache', JSON.stringify(posProductsCache));
+          } catch (e) {}
+        } catch (err) {
+          console.error('Error al cargar lista de productos para POS:', err);
+          posProductsCache = [];
+        }
       }
     }
 
@@ -4696,6 +4876,9 @@ function bindPOSEvents() {
         
         // Limpiar sesión activa
         activeCashSession = null;
+        try {
+          sessionStorage.removeItem('facilito_cash_session');
+        } catch (e) {}
         await renderAdminPOS();
       } catch (err: any) {
         alert(err.message || 'Error al cerrar caja.');
@@ -8429,6 +8612,9 @@ function renderOpenCashSessionScreen(panel: HTMLElement) {
     }
     try {
       activeCashSession = await api.cash.open(val);
+      try {
+        sessionStorage.setItem('facilito_cash_session', JSON.stringify(activeCashSession));
+      } catch (e) {}
       if (activeCashSession && (activeCashSession as any).cash_drop_limit) {
         posCashLimit = Number((activeCashSession as any).cash_drop_limit);
       }
