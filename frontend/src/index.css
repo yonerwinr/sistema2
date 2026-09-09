@@ -2291,4 +2291,339 @@ select option:hover {
   transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ==========================================================================
+   VISTA DE INFORMACIÓN (/info) - MINIMALISTA & MODERNA CON SCROLL ANIMATION
+   ========================================================================== */
+.info-page-wrapper {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 64px;
+}
+
+/* 1. Hero Minimalista */
+.info-hero {
+  text-align: center;
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 40px 20px 20px;
+}
+
+.info-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(0, 119, 246, 0.08);
+  border: 1px solid rgba(0, 119, 246, 0.25);
+  color: #60a5fa;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 20px;
+}
+
+.info-hero-title {
+  font-size: clamp(32px, 4.8vw, 52px);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -1.2px;
+  color: #ffffff;
+  margin-bottom: 18px;
+}
+
+.info-hero-subtitle {
+  font-size: clamp(14.5px, 1.25vw, 16.5px);
+  color: #94a3b8;
+  line-height: 1.65;
+  max-width: 680px;
+  margin: 0 auto 28px;
+}
+
+.info-hero-ctas {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* 2. Grid de Métricas / Números Clave */
+.info-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.info-metric-card {
+  background: rgba(18, 24, 39, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  padding: 28px 24px;
+  text-align: center;
+  backdrop-filter: blur(14px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.info-metric-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(0, 119, 246, 0.35);
+  box-shadow: 0 12px 30px rgba(0, 119, 246, 0.12);
+}
+
+.info-metric-number {
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  margin-bottom: 6px;
+  background: linear-gradient(135deg, #0084ff 0%, #ff7300 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.info-metric-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 4px;
+}
+
+.info-metric-sub {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* 3. Secciones Informativas / Bento */
+.info-section-header {
+  text-align: center;
+  max-width: 650px;
+  margin: 0 auto 36px;
+}
+
+.info-section-tag {
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--brand-orange);
+  margin-bottom: 8px;
+}
+
+.info-section-title {
+  font-size: clamp(26px, 3.2vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.info-section-desc {
+  font-size: 14.5px;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+/* Bento 3 Pilares */
+.info-pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.info-pillar-card {
+  background: rgba(18, 24, 39, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  backdrop-filter: blur(14px);
+  transition: all 0.35s ease;
+}
+
+.info-pillar-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(255, 115, 0, 0.4);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+}
+
+.info-pillar-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.info-pillar-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.info-pillar-text {
+  font-size: 13.5px;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
+/* 4. Pasos (Steps) */
+.info-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.info-step-card {
+  background: rgba(18, 24, 39, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 22px;
+  padding: 30px 26px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.info-step-card:hover {
+  border-color: rgba(0, 119, 246, 0.35);
+  transform: translateY(-4px);
+}
+
+.info-step-number {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--brand-blue);
+  background: rgba(0, 119, 246, 0.12);
+  padding: 4px 12px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-bottom: 16px;
+  border: 1px solid rgba(0, 119, 246, 0.25);
+}
+
+.info-step-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.info-step-desc {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.55;
+}
+
+/* 5. FAQ Accordion Minimalista */
+.info-faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.info-faq-item {
+  background: rgba(18, 24, 39, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+
+.info-faq-item:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.info-faq-question {
+  width: 100%;
+  padding: 20px 24px;
+  background: none;
+  border: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.info-faq-chevron {
+  font-size: 16px;
+  color: var(--brand-blue);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.info-faq-item.open .info-faq-chevron {
+  transform: rotate(180deg);
+}
+
+.info-faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.16, 1, 0.3, 1), padding 0.3s ease;
+  padding: 0 24px;
+  color: #94a3b8;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.info-faq-item.open .info-faq-answer {
+  max-height: 240px;
+  padding: 0 24px 20px;
+}
+
+/* 6. Contact & Hours Bento Card */
+.info-contact-card {
+  background: linear-gradient(135deg, rgba(0, 119, 246, 0.1) 0%, rgba(255, 115, 0, 0.1) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  padding: 36px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 28px;
+  backdrop-filter: blur(16px);
+}
+
+.info-contact-col-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--brand-blue);
+  margin-bottom: 8px;
+}
+
+.info-contact-col-main {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.info-contact-col-sub {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+/* 7. Call To Action Final */
+.info-cta-box {
+  background: linear-gradient(135deg, rgba(0, 119, 246, 0.15) 0%, rgba(18, 24, 39, 0.9) 50%, rgba(255, 115, 0, 0.15) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 30px;
+  padding: 50px 30px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
 

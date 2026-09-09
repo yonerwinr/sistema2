@@ -9,7 +9,7 @@ Chart.register(...registerables);
 // ==========================================================================
 // ESTADO GLOBAL DE LA APP
 // ==========================================================================
-let currentView: 'store' | 'auth' | 'admin' = 'store';
+let currentView: 'store' | 'auth' | 'admin' | 'info' = 'store';
 let currentUser: User | null = null;
 let productsList: Product[] = [];
 let activeCashSession: CashSession | null = null;
@@ -318,6 +318,13 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Cargar estado instantáneo de la memoria antes de renderizar
   hydrateStateFromCache();
 
+  // Detectar si el usuario ingresó por la ruta /info o #info
+  const initialPath = window.location.pathname.toLowerCase();
+  const isInfoRoute = initialPath === '/info' || initialPath.endsWith('/info') || window.location.hash === '#info';
+  if (isInfoRoute) {
+    currentView = 'info';
+  }
+
   // Cargar carrito del almacenamiento local
   const savedCart = localStorage.getItem('cart');
   if (savedCart) {
@@ -366,15 +373,38 @@ window.addEventListener('DOMContentLoaded', async () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         currentUser = null;
-        navigate('store');
+        if (!isInfoRoute) navigate('store');
       }
     })();
   } else {
-    navigate('store');
+    if (isInfoRoute) {
+      navigate('info', false);
+    } else {
+      const lastView = localStorage.getItem('facilito_last_view');
+      if (lastView === 'auth') {
+        navigate('auth', false);
+      } else {
+        navigate('store', false);
+      }
+    }
   }
 
   // Sincronización en segundo plano: Catálogo de productos frescos
   void loadProducts(true);
+});
+
+// Soporte para botones Atrás/Adelante del navegador
+window.addEventListener('popstate', () => {
+  const path = window.location.pathname.toLowerCase();
+  if (path === '/info' || path.endsWith('/info') || window.location.hash === '#info') {
+    navigate('info', false);
+  } else if (path === '/login' || path.endsWith('/login') || window.location.hash === '#login') {
+    navigate('auth', false);
+  } else if (path === '/admin' || path.endsWith('/admin') || window.location.hash === '#admin') {
+    navigate('admin', false);
+  } else {
+    navigate('store', false);
+  }
 });
 
 async function loadProducts(isSilent: boolean = false) {
@@ -429,11 +459,25 @@ async function loadExchangeRates() {
 // ==========================================================================
 // ENRUTADOR (Navegación SPA)
 // ==========================================================================
-function navigate(view: 'store' | 'auth' | 'admin') {
+function navigate(view: 'store' | 'auth' | 'admin' | 'info', updateUrl: boolean = true) {
   currentView = view;
   try {
     localStorage.setItem('facilito_last_view', view);
   } catch (e) {}
+
+  if (updateUrl) {
+    try {
+      if (view === 'info') {
+        window.history.pushState({ view: 'info' }, '', '/info');
+      } else if (view === 'store') {
+        window.history.pushState({ view: 'store' }, '', '/');
+      } else if (view === 'auth') {
+        window.history.pushState({ view: 'auth' }, '', '/login');
+      } else if (view === 'admin') {
+        window.history.pushState({ view: 'admin' }, '', '/admin');
+      }
+    } catch (e) {}
+  }
   
   // Destruir gráficos previos si salimos de admin
   if (currentView !== 'admin') {
@@ -446,6 +490,7 @@ function navigate(view: 'store' | 'auth' | 'admin') {
   }
 
   renderApp();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function destroyCharts() {
@@ -482,6 +527,7 @@ function renderApp() {
     ${renderNavbar()}
     <main id="main-content" style="flex-grow: 1;">
       ${currentView === 'store' ? renderStoreView() : ''}
+      ${currentView === 'info' ? renderInfoView() : ''}
       ${currentView === 'auth' ? renderAuthView() : ''}
       ${currentView === 'admin' ? renderAdminDashboard() : ''}
     </main>
@@ -502,6 +548,8 @@ function renderApp() {
 
   if (currentView === 'store') {
     bindStoreEvents();
+  } else if (currentView === 'info') {
+    bindInfoEvents();
   } else if (currentView === 'auth') {
     bindAuthEvents();
   } else if (currentView === 'admin') {
@@ -544,6 +592,7 @@ function renderNavbar(): string {
 
         <div class="nav-links" id="nav-links-menu">
           <a class="nav-link ${currentView === 'store' ? 'active' : ''}" id="link-store">Tienda</a>
+          <a class="nav-link ${currentView === 'info' ? 'active' : ''}" id="link-info">Información</a>
           
           ${currentUser ? `
             ${(currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') ? `
@@ -574,9 +623,14 @@ function renderNavbar(): string {
 
 function renderFooter(): string {
   return `
-    <footer style="background: var(--bg-secondary); border-top: 1px solid var(--border-glass); padding: 24px 0; text-align: center; font-size: 13px; color: var(--text-secondary); margin-top: auto;">
-      <div class="container">
+    <footer style="background: var(--bg-secondary); border-top: 1px solid var(--border-glass); padding: 28px 0; text-align: center; font-size: 13px; color: var(--text-secondary); margin-top: auto;">
+      <div class="container" style="display:flex; flex-direction:column; align-items:center; gap:12px;">
         <p>&copy; ${new Date().getFullYear()} FacilitoApp 🛍️. Tu tienda online de confianza. Calidad garantizada, ofertas exclusivas y envíos rápidos a todo el país.</p>
+        <div style="display:flex; gap:20px; font-size:12.5px; font-weight:600; flex-wrap:wrap; justify-content:center;">
+          <a id="footer-link-store" style="color:var(--text-secondary); cursor:pointer; text-decoration:none;">🛍️ Catálogo de Tienda</a>
+          <a id="footer-link-info" style="color:var(--brand-blue); cursor:pointer; text-decoration:none;">ℹ️ Conoce Más (/info)</a>
+          <a id="footer-link-faq" style="color:var(--text-secondary); cursor:pointer; text-decoration:none;">❓ Preguntas Frecuentes</a>
+        </div>
       </div>
     </footer>
   `;
@@ -608,6 +662,15 @@ function bindGeneralEvents() {
   });
 
   document.getElementById('link-store')?.addEventListener('click', () => navigate('store'));
+  document.getElementById('link-info')?.addEventListener('click', () => navigate('info'));
+  document.getElementById('footer-link-store')?.addEventListener('click', () => navigate('store'));
+  document.getElementById('footer-link-info')?.addEventListener('click', () => navigate('info'));
+  document.getElementById('footer-link-faq')?.addEventListener('click', () => {
+    navigate('info');
+    setTimeout(() => {
+      document.getElementById('info-faq-anchor')?.scrollIntoView({ behavior: 'smooth' });
+    }, 150);
+  });
   document.getElementById('link-admin')?.addEventListener('click', () => {
     activeAdminView = 'stats';
     navigate('admin');
@@ -1075,6 +1138,237 @@ function bindStoreEvents() {
       const prod = productsList.find(p => p.id === id);
       if (prod) {
         addToCart(prod);
+      }
+    });
+  });
+}
+
+// ==========================================================================
+// VISTA: INFORMACIÓN (/info) - MINIMALISTA & MODERNA CON SCROLL ANIMATION
+// ==========================================================================
+function renderInfoView(): string {
+  return `
+    <div class="info-page-wrapper">
+      <!-- 1. HERO MINIMALISTA -->
+      <section class="info-hero animate-on-scroll animate-fade-up">
+        <div class="info-hero-badge">
+          <span class="pulsing-dot"></span>
+          <span>INFORMACIÓN OFICIAL • FACILITOAPP</span>
+        </div>
+        <h1 class="info-hero-title">
+          Tecnología simple, rápida y transparente para todos.
+        </h1>
+        <p class="info-hero-subtitle">
+          FacilitoApp nace con el propósito de conectar a las personas con la mejor tecnología del mercado, ofreciendo precios reales con tasa oficial del día, atención personalizada y envíos seguros a nivel nacional.
+        </p>
+        <div class="info-hero-ctas">
+          <button class="btn-hero-primary" id="info-cta-store">
+            🛍️ Ver Catálogo de Productos
+          </button>
+          <a href="#info-faq-anchor" class="btn-hero-secondary" id="info-cta-faq">
+            ❓ Preguntas Frecuentes
+          </a>
+        </div>
+      </section>
+
+      <!-- 2. MÉTRICAS CLAVE (BENTO COUNTER CARDS) -->
+      <section class="info-metrics-grid animate-on-scroll animate-fade-up">
+        <div class="info-metric-card">
+          <div class="info-metric-number">100%</div>
+          <div class="info-metric-label">Tasa Oficial Sincronizada</div>
+          <div class="info-metric-sub">Precios transparentes en $ y Bs. al cambio BCV del día</div>
+        </div>
+        <div class="info-metric-card">
+          <div class="info-metric-number">24h</div>
+          <div class="info-metric-label">Despachos & Entregas</div>
+          <div class="info-metric-sub">Entregas el mismo día y envíos asegurados a todo el país</div>
+        </div>
+        <div class="info-metric-card">
+          <div class="info-metric-number">4.9 ★</div>
+          <div class="info-metric-label">Satisfacción de Clientes</div>
+          <div class="info-metric-sub">Cientos de compradores confían en nuestra atención y garantía</div>
+        </div>
+        <div class="info-metric-card">
+          <div class="info-metric-number">&lt;50ms</div>
+          <div class="info-metric-label">Plataforma Ultrarrápida</div>
+          <div class="info-metric-sub">Navegación instantánea en cualquier dispositivo o conexión</div>
+        </div>
+      </section>
+
+      <!-- 3. PILARES / NUESTRA PROPUESTA -->
+      <section class="animate-on-scroll animate-fade-up">
+        <div class="info-section-header">
+          <div class="info-section-tag">NUESTRA PROPUESTA</div>
+          <h2 class="info-section-title">Comprar tecnología nunca fue tan fácil</h2>
+          <p class="info-section-desc">Diseñamos cada detalle para que tu experiencia sea cómoda, segura y libre de complicaciones.</p>
+        </div>
+
+        <div class="info-pillars-grid">
+          <div class="info-pillar-card">
+            <div class="info-pillar-icon" style="color:var(--brand-blue);">📱</div>
+            <div class="info-pillar-title">Catálogo Completo & Actualizado</div>
+            <div class="info-pillar-text">
+              Smartphones de última generación, computadoras portátiles, accesorios de audio y gadgets inteligentes con disponibilidad de inventario verificada en tiempo real.
+            </div>
+          </div>
+          <div class="info-pillar-card">
+            <div class="info-pillar-icon" style="color:var(--brand-orange);">💳</div>
+            <div class="info-pillar-title">Múltiples Métodos de Pago</div>
+            <div class="info-pillar-text">
+              Paga en tu moneda favorita sin cálculos engorrosos: Pago Móvil interbancario, Efectivo en dólares o euros, Binance Pay USDT y tarjetas de débito o crédito.
+            </div>
+          </div>
+          <div class="info-pillar-card">
+            <div class="info-pillar-icon" style="color:#10b981;">🛡️</div>
+            <div class="info-pillar-title">Garantía & Comprobante Digital</div>
+            <div class="info-pillar-text">
+              Todos nuestros productos cuentan con garantía oficial de fábrica y comprobante digital inmediato con código QR para seguimiento y tranquilidad total.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. CÓMO FUNCIONA (PASOS) -->
+      <section class="animate-on-scroll animate-fade-up">
+        <div class="info-section-header">
+          <div class="info-section-tag">PASO A PASO</div>
+          <h2 class="info-section-title">Tu compra lista en 3 simples pasos</h2>
+          <p class="info-section-desc">Sin registros complicados ni demoras innecesarias.</p>
+        </div>
+
+        <div class="info-steps-grid">
+          <div class="info-step-card">
+            <span class="info-step-number">PASO 01</span>
+            <h3 class="info-step-title">Elige tus Productos</h3>
+            <p class="info-step-desc">Explora las categorías, filtra por disponibilidad y agrega lo que necesites a tu carrito de compras.</p>
+          </div>
+          <div class="info-step-card">
+            <span class="info-step-number" style="color:var(--brand-orange); background:rgba(255,115,0,0.12); border-color:rgba(255,115,0,0.3);">PASO 02</span>
+            <h3 class="info-step-title">Confirma tu Pago</h3>
+            <p class="info-step-desc">Selecciona Pago Móvil, Efectivo o Binance. Verás el total exacto en Bolívares y Dólares al cambio oficial sin recargos.</p>
+          </div>
+          <div class="info-step-card">
+            <span class="info-step-number" style="color:#10b981; background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.3);">PASO 03</span>
+            <h3 class="info-step-title">Recibe o Retira</h3>
+            <p class="info-step-desc">Te enviamos tu paquete asegurado a tu dirección o puedes pasar retirándolo por nuestra sede física sin esperas.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. PREGUNTAS FRECUENTES (FAQ ACORDEÓN) -->
+      <div id="info-faq-anchor" style="position:relative; top:-40px;"></div>
+      <section class="animate-on-scroll animate-fade-up">
+        <div class="info-section-header">
+          <div class="info-section-tag">RESOLVEMOS TUS DUDAS</div>
+          <h2 class="info-section-title">Preguntas Frecuentes</h2>
+          <p class="info-section-desc">Todo lo que necesitas saber antes de realizar tu compra.</p>
+        </div>
+
+        <div class="info-faq-list">
+          <div class="info-faq-item open">
+            <button class="info-faq-question">
+              <span>¿Cómo se calculan los precios en Bolívares (Bs.)?</span>
+              <span class="info-faq-chevron">▼</span>
+            </button>
+            <div class="info-faq-answer">
+              Todos nuestros precios en Bolívares se calculan con la tasa oficial publicada por el Banco Central de Venezuela (BCV), la cual se sincroniza de forma automática en nuestra plataforma para garantizar transparencia total.
+            </div>
+          </div>
+
+          <div class="info-faq-item">
+            <button class="info-faq-question">
+              <span>¿Qué métodos de pago tienen disponibles?</span>
+              <span class="info-faq-chevron">▼</span>
+            </button>
+            <div class="info-faq-answer">
+              Aceptamos Pago Móvil de cualquier entidad bancaria nacional, Efectivo en Dólares ($) y Euros (€), Binance Pay (USDT) y tarjetas de débito o crédito nacionales e internacionales.
+            </div>
+          </div>
+
+          <div class="info-faq-item">
+            <button class="info-faq-question">
+              <span>¿Realizan envíos a todo el país?</span>
+              <span class="info-faq-chevron">▼</span>
+            </button>
+            <div class="info-faq-answer">
+              Sí, despachamos a nivel nacional mediante las principales empresas de encomienda (MRW, Zoom, Tealca) con número de guía y seguro de envío. En la zona metropolitana contamos con servicio express el mismo día.
+            </div>
+          </div>
+
+          <div class="info-faq-item">
+            <button class="info-faq-question">
+              <span>¿Puedo retirar personalmente mi pedido?</span>
+              <span class="info-faq-chevron">▼</span>
+            </button>
+            <div class="info-faq-answer">
+              ¡Por supuesto! Puedes seleccionar la opción de retiro en tienda durante tu checkout y pasar por nuestra sede física en el horario comercial sin ningún costo adicional.
+            </div>
+          </div>
+
+          <div class="info-faq-item">
+            <button class="info-faq-question">
+              <span>¿Los productos tienen garantía?</span>
+              <span class="info-faq-chevron">▼</span>
+            </button>
+            <div class="info-faq-answer">
+              Todos nuestros productos son 100% nuevos y originales, respaldados por garantía oficial contra defectos de fábrica. Además, recibes un comprobante digital con código QR para cualquier consulta o trámite.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. HORARIOS & ATENCIÓN DIRECTA -->
+      <section class="info-contact-card animate-on-scroll animate-fade-up">
+        <div>
+          <div class="info-contact-col-title">📍 Ubicación & Retiro</div>
+          <div class="info-contact-col-main">Sede Comercial Central</div>
+          <div class="info-contact-col-sub">Zona Comercial Principal. Espacio accesible con estacionamiento para retiros inmediatos.</div>
+        </div>
+        <div>
+          <div class="info-contact-col-title">🕒 Horario de Atención</div>
+          <div class="info-contact-col-main">Lunes a Sábado</div>
+          <div class="info-contact-col-sub">8:30 AM a 6:30 PM (Horario corrido). Domingos cerrado para mantenimiento y logística.</div>
+        </div>
+        <div>
+          <div class="info-contact-col-title">💬 Atención Inmediata</div>
+          <div class="info-contact-col-main">Soporte & Asesoría</div>
+          <div class="info-contact-col-sub">¿Tienes preguntas sobre un producto o envío? Nuestro equipo de atención te atiende al instante.</div>
+        </div>
+      </section>
+
+      <!-- 7. LLAMADO A LA ACCIÓN FINAL -->
+      <section class="info-cta-box animate-on-scroll animate-zoom-in">
+        <h2 style="font-size:clamp(26px, 3.5vw, 38px); font-weight:900; color:#ffffff; margin-bottom:12px; letter-spacing:-0.5px;">
+          ¿Listo para estrenar la mejor tecnología?
+        </h2>
+        <p style="font-size:15px; color:#94a3b8; max-width:540px; margin:0 auto 24px; line-height:1.6;">
+          Descubre cientos de artículos verificados con entrega inmediata, garantía oficial y precios transparentes.
+        </p>
+        <button class="btn-hero-primary" id="info-cta-bottom" style="font-size:16px; padding:16px 36px;">
+          🛍️ Explorar Tienda FacilitoApp
+        </button>
+      </section>
+    </div>
+  `;
+}
+
+function bindInfoEvents() {
+  // Botones para ir a la tienda
+  document.getElementById('info-cta-store')?.addEventListener('click', () => navigate('store'));
+  document.getElementById('info-cta-bottom')?.addEventListener('click', () => navigate('store'));
+  
+  // Desplazamiento suave al ancla de FAQ
+  document.getElementById('info-cta-faq')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('info-faq-anchor')?.scrollIntoView({ behavior: 'smooth' });
+  });
+
+  // Acordeón interactivo de Preguntas Frecuentes
+  document.querySelectorAll('.info-faq-question').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const item = (e.currentTarget as HTMLElement).closest('.info-faq-item');
+      if (item) {
+        item.classList.toggle('open');
       }
     });
   });
