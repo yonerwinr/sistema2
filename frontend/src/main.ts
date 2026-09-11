@@ -847,16 +847,17 @@ function renderStoreView(): string {
 
   if (productsLoading && productsList.length === 0) {
     return `
-      <section class="store-hero-epic animate-on-scroll animate-zoom-in">
-        <div class="container" style="min-height:260px; display:flex; flex-direction:column; justify-content:center; gap:16px;">
-          <div style="width: 240px; height: 24px; border-radius: 999px; background: rgba(255,255,255,0.08);"></div>
-          <div style="width: min(100%, 540px); height: 22px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
-          <div style="width: min(100%, 360px); height: 18px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
-          <div style="margin-top: 10px; font-size: 15px; color: var(--text-secondary); font-weight: 600; display:flex; align-items:center; gap:8px;">
-            <span class="pulsing-dot"></span> Cargando los mejores productos para ti...
+      <div class="store-page-clean animate-on-scroll animate-fade-in">
+        <div class="container store-container" style="padding: 24px 0 48px;">
+          <div style="min-height:220px; display:flex; flex-direction:column; justify-content:center; gap:16px;">
+            <div style="width: 220px; height: 24px; border-radius: 999px; background: rgba(255,255,255,0.08);"></div>
+            <div style="width: min(100%, 500px); height: 20px; border-radius: 999px; background: rgba(255,255,255,0.06);"></div>
+            <div style="margin-top: 8px; font-size: 15px; color: var(--text-secondary); font-weight: 600; display:flex; align-items:center; gap:8px;">
+              <span class="pulsing-dot"></span> Cargando catálogo de productos...
+            </div>
           </div>
         </div>
-      </section>
+      </div>
     `;
   }
 
@@ -931,272 +932,107 @@ function renderStoreView(): string {
   }).join('');
 
   return `
-    <!-- HERO SECTION SPLIT & 3D STAGE -->
-    <section class="store-hero-epic animate-on-scroll animate-zoom-in">
-      <div class="hero-grid-split">
-        <!-- Columna Izquierda: Mensaje de Tienda, Tasas y CTA -->
-        <div>
-          <div class="hero-badge-pill">
-            <span class="pulsing-dot"></span>
-            <span>🔥 LO ÚLTIMO EN TECNOLOGÍA • OFERTAS EXCLUSIVAS</span>
+    <div class="store-page-clean animate-on-scroll animate-fade-in">
+      <div class="container store-container" style="display:flex; flex-direction:column; gap:20px; padding: 24px 0 48px;">
+        
+        <!-- HEADER COMPACTO Y ELEGANTE DE TIENDA -->
+        <header class="store-header-clean animate-fade-up">
+          <div class="store-header-info">
+            <div class="store-header-pill">
+              <span class="pulsing-dot"></span>
+              <span>CATÁLOGO OFICIAL • PRECIOS EN $ Y BS.</span>
+            </div>
+            <h1 class="store-header-title">
+              Tienda <span class="brand-text-facilito">Facilito</span><span class="brand-text-app">App</span>
+            </h1>
+            <p class="store-header-sub">
+              Explora los mejores productos y tecnología con precios oficiales y disponibilidad inmediata.
+            </p>
           </div>
           
-          <h1 class="hero-title-epic">
-            Descubre y compra en <span class="brand-text-facilito">Facilito</span><span class="brand-text-app">App</span> 🛍️
-          </h1>
-          
-          <p class="hero-subtitle-epic">
-            Los mejores smartphones, computadoras y accesorios a precios inmejorables. Visualiza cada precio en <strong>Dólares ($)</strong> o <strong>Bolívares (Bs.)</strong>, paga con tu método favorito y recibe tu pedido rápido y seguro.
-          </p>
-
-          <div class="hero-actions-row">
-            <a href="#store-catalog-anchor" class="btn-hero-primary" id="hero-cta-explore">
-              🛍️ Ver Todos los Productos
-            </a>
-            <button class="btn-hero-secondary" id="hero-btn-promos">
-              🔥 Solo en Stock
-            </button>
-            <div class="hero-rate-ticker">
-              <span>🇻🇪 Tasa del Día (BCV): <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
+          <div class="store-header-rate-box">
+            <div class="store-rate-chip" title="Tasa oficial de cambio del Banco Central de Venezuela">
+              <div class="store-rate-chip-icon">🇻🇪</div>
+              <div class="store-rate-chip-content">
+                <span class="store-rate-chip-label">Tasa Oficial BCV</span>
+                <span class="store-rate-chip-value">Bs. ${formatRate(rateUsdToVes)} <small>/ USD</small></span>
+              </div>
             </div>
           </div>
+        </header>
 
-          <!-- Métricas de Confianza del Cliente -->
-          <div class="hero-trust-row">
-            <div class="hero-trust-item">
-              <span style="font-size:16px;">⭐</span>
-              <span><strong>4.9 / 5</strong> Clientes Satisfechos</span>
-            </div>
-            <div class="hero-trust-item">
-              <span style="font-size:16px;">🚀</span>
-              <span>Entregas <strong>Express 24h</strong></span>
-            </div>
-            <div class="hero-trust-item">
-              <span style="font-size:16px;">🛡️</span>
-              <span>Garantía <strong>100% Oficial</strong></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Columna Derecha: Escenario 3D con Logo y Chips de Beneficios para el Comprador -->
-        <div class="hero-mascot-stage">
-          <div class="mascot-glow-backdrop"></div>
-          
-          <!-- Chip Flotante Superior -->
-          <div class="floating-chip top-right">
-            <span class="pulsing-dot"></span>
-            <span>⚡ Pagos Rápidos & Seguros</span>
+        <!-- DASHBOARD DE BÚSQUEDA Y FILTROS PREMIUM -->
+        <div class="store-filter-dashboard animate-fade-up">
+          <!-- Fila Superior: Categorías en Horizontal con Iconos -->
+          <div class="store-categories-scroll">
+            ${categories.map(cat => {
+              const icon = categoryIcons[cat] || '📦';
+              const isActive = selectedCategory === (cat === 'Todas' ? '' : cat);
+              return `
+                <button class="filter-category-btn-premium ${isActive ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}">
+                  <span style="font-size:16px;">${icon}</span>
+                  <span>${cat}</span>
+                </button>
+              `;
+            }).join('')}
           </div>
 
-          <!-- Pod Central con Logo Oficial -->
-          <div class="mascot-card-core animate-float">
-            <img src="/logo.png" class="mascot-logo-img" alt="FacilitoApp Tienda Online">
-          </div>
-
-          <!-- Chip Flotante Inferior Izquierdo -->
-          <div class="floating-chip bottom-left">
-            <span>📦 Envíos a Todo el País</span>
-          </div>
-
-          <!-- Chip Flotante Inferior Derecho -->
-          <div class="floating-chip bottom-right">
-            <span>⭐ Productos 100% Originales</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 4 PILARES DE VALOR PARA EL CLIENTE (BENTO GRID) -->
-    <div class="pillars-grid animate-on-scroll animate-fade-up">
-      <div class="pillar-card">
-        <div class="pillar-icon-box blue">🚚</div>
-        <div>
-          <div class="pillar-title">Envíos a Domicilio & Retiro</div>
-          <div class="pillar-desc">Recibe tus compras rápido en tu dirección o retira en nuestra sede física.</div>
-        </div>
-      </div>
-      <div class="pillar-card">
-        <div class="pillar-icon-box orange">💰</div>
-        <div>
-          <div class="pillar-title">Precios Claros en $ y Bs.</div>
-          <div class="pillar-desc">Siempre sabrás el monto exacto en tu moneda favorita antes de comprar.</div>
-        </div>
-      </div>
-      <div class="pillar-card">
-        <div class="pillar-icon-box green">🔒</div>
-        <div>
-          <div class="pillar-title">Compra Fácil & Protegida</div>
-          <div class="pillar-desc">Paga cómodamente con Pago Móvil, Efectivo, Binance o Tarjetas.</div>
-        </div>
-      </div>
-      <div class="pillar-card">
-        <div class="pillar-icon-box gold">⭐</div>
-        <div>
-          <div class="pillar-title">Garantía & Soporte Directo</div>
-          <div class="pillar-desc">Todos nuestros artículos cuentan con respaldo oficial y asesoría personalizada.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- BANNER DE CUPÓN / PROMOCIÓN -->
-    <div class="promo-coupon-strip animate-on-scroll animate-fade-up">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:22px;">🎁</span>
-        <div>
-          <span style="font-size:13.5px; font-weight:700; color:#f8fafc;">¡Ahorra en tu compra de hoy!</span>
-          <span style="font-size:12.5px; color:#94a3b8; margin-left:6px;">Usa el código de bienvenida en tu carrito:</span>
-        </div>
-        <span class="promo-coupon-badge" id="promo-code-display">BIENVENIDO</span>
-      </div>
-      <button class="promo-copy-btn" id="copy-coupon-btn" title="Copiar código al portapapeles">
-        📋 Copiar Cupón
-      </button>
-    </div>
-
-    <!-- ANCLAJE PARA DESPLAZAMIENTO SUAVE -->
-    <div id="store-catalog-anchor" style="position:relative; top:-20px;"></div>
-
-    <div class="container store-container" style="display:flex; flex-direction:column; gap:24px; padding:0;">
-      <!-- DASHBOARD DE BÚSQUEDA Y FILTROS PREMIUM -->
-      <div class="store-filter-dashboard animate-on-scroll animate-fade-up visible">
-        <!-- Fila Superior: Categorías en Horizontal con Iconos -->
-        <div style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 10px; overflow-x: auto; width: 100%; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); -webkit-overflow-scrolling: touch; scrollbar-width: none;">
-          ${categories.map(cat => {
-            const icon = categoryIcons[cat] || '📦';
-            const isActive = selectedCategory === (cat === 'Todas' ? '' : cat);
-            return `
-              <button class="filter-category-btn-premium ${isActive ? 'active' : ''}" data-category="${cat === 'Todas' ? '' : cat}" style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size:16px;">${icon}</span>
-                <span>${cat}</span>
-              </button>
-            `;
-          }).join('')}
-        </div>
-
-        <!-- Fila Inferior: Buscador, Ordenamiento, Disponibilidad y Contador -->
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
-          <!-- Buscador con icono y limpiador -->
-          <div style="position: relative; flex: 1; min-width: 260px; max-width: 420px;">
-            <input type="text" class="form-control store-search-glow" id="store-search" placeholder="🔍 Buscar por nombre, categoría o código..." value="${searchQuery}" style="padding-left: 18px; padding-right: 40px; border-radius: 50px; height: 42px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 13.5px; font-weight: 500; width: 100%;">
-            ${searchQuery ? `
-              <button id="store-search-clear" class="search-clear-btn" title="Limpiar búsqueda">&times;</button>
-            ` : ''}
-          </div>
-
-          <!-- Controles de ordenamiento y disponibilidad -->
-          <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Ordenar:</span>
-              <select id="store-sort-select" class="select-premium" style="height: 38px; padding: 0 16px !important;">
-                <option value="default" ${storeSortOrder === 'default' ? 'selected' : ''}>Relevancia</option>
-                <option value="price_asc" ${storeSortOrder === 'price_asc' ? 'selected' : ''}>Menor Precio ($)</option>
-                <option value="price_desc" ${storeSortOrder === 'price_desc' ? 'selected' : ''}>Mayor Precio ($)</option>
-              </select>
+          <!-- Fila Inferior: Buscador, Ordenamiento, Disponibilidad y Contador -->
+          <div class="store-controls-row">
+            <!-- Buscador con icono y limpiador -->
+            <div class="store-search-wrap">
+              <input type="text" class="form-control store-search-glow" id="store-search" placeholder="🔍 Buscar por nombre, categoría o código..." value="${searchQuery}">
+              ${searchQuery ? `
+                <button id="store-search-clear" class="search-clear-btn" title="Limpiar búsqueda">&times;</button>
+              ` : ''}
             </div>
 
-            <label class="switch-premium-label" style="display: flex; align-items: center; gap: 8px;">
-              <input type="checkbox" id="store-available-toggle" class="switch-premium-checkbox" ${storeOnlyAvailable ? 'checked' : ''}>
-              <span>Solo en Stock 🐒</span>
-            </label>
-            
-            <!-- Contador de Resultados -->
-            <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); background: rgba(255,255,255,0.04); padding: 8px 14px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.06); white-space: nowrap;">
-              🛒 ${displayedProducts.length} ${displayedProducts.length === 1 ? 'producto' : 'productos'}
+            <!-- Controles de ordenamiento y disponibilidad -->
+            <div class="store-actions-wrap">
+              <div class="store-sort-wrap">
+                <span class="store-control-label">Ordenar:</span>
+                <select id="store-sort-select" class="select-premium">
+                  <option value="default" ${storeSortOrder === 'default' ? 'selected' : ''}>Relevancia</option>
+                  <option value="price_asc" ${storeSortOrder === 'price_asc' ? 'selected' : ''}>Menor Precio ($)</option>
+                  <option value="price_desc" ${storeSortOrder === 'price_desc' ? 'selected' : ''}>Mayor Precio ($)</option>
+                </select>
+              </div>
+
+              <label class="switch-premium-label">
+                <input type="checkbox" id="store-available-toggle" class="switch-premium-checkbox" ${storeOnlyAvailable ? 'checked' : ''}>
+                <span>Solo en Stock</span>
+              </label>
+              
+              <!-- Contador de Resultados -->
+              <div class="store-count-badge">
+                🛒 ${displayedProducts.length} ${displayedProducts.length === 1 ? 'producto' : 'productos'}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- GRID DE PRODUCTOS (ANCHO COMPLETO) -->
-      <section style="width: 100%;">
-        <div class="products-grid stagger-container">
-          ${productsHtml.length > 0 ? productsHtml : `
-            <div class="card text-center" style="grid-column: 1 / -1; padding: 60px 20px; text-align: center; color: var(--text-secondary); background: rgba(18,24,39,0.5); border-radius:24px; border:1px solid rgba(255,255,255,0.06);">
-              <span style="font-size: 52px; display:block; margin-bottom:14px;">🐒🔍</span>
-              <h3 style="color:#ffffff; font-size:18px; font-weight:700; margin-bottom:6px;">No encontramos productos con esos filtros</h3>
-              <p style="font-size:13px; color:var(--text-muted); max-width:400px; margin:0 auto 16px;">Prueba ajustando el término de búsqueda o cambiando la categoría seleccionada.</p>
-              <button class="btn btn-secondary" id="reset-store-filters-btn" style="border-radius:50px; padding:8px 20px; font-size:13px;">
-                Ver todos los productos
-              </button>
-            </div>
-          `}
-        </div>
-      </section>
+        <!-- GRID DE PRODUCTOS (ANCHO COMPLETO) -->
+        <section class="store-products-section">
+          <div class="products-grid stagger-container">
+            ${productsHtml.length > 0 ? productsHtml : `
+              <div class="card text-center" style="grid-column: 1 / -1; padding: 60px 20px; text-align: center; color: var(--text-secondary); background: rgba(18,24,39,0.5); border-radius:24px; border:1px solid rgba(255,255,255,0.06);">
+                <span style="font-size: 48px; display:block; margin-bottom:14px;">🔍</span>
+                <h3 style="color:#ffffff; font-size:18px; font-weight:700; margin-bottom:6px;">No encontramos productos con esos filtros</h3>
+                <p style="font-size:13px; color:var(--text-muted); max-width:400px; margin:0 auto 16px;">Prueba ajustando el término de búsqueda o seleccionando otra categoría.</p>
+                <button class="btn btn-secondary" id="reset-store-filters-btn" style="border-radius:50px; padding:8px 20px; font-size:13px;">
+                  Ver todos los productos
+                </button>
+              </div>
+            `}
+          </div>
+        </section>
 
-      <!-- RIBBON DE MÉTODOS DE PAGO Y CONFIANZA -->
-      <div class="payment-trust-ribbon animate-on-scroll animate-fade-up">
-        <div style="font-size:14px; font-weight:700; color:#f8fafc; letter-spacing:0.3px;">
-          Aceptamos tus métodos de pago preferidos con total seguridad:
-        </div>
-        <div class="payment-badges-row">
-          <div class="payment-method-pill">
-            <span>💵</span>
-            <span>Efectivo ($ / € / Bs.)</span>
-          </div>
-          <div class="payment-method-pill">
-            <span>📲</span>
-            <span>Pago Móvil (Todos los Bancos)</span>
-          </div>
-          <div class="payment-method-pill">
-            <span>🟡</span>
-            <span>Binance Pay USDT</span>
-          </div>
-          <div class="payment-method-pill">
-            <span>💳</span>
-            <span>Tarjetas de Débito / Crédito</span>
-          </div>
-          <div class="payment-method-pill">
-            <span>🏦</span>
-            <span>Transferencias Inmediatas</span>
-          </div>
-          <div class="payment-method-pill" style="border-color:rgba(16,185,129,0.3); color:#34d399;">
-            <span>🛡️</span>
-            <span>Garantía & Envíos Seguros</span>
-          </div>
-        </div>
       </div>
     </div>
   `;
 }
 
 function bindStoreEvents() {
-  // Desplazamiento suave al catálogo desde el botón hero
-  document.getElementById('hero-cta-explore')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    const target = document.getElementById('store-catalog-anchor');
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth' });
-    }
-  });
-
-  // Botón "Solo Disponibles" en el hero
-  document.getElementById('hero-btn-promos')?.addEventListener('click', () => {
-    storeOnlyAvailable = !storeOnlyAvailable;
-    renderApp();
-    document.getElementById('store-catalog-anchor')?.scrollIntoView({ behavior: 'smooth' });
-  });
-
-  // Copiar cupón promocional con feedback visual
-  document.getElementById('copy-coupon-btn')?.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText('BIENVENIDO');
-      const btn = document.getElementById('copy-coupon-btn');
-      if (btn) {
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '✅ ¡Copiado!';
-        btn.style.background = '#10b981';
-        btn.style.borderColor = '#10b981';
-        setTimeout(() => {
-          btn.innerHTML = originalText;
-          btn.style.background = '';
-          btn.style.borderColor = '';
-        }, 2000);
-      }
-    } catch {
-      alert('Código del cupón: BIENVENIDO (Escríbelo en tu carrito para obtener tu descuento)');
-    }
-  });
-
   // Resetear filtros si no hay resultados
   document.getElementById('reset-store-filters-btn')?.addEventListener('click', async () => {
     searchQuery = '';
