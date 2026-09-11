@@ -1,6 +1,6 @@
 import { Chart, registerables } from 'chart.js';
 import { api } from './utils/api';
-import type { Product, User, SaleDetail, AuditLog, Sale, CashSession } from './utils/api';
+import type { Product, User, SaleDetail, AuditLog, Sale, CashSession, ReturnClaim, ReturnClaimStats } from './utils/api';
 import { initScrollAnimations } from './utils/scroll-animation';
 import './index.css';
 
@@ -9,7 +9,7 @@ Chart.register(...registerables);
 // ==========================================================================
 // ESTADO GLOBAL DE LA APP
 // ==========================================================================
-let currentView: 'store' | 'auth' | 'admin' | 'info' = 'store';
+let currentView: 'store' | 'auth' | 'admin' | 'info' = 'info';
 let currentUser: User | null = null;
 let productsList: Product[] = [];
 let activeCashSession: CashSession | null = null;
@@ -155,7 +155,7 @@ function smartMatch(target: string | undefined | null, query: string | undefined
 }
 
 // Vista activa dentro de Administración
-type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports' | 'suppliers' | 'online_billing';
+type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports' | 'suppliers' | 'online_billing' | 'returns';
 let activeAdminView: AdminSubView = 'pos';
 
 // Nuevas variables de estado para el control en POS
@@ -318,10 +318,23 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Cargar estado instantáneo de la memoria antes de renderizar
   hydrateStateFromCache();
 
-  // Detectar si el usuario ingresó por la ruta /info o #info
+  // Detectar si el usuario ingresó por una ruta específica
   const initialPath = window.location.pathname.toLowerCase();
   const isInfoRoute = initialPath === '/info' || initialPath.endsWith('/info') || window.location.hash === '#info';
-  if (isInfoRoute) {
+  const isStoreRoute = initialPath === '/tienda' || initialPath === '/store' || initialPath.endsWith('/tienda') || window.location.hash === '#tienda';
+  const isLoginRoute = initialPath === '/login' || initialPath.endsWith('/login') || window.location.hash === '#login';
+  const isAdminRoute = initialPath === '/admin' || initialPath.endsWith('/admin') || window.location.hash === '#admin';
+
+  if (isStoreRoute) {
+    currentView = 'store';
+  } else if (isLoginRoute) {
+    currentView = 'auth';
+  } else if (isAdminRoute) {
+    currentView = 'admin';
+  } else if (isInfoRoute) {
+    currentView = 'info';
+  } else {
+    // Por defecto al abrir la aplicación principal (/) redirigir a info
     currentView = 'info';
   }
 
@@ -351,8 +364,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         localStorage.setItem('user', JSON.stringify(freshUser));
 
         if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
-          // Administradores y Vendedores siempre en la vista Admin
-          if (currentView !== 'admin') {
+          if (isAdminRoute) {
             currentView = 'admin';
             if (currentUser.role === 'billing') {
               activeAdminView = 'online_billing';
@@ -362,30 +374,33 @@ window.addEventListener('DOMContentLoaded', async () => {
               activeAdminView = (localStorage.getItem('facilito_last_admin_view') as AdminSubView) || 'pos';
             }
             navigate('admin');
+          } else if (isStoreRoute) {
+            navigate('store');
           } else {
-            renderApp();
+            // Al abrir la aplicación principal (/), mostrar la web de info
+            navigate('info');
           }
         } else {
-          renderApp();
+          if (isStoreRoute) navigate('store');
+          else if (isLoginRoute) navigate('auth');
+          else navigate('info');
         }
       } catch (e) {
         // Token corrupto o expirado
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         currentUser = null;
-        if (!isInfoRoute) navigate('store');
+        navigate('info');
       }
     })();
   } else {
-    if (isInfoRoute) {
-      navigate('info', false);
+    if (isStoreRoute) {
+      navigate('store', false);
+    } else if (isLoginRoute) {
+      navigate('auth', false);
     } else {
-      const lastView = localStorage.getItem('facilito_last_view');
-      if (lastView === 'auth') {
-        navigate('auth', false);
-      } else {
-        navigate('store', false);
-      }
+      // Redirigir a la web de info del sistema
+      navigate('info', true);
     }
   }
 
@@ -402,8 +417,10 @@ window.addEventListener('popstate', () => {
     navigate('auth', false);
   } else if (path === '/admin' || path.endsWith('/admin') || window.location.hash === '#admin') {
     navigate('admin', false);
-  } else {
+  } else if (path === '/tienda' || path === '/store' || path.endsWith('/tienda') || window.location.hash === '#tienda') {
     navigate('store', false);
+  } else {
+    navigate('info', false);
   }
 });
 
@@ -470,7 +487,7 @@ function navigate(view: 'store' | 'auth' | 'admin' | 'info', updateUrl: boolean 
       if (view === 'info') {
         window.history.pushState({ view: 'info' }, '', '/info');
       } else if (view === 'store') {
-        window.history.pushState({ view: 'store' }, '', '/');
+        window.history.pushState({ view: 'store' }, '', '/tienda');
       } else if (view === 'auth') {
         window.history.pushState({ view: 'auth' }, '', '/login');
       } else if (view === 'admin') {
@@ -3157,8 +3174,10 @@ function hasPermission(perm: string): boolean {
   if (!currentUser) return false;
   if (currentUser.role === 'admin') return true;
   if (currentUser.role === 'billing') {
-    return ['online_billing', 'sales', 'debtors', 'customers'].includes(perm);
+    return ['online_billing', 'sales', 'debtors', 'customers', 'returns'].includes(perm);
   }
+  // Módulo de Devoluciones o Reclamos de Garantía disponible para todos los usuarios de ventas
+  if (perm === 'returns') return true;
   if (!currentUser.permissions) return perm === 'pos';
   try {
     const perms = typeof currentUser.permissions === 'string'
@@ -3235,6 +3254,11 @@ function renderAdminDashboard(): string {
           ${hasPermission('products') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'suppliers' ? 'active' : ''}" id="admin-tab-suppliers">
               🚚 Proveedores
+            </button>
+          ` : ''}
+          ${hasPermission('returns') ? `
+            <button class="sidebar-nav-btn ${activeAdminView === 'returns' ? 'active' : ''}" id="admin-tab-returns">
+              🛠️ Devoluciones o Reclamos de Garantía
             </button>
           ` : ''}
           ${currentUser.role === 'admin' ? `
@@ -3329,6 +3353,7 @@ async function bindAdminEvents() {
   const tabReports = document.getElementById('admin-tab-reports');
   const tabSuppliers = document.getElementById('admin-tab-suppliers');
   const tabOnlineBilling = document.getElementById('admin-tab-online-billing');
+  const tabReturns = document.getElementById('admin-tab-returns');
 
   const clearActiveTabs = () => {
     tabStats?.classList.remove('active');
@@ -3344,6 +3369,7 @@ async function bindAdminEvents() {
     tabReports?.classList.remove('active');
     tabSuppliers?.classList.remove('active');
     tabOnlineBilling?.classList.remove('active');
+    tabReturns?.classList.remove('active');
   };
 
   const switchAdminSubView = (view: AdminSubView) => {
@@ -3457,6 +3483,14 @@ async function bindAdminEvents() {
     await renderOnlineBilling();
   });
 
+  tabReturns?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabReturns.classList.add('active');
+    switchAdminSubView('returns');
+    destroyCharts();
+    await renderAdminReturns();
+  });
+
   // Renderizar la subvista por defecto al cargar
   if (activeAdminView === 'stats') {
     await renderAdminStats();
@@ -3484,6 +3518,8 @@ async function bindAdminEvents() {
     await renderAdminSuppliers();
   } else if (activeAdminView === 'online_billing') {
     await renderOnlineBilling();
+  } else if (activeAdminView === 'returns') {
+    await renderAdminReturns();
   }
 
   // Guardar Tasas de Cambio Manuales (BCV & Binance)
@@ -8840,6 +8876,9 @@ async function renderAdminStaff() {
                 <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
                   <input type="checkbox" class="staff-perm-checkbox" value="staff"> 👥 Gestión de Personal
                 </label>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer;">
+                  <input type="checkbox" class="staff-perm-checkbox" value="returns" checked> 🛠️ Devoluciones y Garantías
+                </label>
               </div>
             </div>
 
@@ -10421,3 +10460,1064 @@ async function renderOnlineBilling() {
     panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al obtener pedidos online del servidor: ${error.message}</div>`;
   }
 }
+
+// ==========================================================================
+// VISTA: DEVOLUCIONES O RECLAMOS DE GARANTÍA
+// ==========================================================================
+let returnsList: ReturnClaim[] = [];
+let returnsLoaded = false;
+let returnsLoading = false;
+let returnsStats: ReturnClaimStats | null = null;
+let returnsSearchQuery = '';
+let returnsStatusFilter = 'all';
+let returnsTypeFilter = 'all';
+
+async function renderAdminReturns() {
+  const panel = document.getElementById('dashboard-content-panel');
+  if (!panel) return;
+
+  if (!returnsLoaded || returnsLoading) {
+    panel.innerHTML = `<div style="padding:20px; font-weight:700; color:var(--text-muted);">Cargando módulo de Devoluciones y Garantías...</div>`;
+  }
+
+  try {
+    returnsLoading = true;
+    const [fetchedClaims, fetchedStats] = await Promise.all([
+      api.returns.getAll({
+        status: returnsStatusFilter,
+        type: returnsTypeFilter,
+        search: returnsSearchQuery
+      }),
+      api.returns.getStats()
+    ]);
+    returnsList = fetchedClaims;
+    returnsStats = fetchedStats;
+    returnsLoaded = true;
+    returnsLoading = false;
+  } catch (error: any) {
+    returnsLoading = false;
+    panel.innerHTML = `<div class="card text-center" style="color:var(--danger)">Error al cargar devoluciones y garantías: ${error.message}</div>`;
+    return;
+  }
+
+  const totalCases = returnsStats?.total ?? returnsList.length;
+  const pendingCases = returnsStats?.pending ?? returnsList.filter(r => ['pending', 'in_repair'].includes(r.status)).length;
+  const repairedCases = returnsStats?.repaired ?? returnsList.filter(r => r.is_repaired || r.status === 'repaired').length;
+  const totalRepairCost = returnsStats?.total_repair_cost ?? returnsList.reduce((sum, r) => sum + (Number(r.repair_cost) || 0), 0);
+  const warrantiesCount = returnsStats?.warranties ?? returnsList.filter(r => r.type === 'warranty').length;
+  const returnsCount = returnsStats?.returns ?? returnsList.filter(r => r.type === 'return').length;
+
+  panel.innerHTML = `
+    <div class="animate-on-scroll animate-fade-up visible">
+      <!-- Header -->
+      <div class="flex justify-between align-center mb-4" style="flex-wrap:wrap; gap:12px;">
+        <div>
+          <h2 style="font-size:24px; font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:8px;">
+            🛠️ Devoluciones o Reclamos de Garantía
+          </h2>
+          <p style="font-size:12px; color:var(--text-secondary);">
+            Gestión de garantías, devoluciones, reparaciones técnicas y registro de costos internos para la tienda
+          </p>
+        </div>
+        <button type="button" class="btn btn-primary" id="btn-open-new-return" style="padding:10px 18px; font-weight:700; border-radius:50px; display:flex; align-items:center; gap:6px;">
+          ➕ Registrar Caso
+        </button>
+      </div>
+
+      <!-- KPI Summary Cards Grid -->
+      <div class="grid grid-4 gap-3 mb-4">
+        <!-- Card 1: Total Casos -->
+        <div class="card" style="padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-glass); background:rgba(255,255,255,0.02);">
+          <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px;">Total Casos</div>
+          <div style="font-size:28px; font-weight:900; color:var(--brand-blue);">${totalCases}</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">
+            🛡️ ${warrantiesCount} Garantías • 🔄 ${returnsCount} Devoluciones
+          </div>
+        </div>
+
+        <!-- Card 2: En Proceso / Taller -->
+        <div class="card" style="padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-glass); background:rgba(255,255,255,0.02);">
+          <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px;">En Taller / Pendientes</div>
+          <div style="font-size:28px; font-weight:900; color:var(--brand-gold);">${pendingCases}</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Casos abiertos en espera o revisión</div>
+        </div>
+
+        <!-- Card 3: Productos Reparados -->
+        <div class="card" style="padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-glass); background:rgba(255,255,255,0.02);">
+          <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px;">Equipos Reparados</div>
+          <div style="font-size:28px; font-weight:900; color:var(--success);">${repairedCases}</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Reparación completada con éxito</div>
+        </div>
+
+        <!-- Card 4: Costo Total Reparaciones (Tienda) -->
+        <div class="card" style="padding:16px; border-radius:var(--radius-md); border:1px solid rgba(255,115,0,0.3); background:rgba(255,115,0,0.04);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:11px; font-weight:700; color:var(--brand-orange); text-transform:uppercase;">Costo Total Reparaciones</span>
+            <span class="badge" style="font-size:9px; background:rgba(255,115,0,0.2); color:var(--brand-orange); padding:2px 6px;">Tienda</span>
+          </div>
+          <div style="font-size:28px; font-weight:900; color:var(--brand-orange);">$${Number(totalRepairCost).toFixed(2)}</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">
+            * Gasto asumido por la tienda (no cobrado al cliente)
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar / Filters -->
+      <div class="card mb-4" style="padding:14px 18px; border-radius:var(--radius-md); border:1px solid var(--border-glass);">
+        <div class="flex justify-between align-center" style="flex-wrap:wrap; gap:12px;">
+          <!-- Buscador -->
+          <div style="flex:1; min-width:260px;">
+            <input 
+              type="text" 
+              class="form-control" 
+              id="returns-search-input" 
+              placeholder="🔍 Buscar por Ticket, Cliente, Cédula, Teléfono o Producto..." 
+              value="${returnsSearchQuery}"
+              style="font-size:13px; padding:10px 14px;"
+            >
+          </div>
+
+          <!-- Filtro Tipo -->
+          <div style="min-width:160px;">
+            <select class="form-control" id="returns-type-filter" style="font-size:13px; padding:10px 14px;">
+              <option value="all" ${returnsTypeFilter === 'all' ? 'selected' : ''}>Todos los Tipos</option>
+              <option value="warranty" ${returnsTypeFilter === 'warranty' ? 'selected' : ''}>🛡️ Garantías</option>
+              <option value="return" ${returnsTypeFilter === 'return' ? 'selected' : ''}>🔄 Devoluciones</option>
+            </select>
+          </div>
+
+          <!-- Filtro Estado -->
+          <div style="min-width:180px;">
+            <select class="form-control" id="returns-status-filter" style="font-size:13px; padding:10px 14px;">
+              <option value="all" ${returnsStatusFilter === 'all' ? 'selected' : ''}>Todos los Estados</option>
+              <option value="pending" ${returnsStatusFilter === 'pending' ? 'selected' : ''}>⏳ Pendientes</option>
+              <option value="in_repair" ${returnsStatusFilter === 'in_repair' ? 'selected' : ''}>🔧 En Reparación</option>
+              <option value="repaired" ${returnsStatusFilter === 'repaired' ? 'selected' : ''}>✅ Reparados</option>
+              <option value="replaced" ${returnsStatusFilter === 'replaced' ? 'selected' : ''}>🔄 Reemplazados</option>
+              <option value="refunded" ${returnsStatusFilter === 'refunded' ? 'selected' : ''}>💵 Reembolsados</option>
+              <option value="rejected" ${returnsStatusFilter === 'rejected' ? 'selected' : ''}>❌ Rechazados</option>
+              <option value="completed" ${returnsStatusFilter === 'completed' ? 'selected' : ''}>🏁 Entregados</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla de Casos -->
+      <div class="card table-responsive" style="border-radius:var(--radius-md); border:1px solid var(--border-glass); padding:0; overflow:hidden;">
+        <table class="table" style="width:100%; margin:0; border-collapse:collapse;">
+          <thead style="background:rgba(255,255,255,0.03); font-size:11px; text-transform:uppercase; color:var(--text-secondary); border-bottom:1px solid var(--border-glass);">
+            <tr>
+              <th style="padding:14px 16px; text-align:left;">Ticket / Tipo</th>
+              <th style="padding:14px 16px; text-align:left;">Fecha</th>
+              <th style="padding:14px 16px; text-align:left;">Cliente</th>
+              <th style="padding:14px 16px; text-align:left;">Producto & Serial</th>
+              <th style="padding:14px 16px; text-align:left;">Motivo / Falla</th>
+              <th style="padding:14px 16px; text-align:center;">Estado</th>
+              <th style="padding:14px 16px; text-align:right;">Reparación / Tienda</th>
+              <th style="padding:14px 16px; text-align:center;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody style="font-size:12px;">
+            ${returnsList.length === 0 ? `
+              <tr>
+                <td colspan="8" style="text-align:center; padding:40px; color:var(--text-muted);">
+                  <div style="font-size:32px; margin-bottom:8px;">📦</div>
+                  No se encontraron casos de garantías o devoluciones registrados con estos filtros.
+                </td>
+              </tr>
+            ` : returnsList.map(item => {
+              const isRep = item.is_repaired === 1 || item.is_repaired === true || item.status === 'repaired';
+              const repCost = parseFloat(String(item.repair_cost || 0)) || 0;
+              
+              let statusBadge = '';
+              switch(item.status) {
+                case 'pending':
+                  statusBadge = '<span class="status-badge status-pending">⏳ Pendiente</span>';
+                  break;
+                case 'in_repair':
+                  statusBadge = '<span class="status-badge" style="background:rgba(0,119,246,0.15); color:var(--brand-blue); border:1px solid rgba(0,119,246,0.3);">🔧 En Reparación</span>';
+                  break;
+                case 'repaired':
+                  statusBadge = '<span class="status-badge status-completed">✅ Reparado</span>';
+                  break;
+                case 'replaced':
+                  statusBadge = '<span class="status-badge" style="background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3);">🔄 Reemplazado</span>';
+                  break;
+                case 'refunded':
+                  statusBadge = '<span class="status-badge" style="background:rgba(245,158,11,0.15); color:var(--brand-gold); border:1px solid rgba(245,158,11,0.3);">💵 Reembolsado</span>';
+                  break;
+                case 'rejected':
+                  statusBadge = '<span class="status-badge status-cancelled">❌ Rechazado</span>';
+                  break;
+                case 'completed':
+                  statusBadge = '<span class="status-badge" style="background:rgba(16,185,129,0.15); color:var(--success); border:1px solid rgba(16,185,129,0.3);">🏁 Entregado</span>';
+                  break;
+                default:
+                  statusBadge = `<span class="status-badge">${item.status}</span>`;
+              }
+
+              const dateFormatted = new Date(item.received_at || item.created_at).toLocaleDateString('es-ES', {
+                day: '2-digit', month: '2-digit', year: 'numeric'
+              });
+
+              return `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
+                  <td style="padding:14px 16px;">
+                    <div style="font-weight:800; color:var(--brand-blue); font-size:13px; letter-spacing:0.5px;">${item.code}</div>
+                    <div style="margin-top:2px;">
+                      ${item.type === 'return' 
+                        ? '<span class="badge" style="background:rgba(245,158,11,0.15); color:var(--brand-gold); font-size:10px; padding:2px 6px;">🔄 Devolución</span>'
+                        : '<span class="badge" style="background:rgba(0,119,246,0.15); color:var(--brand-blue); font-size:10px; padding:2px 6px;">🛡️ Garantía</span>'
+                      }
+                      ${item.sale_id ? `<span style="font-size:10px; color:var(--text-muted); margin-left:4px;">#Fac-${item.sale_id}</span>` : ''}
+                    </div>
+                  </td>
+                  <td style="padding:14px 16px; color:var(--text-secondary); white-space:nowrap;">
+                    ${dateFormatted}
+                  </td>
+                  <td style="padding:14px 16px;">
+                    <div style="font-weight:700; color:var(--text-primary);">${item.customer_name}</div>
+                    <div style="font-size:11px; color:var(--text-secondary);">
+                      ${item.customer_ci ? `CI: ${item.customer_ci}` : ''}
+                      ${item.customer_phone ? ` • Tel: ${item.customer_phone}` : ''}
+                    </div>
+                  </td>
+                  <td style="padding:14px 16px;">
+                    <div style="font-weight:700; color:var(--text-primary);">${item.product_name}</div>
+                    ${item.product_sku ? `<div style="font-size:10px; color:var(--text-muted); font-family:monospace;">Serial/SKU: ${item.product_sku}</div>` : ''}
+                  </td>
+                  <td style="padding:14px 16px; max-width:220px;">
+                    <div style="font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.reason}</div>
+                    ${item.issue_description ? `<div style="font-size:11px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.issue_description}</div>` : ''}
+                  </td>
+                  <td style="padding:14px 16px; text-align:center; white-space:nowrap;">
+                    ${statusBadge}
+                  </td>
+                  <td style="padding:14px 16px; text-align:right; white-space:nowrap;">
+                    ${isRep ? `
+                      <div style="display:inline-flex; flex-direction:column; align-items:flex-end;">
+                        <span style="color:var(--success); font-weight:800; font-size:11px; display:inline-flex; align-items:center; gap:2px;">
+                          🔧 Reparado
+                        </span>
+                        <span style="color:var(--brand-orange); font-weight:900; font-size:13px;">
+                          $${repCost.toFixed(2)}
+                        </span>
+                        <span style="font-size:9px; color:var(--text-muted);">(Costo Tienda)</span>
+                      </div>
+                    ` : `
+                      <span style="color:var(--text-muted); font-size:11px;">Sin reparar</span>
+                    `}
+                  </td>
+                  <td style="padding:14px 16px; text-align:center; white-space:nowrap;">
+                    <div style="display:inline-flex; gap:6px; align-items:center;">
+                      <button type="button" class="btn btn-secondary btn-manage-return" data-id="${item.id}" title="Gestionar caso y reparaciones" style="padding:6px 10px; font-size:11px; border-radius:6px;">
+                        👁️ Gestionar
+                      </button>
+                      <button type="button" class="btn btn-secondary btn-print-return" data-id="${item.id}" title="Imprimir comprobante para cliente" style="padding:6px 10px; font-size:11px; border-radius:6px;">
+                        📄
+                      </button>
+                      ${item.customer_phone ? `
+                        <button type="button" class="btn btn-secondary btn-wa-return" data-id="${item.id}" title="Enviar mensaje de estado por WhatsApp" style="padding:6px 10px; font-size:11px; border-radius:6px; background:rgba(37,211,102,0.1); color:#25D366; border:1px solid rgba(37,211,102,0.3);">
+                          💬
+                        </button>
+                      ` : ''}
+                      ${currentUser?.role === 'admin' ? `
+                        <button type="button" class="btn btn-secondary btn-delete-return" data-id="${item.id}" title="Eliminar registro" style="padding:6px 10px; font-size:11px; border-radius:6px; color:var(--danger); border:1px solid rgba(255,75,75,0.3);">
+                          🗑️
+                        </button>
+                      ` : ''}
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Contenedores para Modales Dinámicos -->
+      <div id="returns-modal-root"></div>
+    </div>
+  `;
+
+  // Search & Filter listeners
+  let debounce: any;
+  document.getElementById('returns-search-input')?.addEventListener('input', (e) => {
+    clearTimeout(debounce);
+    returnsSearchQuery = (e.target as HTMLInputElement).value;
+    debounce = setTimeout(() => {
+      void renderAdminReturns();
+    }, 300);
+  });
+
+  document.getElementById('returns-type-filter')?.addEventListener('change', (e) => {
+    returnsTypeFilter = (e.target as HTMLSelectElement).value;
+    void renderAdminReturns();
+  });
+
+  document.getElementById('returns-status-filter')?.addEventListener('change', (e) => {
+    returnsStatusFilter = (e.target as HTMLSelectElement).value;
+    void renderAdminReturns();
+  });
+
+  // Open New Return modal
+  document.getElementById('btn-open-new-return')?.addEventListener('click', () => {
+    openNewReturnModal();
+  });
+
+  // Manage return button
+  document.querySelectorAll('.btn-manage-return').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const found = returnsList.find(r => r.id === id);
+      if (found) {
+        openManageReturnModal(found);
+      }
+    });
+  });
+
+  // Print return button
+  document.querySelectorAll('.btn-print-return').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const found = returnsList.find(r => r.id === id);
+      if (found) {
+        openPrintReturnModal(found);
+      }
+    });
+  });
+
+  // WhatsApp return button
+  document.querySelectorAll('.btn-wa-return').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const found = returnsList.find(r => r.id === id);
+      if (found) {
+        sendReturnWhatsApp(found);
+      }
+    });
+  });
+
+  // Delete return button (admin)
+  document.querySelectorAll('.btn-delete-return').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = parseInt((e.currentTarget as HTMLButtonElement).dataset.id || '0');
+      const found = returnsList.find(r => r.id === id);
+      if (!found) return;
+
+      if (confirm(`¿Está seguro de eliminar el caso ${found.code}?\n\nEsta acción no se puede deshacer.`)) {
+        try {
+          await api.returns.delete(id);
+          alert(`Caso ${found.code} eliminado correctamente.`);
+          void renderAdminReturns();
+        } catch (err: any) {
+          alert(`Error al eliminar caso: ${err.message}`);
+        }
+      }
+    });
+  });
+}
+
+// Modal: Registrar Nuevo Caso
+function openNewReturnModal() {
+  const modalRoot = document.getElementById('returns-modal-root');
+  if (!modalRoot) return;
+
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" id="new-return-backdrop" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(4px);">
+      <div class="card" style="width:100%; max-width:680px; max-height:90vh; overflow-y:auto; padding:24px; border-radius:var(--radius-lg); border:1px solid var(--border-glass); background:var(--bg-secondary); position:relative;">
+        <div class="flex justify-between align-center mb-3">
+          <div>
+            <h3 style="font-size:18px; font-weight:800; display:flex; align-items:center; gap:8px;">
+              ➕ Registrar Reclamo o Devolución
+            </h3>
+            <p style="font-size:12px; color:var(--text-secondary);">Ingrese los datos del cliente, producto y desperfecto</p>
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-close-new-return-modal" style="padding:4px 10px; font-size:14px; border-radius:50px;">✕</button>
+        </div>
+
+        <form id="new-return-form">
+          <!-- Tipo de Solicitud -->
+          <div class="form-group mb-3">
+            <label class="form-label" style="font-size:12px; font-weight:700;">Tipo de Solicitud *</label>
+            <div style="display:flex; gap:12px;">
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; background:rgba(0,119,246,0.1); padding:8px 14px; border-radius:8px; border:1px solid rgba(0,119,246,0.3); flex:1;">
+                <input type="radio" name="new-return-type" value="warranty" checked>
+                <strong>🛡️ Reclamo de Garantía</strong>
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px; background:rgba(245,158,11,0.1); padding:8px 14px; border-radius:8px; border:1px solid rgba(245,158,11,0.3); flex:1;">
+                <input type="radio" name="new-return-type" value="return">
+                <strong>🔄 Devolución Directa</strong>
+              </label>
+            </div>
+          </div>
+
+          <!-- Búsqueda rápida de Factura/Venta (Opcional) -->
+          <div class="card mb-3" style="padding:12px; background:rgba(255,255,255,0.02); border:1px dashed var(--border-glass); border-radius:var(--radius-sm);">
+            <label class="form-label" style="font-size:11px; font-weight:700; color:var(--brand-blue); display:flex; align-items:center; gap:4px;">
+              🔍 Vincular con Venta / Factura (Opcional)
+            </label>
+            <div class="flex gap-2">
+              <input type="text" class="form-control" id="new-return-sale-search" placeholder="Ingrese # de Factura o Cédula del Cliente..." style="font-size:12px; padding:8px 12px; flex:1;">
+              <button type="button" class="btn btn-secondary" id="btn-search-sale-for-return" style="padding:8px 14px; font-size:12px; font-weight:700; white-space:nowrap;">
+                Buscar Venta
+              </button>
+            </div>
+            <div id="new-return-sale-result" style="margin-top:8px; font-size:12px;"></div>
+          </div>
+
+          <!-- Datos del Producto -->
+          <div class="grid grid-2 gap-2 mb-3">
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px; font-weight:700;">Nombre del Producto *</label>
+              <input type="text" class="form-control" id="new-return-prod-name" required placeholder="Ej: iPhone 15 Pro Max 256GB" style="font-size:12px; padding:8px 12px;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px; font-weight:700;">Serial / IMEI / Código SKU</label>
+              <input type="text" class="form-control" id="new-return-prod-sku" placeholder="Ej: SN-98273461 o IMEI" style="font-size:12px; padding:8px 12px;">
+            </div>
+          </div>
+
+          <!-- Datos del Cliente -->
+          <div class="grid grid-2 gap-2 mb-3">
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px; font-weight:700;">Nombre del Cliente *</label>
+              <input type="text" class="form-control" id="new-return-cust-name" required placeholder="Nombre completo" style="font-size:12px; padding:8px 12px;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px; font-weight:700;">Cédula / RIF</label>
+              <input type="text" class="form-control" id="new-return-cust-ci" placeholder="Ej: V-12345678" style="font-size:12px; padding:8px 12px;">
+            </div>
+          </div>
+
+          <div class="grid grid-2 gap-2 mb-3">
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px; font-weight:700;">Teléfono / WhatsApp</label>
+              <input type="text" class="form-control" id="new-return-cust-phone" placeholder="Ej: 04121234567" style="font-size:12px; padding:8px 12px;">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px; font-weight:700;">Correo Electrónico</label>
+              <input type="email" class="form-control" id="new-return-cust-email" placeholder="cliente@correo.com" style="font-size:12px; padding:8px 12px;">
+            </div>
+          </div>
+
+          <!-- Motivo y Falla -->
+          <div class="form-group mb-3">
+            <label class="form-label" style="font-size:11px; font-weight:700;">Motivo Principal / Falla Reportada *</label>
+            <input type="text" class="form-control" id="new-return-reason" required placeholder="Ej: No enciende / Pantalla no responde / Batería se descarga rápido" style="font-size:12px; padding:8px 12px;">
+          </div>
+
+          <div class="form-group mb-3">
+            <label class="form-label" style="font-size:11px; font-weight:700;">Descripción Detallada del Problema</label>
+            <textarea class="form-control" id="new-return-desc" rows="2" placeholder="Detalle las condiciones en que falla el equipo, accesorios con los que se recibe..." style="font-size:12px; padding:8px 12px;"></textarea>
+          </div>
+
+          <!-- Estado inicial y opción de Reparación -->
+          <div class="grid grid-2 gap-2 mb-3">
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px; font-weight:700;">Estado Inicial del Caso</label>
+              <select class="form-control" id="new-return-status" style="font-size:12px; padding:8px 12px;">
+                <option value="pending">⏳ Pendiente (Recibido)</option>
+                <option value="in_repair">🔧 En Reparación (En Taller)</option>
+                <option value="repaired">✅ Ya Reparado</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="display:flex; flex-direction:column; justify-content:flex-end;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; padding:8px 10px; background:rgba(255,255,255,0.03); border-radius:6px; border:1px solid var(--border-glass);">
+                <input type="checkbox" id="new-return-is-repaired">
+                <span>¿Registrar Reparación y Costo Tienda?</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Sección Reparación (Condicional) -->
+          <div id="new-return-repair-section" style="display:none; padding:14px; background:rgba(255,115,0,0.05); border:1px solid rgba(255,115,0,0.3); border-radius:var(--radius-sm); margin-bottom:16px;">
+            <div style="font-weight:700; font-size:12px; color:var(--brand-orange); margin-bottom:8px; display:flex; align-items:center; gap:4px;">
+              🔧 Datos de la Reparación Técnica
+            </div>
+            <div class="grid grid-2 gap-2 mb-2">
+              <div class="form-group">
+                <label class="form-label" style="font-size:11px; font-weight:700;">Costo Reparación Tienda ($ USD)</label>
+                <input type="number" step="0.01" min="0" class="form-control" id="new-return-repair-cost" value="0.00" style="font-size:12px; padding:8px 12px; font-weight:700; color:var(--brand-orange);">
+                <small style="font-size:10px; color:var(--text-muted);">* Costo interno asumido por la tienda (no se cobra al cliente)</small>
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size:11px; font-weight:700;">Técnico / Servicio Autorizado</label>
+                <input type="text" class="form-control" id="new-return-tech-name" placeholder="Ej: Carlos Silva / Taller Central" style="font-size:12px; padding:8px 12px;">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:11px; font-weight:700;">Notas de Reparación / Repuestos</label>
+              <textarea class="form-control" id="new-return-repair-notes" rows="2" placeholder="Repuestos reemplazados, trabajo realizado..." style="font-size:12px; padding:8px 12px;"></textarea>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 mt-4">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-new-return" style="padding:8px 16px; font-size:12px;">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="btn-submit-new-return" style="padding:8px 20px; font-size:12px; font-weight:700;">Guardar Caso</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  // Close handlers
+  const closeModal = () => {
+    modalRoot.innerHTML = '';
+  };
+  document.getElementById('btn-close-new-return-modal')?.addEventListener('click', closeModal);
+  document.getElementById('btn-cancel-new-return')?.addEventListener('click', closeModal);
+
+  // Toggle repair fields
+  const chkRepaired = document.getElementById('new-return-is-repaired') as HTMLInputElement;
+  const repSection = document.getElementById('new-return-repair-section');
+  const selStatus = document.getElementById('new-return-status') as HTMLSelectElement;
+
+  const updateRepairDisplay = () => {
+    if (chkRepaired.checked || selStatus.value === 'repaired' || selStatus.value === 'in_repair') {
+      if (repSection) repSection.style.display = 'block';
+      if (selStatus.value === 'repaired') chkRepaired.checked = true;
+    } else {
+      if (repSection) repSection.style.display = 'none';
+    }
+  };
+
+  chkRepaired?.addEventListener('change', updateRepairDisplay);
+  selStatus?.addEventListener('change', updateRepairDisplay);
+
+  // Search sale handler
+  let selectedSaleId: number | null = null;
+  let selectedProductId: number | null = null;
+
+  document.getElementById('btn-search-sale-for-return')?.addEventListener('click', async () => {
+    const term = (document.getElementById('new-return-sale-search') as HTMLInputElement).value.trim();
+    const resDiv = document.getElementById('new-return-sale-result');
+    if (!term || !resDiv) return;
+
+    resDiv.innerHTML = `<span style="color:var(--text-muted);">Buscando venta...</span>`;
+
+    try {
+      // Buscar venta por ID o en ventas cargadas
+      let sale: any = null;
+      const numId = parseInt(term.replace('#', ''));
+      if (!isNaN(numId)) {
+        try {
+          sale = await api.sales.getDetails(numId);
+        } catch (e) {}
+      }
+
+      if (!sale) {
+        // Buscar por CI de cliente en ventas
+        const salesData = await api.sales.getAllAdmin();
+        const found = salesData.find((s: any) => s.id === numId || (s.customer_ci && s.customer_ci.toLowerCase().includes(term.toLowerCase())));
+        if (found) {
+          sale = await api.sales.getDetails(found.id);
+        }
+      }
+
+      if (sale) {
+        selectedSaleId = sale.id;
+
+        // Autocompletar datos del cliente
+        (document.getElementById('new-return-cust-name') as HTMLInputElement).value = sale.customer_name || '';
+        (document.getElementById('new-return-cust-ci') as HTMLInputElement).value = sale.customer_ci || '';
+        (document.getElementById('new-return-cust-phone') as HTMLInputElement).value = sale.customer_phone || '';
+        (document.getElementById('new-return-cust-email') as HTMLInputElement).value = sale.customer_email || '';
+
+        // Armar selector de productos de la venta
+        const items = sale.items || [];
+        if (items.length > 0) {
+          resDiv.innerHTML = `
+            <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); padding:8px 12px; border-radius:6px; margin-top:4px;">
+              <div style="color:var(--success); font-weight:700; margin-bottom:4px;">
+                ✓ Venta #${sale.id} encontrada (${new Date(sale.created_at).toLocaleDateString('es-ES')} - Total: $${Number(sale.total).toFixed(2)})
+              </div>
+              <label style="font-size:11px; font-weight:700;">Seleccione el producto afectado de esta factura:</label>
+              <select class="form-control" id="select-sale-item-return" style="font-size:11px; padding:6px 10px; margin-top:4px;">
+                <option value="">-- Seleccionar producto --</option>
+                ${items.map((it: any) => `
+                  <option value="${it.product_id}" data-name="${it.product_name || it.name}" data-code="${it.code || ''}">
+                    ${it.product_name || it.name} (Cant: ${it.quantity} - $${Number(it.price).toFixed(2)})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+          `;
+
+          document.getElementById('select-sale-item-return')?.addEventListener('change', (e) => {
+            const selectEl = e.target as HTMLSelectElement;
+            const selectedOpt = selectEl.selectedOptions[0];
+            if (selectedOpt && selectEl.value) {
+              selectedProductId = parseInt(selectEl.value);
+              (document.getElementById('new-return-prod-name') as HTMLInputElement).value = selectedOpt.dataset.name || '';
+              if (selectedOpt.dataset.code) {
+                (document.getElementById('new-return-prod-sku') as HTMLInputElement).value = selectedOpt.dataset.code;
+              }
+            }
+          });
+        } else {
+          resDiv.innerHTML = `<span style="color:var(--success);">✓ Venta #${sale.id} vinculada correctamente.</span>`;
+        }
+      } else {
+        resDiv.innerHTML = `<span style="color:var(--warning);">No se encontró ninguna venta con "${term}". Puedes ingresar los datos manualmente.</span>`;
+      }
+    } catch (e: any) {
+      resDiv.innerHTML = `<span style="color:var(--danger);">Error en búsqueda: ${e.message}</span>`;
+    }
+  });
+
+  // Submit form handler
+  document.getElementById('new-return-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const btnSubmit = document.getElementById('btn-submit-new-return') as HTMLButtonElement;
+    btnSubmit.disabled = true;
+    btnSubmit.innerText = 'Guardando...';
+
+    try {
+      const typeRadio = document.querySelector('input[name="new-return-type"]:checked') as HTMLInputElement;
+      const typeVal = (typeRadio ? typeRadio.value : 'warranty') as 'warranty' | 'return';
+
+      const productName = (document.getElementById('new-return-prod-name') as HTMLInputElement).value.trim();
+      const productSku = (document.getElementById('new-return-prod-sku') as HTMLInputElement).value.trim();
+      const customerName = (document.getElementById('new-return-cust-name') as HTMLInputElement).value.trim();
+      const customerCi = (document.getElementById('new-return-cust-ci') as HTMLInputElement).value.trim();
+      const customerPhone = (document.getElementById('new-return-cust-phone') as HTMLInputElement).value.trim();
+      const customerEmail = (document.getElementById('new-return-cust-email') as HTMLInputElement).value.trim();
+      const reason = (document.getElementById('new-return-reason') as HTMLInputElement).value.trim();
+      const issueDesc = (document.getElementById('new-return-desc') as HTMLTextAreaElement).value.trim();
+      const statusVal = (document.getElementById('new-return-status') as HTMLSelectElement).value as any;
+      const isRep = (document.getElementById('new-return-is-repaired') as HTMLInputElement).checked || statusVal === 'repaired';
+      const repairCost = parseFloat((document.getElementById('new-return-repair-cost') as HTMLInputElement)?.value || '0') || 0;
+      const techName = (document.getElementById('new-return-tech-name') as HTMLInputElement)?.value.trim() || '';
+      const repairNotes = (document.getElementById('new-return-repair-notes') as HTMLTextAreaElement)?.value.trim() || '';
+
+      const resp = await api.returns.create({
+        type: typeVal,
+        sale_id: selectedSaleId,
+        product_id: selectedProductId,
+        product_name: productName,
+        product_sku: productSku || null,
+        customer_name: customerName,
+        customer_ci: customerCi || null,
+        customer_phone: customerPhone || null,
+        customer_email: customerEmail || null,
+        reason,
+        issue_description: issueDesc || null,
+        status: statusVal,
+        is_repaired: isRep ? 1 : 0,
+        repair_cost: repairCost,
+        technician_name: techName || null,
+        repair_notes: repairNotes || null
+      });
+
+      alert(`¡Caso registrado exitosamente!\n\nNúmero de Ticket: ${resp.code}`);
+      closeModal();
+      void renderAdminReturns();
+    } catch (err: any) {
+      alert(`Error al guardar caso: ${err.message}`);
+      btnSubmit.disabled = false;
+      btnSubmit.innerText = 'Guardar Caso';
+    }
+  });
+}
+
+// Modal: Gestionar Caso / Reparación
+function openManageReturnModal(item: ReturnClaim) {
+  const modalRoot = document.getElementById('returns-modal-root');
+  if (!modalRoot) return;
+
+  const isRep = item.is_repaired === 1 || item.is_repaired === true || item.status === 'repaired';
+  const repCost = parseFloat(String(item.repair_cost || 0)) || 0;
+
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" id="manage-return-backdrop" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(4px);">
+      <div class="card" style="width:100%; max-width:680px; max-height:90vh; overflow-y:auto; padding:24px; border-radius:var(--radius-lg); border:1px solid var(--border-glass); background:var(--bg-secondary); position:relative;">
+        <div class="flex justify-between align-center mb-3">
+          <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="badge" style="background:rgba(0,119,246,0.2); color:var(--brand-blue); font-size:12px; font-weight:800; padding:4px 10px;">
+                ${item.code}
+              </span>
+              <h3 style="font-size:18px; font-weight:800; margin:0;">
+                Gestionar Caso y Reparaciones
+              </h3>
+            </div>
+            <p style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
+              ${item.type === 'warranty' ? '🛡️ Reclamo de Garantía' : '🔄 Devolución'} • Registrado el ${new Date(item.received_at || item.created_at).toLocaleDateString('es-ES')}
+            </p>
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-close-manage-return-modal" style="padding:4px 10px; font-size:14px; border-radius:50px;">✕</button>
+        </div>
+
+        <!-- Resumen de datos -->
+        <div class="card mb-3" style="padding:14px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:var(--radius-sm); font-size:12px;">
+          <div class="grid grid-2 gap-2">
+            <div>
+              <span style="color:var(--text-secondary);">Cliente:</span> <strong>${item.customer_name}</strong>
+              ${item.customer_ci ? `<div style="color:var(--text-muted);">CI: ${item.customer_ci}</div>` : ''}
+              ${item.customer_phone ? `<div style="color:var(--text-muted);">Tel: ${item.customer_phone}</div>` : ''}
+            </div>
+            <div>
+              <span style="color:var(--text-secondary);">Producto:</span> <strong>${item.product_name}</strong>
+              ${item.product_sku ? `<div style="color:var(--text-muted); font-family:monospace;">Serial: ${item.product_sku}</div>` : ''}
+              ${item.sale_id ? `<div style="color:var(--brand-blue);">Factura asociada: #${item.sale_id}</div>` : ''}
+            </div>
+          </div>
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.05);">
+            <span style="color:var(--text-secondary);">Falla / Motivo:</span> <span style="font-weight:600;">${item.reason}</span>
+            ${item.issue_description ? `<div style="color:var(--text-muted); margin-top:2px;">${item.issue_description}</div>` : ''}
+          </div>
+        </div>
+
+        <form id="manage-return-form">
+          <!-- Cambio de Estado -->
+          <div class="form-group mb-3">
+            <label class="form-label" style="font-size:12px; font-weight:700;">Estado del Caso *</label>
+            <select class="form-control" id="manage-return-status" style="font-size:13px; padding:10px 12px; font-weight:700;">
+              <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>⏳ Pendiente (Recibido / En espera)</option>
+              <option value="in_repair" ${item.status === 'in_repair' ? 'selected' : ''}>🔧 En Reparación (En Taller Técnico)</option>
+              <option value="repaired" ${item.status === 'repaired' ? 'selected' : ''}>✅ Reparado (Reparación Finalizada con Éxito)</option>
+              <option value="replaced" ${item.status === 'replaced' ? 'selected' : ''}>🔄 Reemplazado (Cambio por otro producto)</option>
+              <option value="refunded" ${item.status === 'refunded' ? 'selected' : ''}>💵 Reembolsado (Devolución de dinero)</option>
+              <option value="rejected" ${item.status === 'rejected' ? 'selected' : ''}>❌ Rechazado (No procede garantía)</option>
+              <option value="completed" ${item.status === 'completed' ? 'selected' : ''}>🏁 Entregado / Completado (Cerrado)</option>
+            </select>
+          </div>
+
+          <!-- SECCIÓN DE REPARACIÓN Y COSTOS INTERNOS DE TIENDA -->
+          <div class="card mb-3" style="padding:16px; border:1px solid rgba(255,115,0,0.3); background:rgba(255,115,0,0.03); border-radius:var(--radius-sm);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer; color:var(--text-primary);">
+                <input type="checkbox" id="manage-return-is-repaired" ${isRep ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
+                <span>¿El producto fue o requiere ser reparado?</span>
+              </label>
+              <span class="badge" style="background:rgba(255,115,0,0.2); color:var(--brand-orange); font-size:10px;">
+                Costo Tienda
+              </span>
+            </div>
+
+            <div id="manage-repair-fields" style="display:${isRep ? 'block' : 'none'};">
+              <!-- Alerta explicativa del costo de tienda -->
+              <div style="font-size:11px; padding:10px 14px; border-radius:6px; background:rgba(255,115,0,0.1); border:1px solid rgba(255,115,0,0.25); color:var(--brand-orange); margin-bottom:12px; line-height:1.4;">
+                ℹ️ <strong>Costo Interno de la Tienda:</strong> Este monto representa el costo adicional asumido internamente por el negocio para solucionar la garantía (repuestos, técnico o servicio especializado). <strong>No altera el precio pagado por el cliente.</strong>
+              </div>
+
+              <div class="grid grid-2 gap-2 mb-3">
+                <div class="form-group">
+                  <label class="form-label" style="font-size:11px; font-weight:700; color:var(--brand-orange);">Costo de Reparación / Tienda ($ USD) *</label>
+                  <input type="number" step="0.01" min="0" class="form-control" id="manage-repair-cost" value="${repCost.toFixed(2)}" style="font-size:13px; font-weight:800; color:var(--brand-orange); padding:8px 12px;">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" style="font-size:11px; font-weight:700;">Técnico / Servicio Autorizado</label>
+                  <input type="text" class="form-control" id="manage-technician" value="${item.technician_name || ''}" placeholder="Ej: Laboratorio Tech / Juan Pérez" style="font-size:12px; padding:8px 12px;">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="font-size:11px; font-weight:700;">Detalle de Reparación & Repuestos Utilizados</label>
+                <textarea class="form-control" id="manage-repair-notes" rows="2" placeholder="Describa el trabajo realizado, repuestos cambiados, pruebas de rendimiento..." style="font-size:12px; padding:8px 12px;">${item.repair_notes || ''}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dictamen Final / Resolución al Cliente -->
+          <div class="form-group mb-4">
+            <label class="form-label" style="font-size:12px; font-weight:700;">Dictamen Técnico / Resolución para el Cliente</label>
+            <textarea class="form-control" id="manage-resolution" rows="2" placeholder="Resumen de la solución entregada al cliente o motivos de rechazo..." style="font-size:12px; padding:8px 12px;">${item.resolution || ''}</textarea>
+          </div>
+
+          <!-- Botones de Acción -->
+          <div class="flex justify-between align-center" style="flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-secondary" id="btn-print-from-manage" style="padding:8px 14px; font-size:12px;">
+                📄 Imprimir Comprobante
+              </button>
+              ${item.customer_phone ? `
+                <button type="button" class="btn btn-secondary" id="btn-wa-from-manage" style="padding:8px 14px; font-size:12px; background:rgba(37,211,102,0.1); color:#25D366; border:1px solid rgba(37,211,102,0.3);">
+                  💬 Enviar WhatsApp
+                </button>
+              ` : ''}
+            </div>
+
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-manage-return" style="padding:8px 16px; font-size:12px;">Cerrar</button>
+              <button type="submit" class="btn btn-primary" id="btn-save-manage-return" style="padding:8px 22px; font-size:12px; font-weight:700;">Guardar Cambios</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const closeModal = () => {
+    modalRoot.innerHTML = '';
+  };
+  document.getElementById('btn-close-manage-return-modal')?.addEventListener('click', closeModal);
+  document.getElementById('btn-cancel-manage-return')?.addEventListener('click', closeModal);
+
+  // Toggle repair section
+  const chkRep = document.getElementById('manage-return-is-repaired') as HTMLInputElement;
+  const fldsRep = document.getElementById('manage-repair-fields');
+  const selSt = document.getElementById('manage-return-status') as HTMLSelectElement;
+
+  const handleRepairToggle = () => {
+    if (chkRep.checked || selSt.value === 'repaired' || selSt.value === 'in_repair') {
+      if (fldsRep) fldsRep.style.display = 'block';
+      if (selSt.value === 'repaired') chkRep.checked = true;
+    } else {
+      if (fldsRep) fldsRep.style.display = 'none';
+    }
+  };
+
+  chkRep?.addEventListener('change', handleRepairToggle);
+  selSt?.addEventListener('change', handleRepairToggle);
+
+  // Print button
+  document.getElementById('btn-print-from-manage')?.addEventListener('click', () => {
+    openPrintReturnModal(item);
+  });
+
+  // WhatsApp button
+  document.getElementById('btn-wa-from-manage')?.addEventListener('click', () => {
+    sendReturnWhatsApp(item);
+  });
+
+  // Form submit
+  document.getElementById('manage-return-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const btnSave = document.getElementById('btn-save-manage-return') as HTMLButtonElement;
+    btnSave.disabled = true;
+    btnSave.innerText = 'Guardando...';
+
+    try {
+      const updatedStatus = selSt.value;
+      const isRepairedVal = chkRep.checked || updatedStatus === 'repaired';
+      const repairCostVal = parseFloat((document.getElementById('manage-repair-cost') as HTMLInputElement)?.value || '0') || 0;
+      const technicianVal = (document.getElementById('manage-technician') as HTMLInputElement)?.value.trim() || '';
+      const repairNotesVal = (document.getElementById('manage-repair-notes') as HTMLTextAreaElement)?.value.trim() || '';
+      const resolutionVal = (document.getElementById('manage-resolution') as HTMLTextAreaElement)?.value.trim() || '';
+
+      await api.returns.update(item.id, {
+        status: updatedStatus as any,
+        is_repaired: isRepairedVal ? 1 : 0,
+        repair_cost: repairCostVal,
+        technician_name: technicianVal || null,
+        repair_notes: repairNotesVal || null,
+        resolution: resolutionVal || null
+      });
+
+      alert('¡Caso actualizado exitosamente!');
+      closeModal();
+      void renderAdminReturns();
+    } catch (err: any) {
+      alert(`Error al actualizar caso: ${err.message}`);
+      btnSave.disabled = false;
+      btnSave.innerText = 'Guardar Cambios';
+    }
+  });
+}
+
+// Modal: Imprimir Ticket de Garantía / Devolución
+function openPrintReturnModal(item: ReturnClaim) {
+  const modalRoot = document.getElementById('returns-modal-root');
+  if (!modalRoot) return;
+
+  const dateStr = new Date(item.received_at || item.created_at).toLocaleString('es-ES');
+  const isRep = item.is_repaired === 1 || item.is_repaired === true || item.status === 'repaired';
+
+  modalRoot.innerHTML = `
+    <div class="modal-backdrop" id="print-return-backdrop" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(4px);">
+      <div class="card" style="width:100%; max-width:520px; max-height:92vh; overflow-y:auto; padding:24px; border-radius:var(--radius-lg); border:1px solid var(--border-glass); background:var(--bg-secondary); position:relative;">
+        <div class="flex justify-between align-center mb-3">
+          <h4 style="font-size:16px; font-weight:800;">📄 Vista Previa de Comprobante</h4>
+          <button type="button" class="btn btn-secondary" id="btn-close-print-modal" style="padding:4px 10px; font-size:14px; border-radius:50px;">✕</button>
+        </div>
+
+        <!-- TICKET IMPRIMIBLE -->
+        <div id="printable-warranty-ticket" style="background:#ffffff; color:#111827; padding:24px; border-radius:10px; font-family:'Courier New', monospace; font-size:12px; line-height:1.4; border:1px solid #e5e7eb;">
+          <div style="text-align:center; border-bottom:2px dashed #9ca3af; padding-bottom:12px; margin-bottom:12px;">
+            <div style="font-size:20px; font-weight:900; letter-spacing:1px; color:#0077f6;">FACILITOAPP</div>
+            <div style="font-size:10px; font-weight:700; text-transform:uppercase; color:#374151;">
+              ${item.type === 'warranty' ? 'COMPROBANTE DE SERVICIO TÉCNICO Y GARANTÍA' : 'COMPROBANTE DE DEVOLUCIÓN'}
+            </div>
+            <div style="font-size:16px; font-weight:900; margin-top:6px; color:#ff7300;">
+              TICKET #${item.code}
+            </div>
+            <div style="font-size:10px; color:#6b7280; margin-top:2px;">Fecha: ${dateStr}</div>
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <div style="font-weight:700; border-bottom:1px solid #e5e7eb; padding-bottom:2px; margin-bottom:4px; font-size:11px; text-transform:uppercase;">
+              Datos del Cliente
+            </div>
+            <div><strong>Cliente:</strong> ${item.customer_name}</div>
+            <div><strong>Cédula/RIF:</strong> ${item.customer_ci || 'N/D'}</div>
+            <div><strong>Teléfono:</strong> ${item.customer_phone || 'N/D'}</div>
+            ${item.customer_email ? `<div><strong>Email:</strong> ${item.customer_email}</div>` : ''}
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <div style="font-weight:700; border-bottom:1px solid #e5e7eb; padding-bottom:2px; margin-bottom:4px; font-size:11px; text-transform:uppercase;">
+              Datos del Producto
+            </div>
+            <div><strong>Producto:</strong> ${item.product_name}</div>
+            ${item.product_sku ? `<div><strong>Serial/IMEI:</strong> ${item.product_sku}</div>` : ''}
+            ${item.sale_id ? `<div><strong>Factura Origen:</strong> #${item.sale_id}</div>` : ''}
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <div style="font-weight:700; border-bottom:1px solid #e5e7eb; padding-bottom:2px; margin-bottom:4px; font-size:11px; text-transform:uppercase;">
+              Diagnóstico y Falla Reportada
+            </div>
+            <div><strong>Falla Reportada:</strong> ${item.reason}</div>
+            ${item.issue_description ? `<div><strong>Detalle:</strong> ${item.issue_description}</div>` : ''}
+            <div style="margin-top:4px;"><strong>Estado Actual:</strong> <span style="text-transform:uppercase; font-weight:800;">${item.status}</span></div>
+          </div>
+
+          ${isRep ? `
+            <div style="background:#f0fdf4; border:1px solid #86efac; padding:8px; border-radius:6px; margin-bottom:10px;">
+              <div style="font-weight:800; color:#15803d; font-size:11px;">✓ PRODUCTO REPARADO & PROBADO</div>
+              ${item.technician_name ? `<div style="font-size:10px; color:#166534;">Técnico: ${item.technician_name}</div>` : ''}
+              ${item.repair_notes ? `<div style="font-size:10px; color:#166534;">Notas: ${item.repair_notes}</div>` : ''}
+            </div>
+          ` : ''}
+
+          ${item.resolution ? `
+            <div style="margin-bottom:10px;">
+              <div style="font-weight:700; border-bottom:1px solid #e5e7eb; padding-bottom:2px; margin-bottom:4px; font-size:11px; text-transform:uppercase;">
+                Resolución / Dictamen
+              </div>
+              <div style="font-size:11px;">${item.resolution}</div>
+            </div>
+          ` : ''}
+
+          <div style="border-top:1px dashed #9ca3af; padding-top:8px; margin-top:10px; font-size:9px; color:#6b7280; text-align:justify;">
+            * La garantía cubre exclusivamente defectos de fabricación comprobables. No cubre fallas causadas por humedad, golpes físicos, variaciones eléctricas o manipulación de software no autorizada. Pasados 30 días continuos de la notificación de retiro sin ser reclamado, el equipo causará gastos de almacenamiento.
+          </div>
+
+          <!-- Líneas de firma -->
+          <div style="display:flex; justify-content:space-between; margin-top:35px; text-align:center; font-size:10px;">
+            <div style="width:45%; border-top:1px solid #374151; padding-top:4px;">
+              Firma del Cliente
+            </div>
+            <div style="width:45%; border-top:1px solid #374151; padding-top:4px;">
+              Firma y Sello Tienda
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 mt-4">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-print" style="padding:8px 16px; font-size:12px;">Cerrar</button>
+          <button type="button" class="btn btn-primary" id="btn-do-print" style="padding:8px 20px; font-size:12px; font-weight:700; display:flex; align-items:center; gap:6px;">
+            🖨️ Imprimir Ticket
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const closeModal = () => {
+    modalRoot.innerHTML = '';
+  };
+  document.getElementById('btn-close-print-modal')?.addEventListener('click', closeModal);
+  document.getElementById('btn-cancel-print')?.addEventListener('click', closeModal);
+
+  document.getElementById('btn-do-print')?.addEventListener('click', () => {
+    const printContent = document.getElementById('printable-warranty-ticket')?.innerHTML;
+    if (!printContent) return;
+
+    const printWin = window.open('', '', 'width=420,height=600');
+    if (!printWin) {
+      alert('Por favor permita las ventanas emergentes para imprimir.');
+      return;
+    }
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Ticket de Garantía - ${item.code}</title>
+        <style>
+          body { margin: 0; padding: 16px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; color: #111827; }
+          @media print {
+            body { padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        ${printContent}
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+      printWin.close();
+    }, 300);
+  });
+}
+
+// Envío de WhatsApp automático según el estado
+function sendReturnWhatsApp(item: ReturnClaim) {
+  if (!item.customer_phone) {
+    alert('Este cliente no tiene número telefónico registrado.');
+    return;
+  }
+
+  let cleanPhone = item.customer_phone.replace(/\D/g, '');
+  if (cleanPhone.startsWith('0')) {
+    cleanPhone = '58' + cleanPhone.substring(1);
+  } else if (!cleanPhone.startsWith('58') && cleanPhone.length === 10) {
+    cleanPhone = '58' + cleanPhone;
+  }
+
+  let statusMsg = '';
+  switch(item.status) {
+    case 'pending':
+      statusMsg = '⏳ *Recibido*: Tu producto se encuentra en cola de revisión técnica.';
+      break;
+    case 'in_repair':
+      statusMsg = '🔧 *En Taller*: Tu producto está siendo diagnosticado y reparado por nuestro equipo técnico especializado.';
+      break;
+    case 'repaired':
+      statusMsg = '✅ *¡REPARADO CON ÉXITO!*: Tu producto ha superado las pruebas de calidad y se encuentra listo para ser retirado en tienda.';
+      break;
+    case 'replaced':
+      statusMsg = '🔄 *Reemplazo Aprobado*: Tu caso ha sido resuelto con la sustitución del equipo.';
+      break;
+    case 'refunded':
+      statusMsg = '💵 *Reembolso Aprobado*: La devolución ha sido completada satisfactoriamente.';
+      break;
+    case 'rejected':
+      statusMsg = '❌ *Evaluado*: Tu solicitud no procede bajo los términos y condiciones de la póliza de garantía.';
+      break;
+    case 'completed':
+      statusMsg = '🏁 *Caso Cerrado*: Equipo entregado a conformidad.';
+      break;
+    default:
+      statusMsg = `Estado: *${item.status}*`;
+  }
+
+  let text = `Hola *${item.customer_name}*, te saludamos cordialmente de *FacilitoApp* 🐒.\n\n`;
+  text += `Te notificamos la actualización de tu ticket *#${item.code}*:\n\n`;
+  text += `📦 *Producto:* ${item.product_name}\n`;
+  if (item.product_sku) text += `🔢 *Serial / IMEI:* ${item.product_sku}\n`;
+  text += `📋 *Falla Reportada:* ${item.reason}\n`;
+  text += `📊 *Estatus Actual:* ${statusMsg}\n`;
+
+  if (item.is_repaired || item.status === 'repaired') {
+    text += `\n✨ *¡Todo listo!* Puedes pasar por nuestra sucursal con este comprobante para realizar la entrega de tu equipo.\n`;
+  }
+
+  if (item.resolution) {
+    text += `\n📝 *Dictamen Técnico:* ${item.resolution}\n`;
+  }
+
+  text += `\n¡Agradecemos tu paciencia y preferencia! Para cualquier consulta responde a este mensaje.`;
+
+  window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`, '_blank');
+}
+

@@ -17,6 +17,7 @@ const stats_1 = __importDefault(require("./controllers/stats"));
 const expenses_1 = __importDefault(require("./controllers/expenses"));
 const cash_1 = __importDefault(require("./controllers/cash"));
 const suppliers_1 = __importDefault(require("./controllers/suppliers"));
+const returns_1 = __importDefault(require("./controllers/returns"));
 const reminders_1 = require("./services/reminders");
 const rates_1 = require("./services/rates");
 dotenv_1.default.config();
@@ -45,6 +46,7 @@ app.use('/api/stats', stats_1.default);
 app.use('/api/expenses', expenses_1.default);
 app.use('/api/cash', cash_1.default);
 app.use('/api/suppliers', suppliers_1.default);
+app.use('/api/returns', returns_1.default);
 // Ruta raiz de prueba
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', message: 'Servidor FacilitoApp funcionando correctamente 🐒' });
@@ -420,6 +422,40 @@ async function runMigrations() {
       ) ENGINE=InnoDB;
     `);
         console.log('Tabla "suppliers" verificada.');
+        // Crear tabla de devoluciones y reclamos de garantía si no existe
+        await conn.query(`
+      CREATE TABLE IF NOT EXISTS returns_claims (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code VARCHAR(50) NOT NULL UNIQUE,
+        type ENUM('warranty', 'return') NOT NULL DEFAULT 'warranty',
+        sale_id INT NULL,
+        product_id INT NULL,
+        product_name VARCHAR(150) NOT NULL,
+        product_sku VARCHAR(100) NULL,
+        customer_name VARCHAR(150) NOT NULL,
+        customer_phone VARCHAR(50) NULL,
+        customer_ci VARCHAR(30) NULL,
+        customer_email VARCHAR(100) NULL,
+        reason VARCHAR(255) NOT NULL,
+        issue_description TEXT NULL,
+        status ENUM('pending', 'in_repair', 'repaired', 'replaced', 'refunded', 'rejected', 'completed') NOT NULL DEFAULT 'pending',
+        is_repaired TINYINT(1) NOT NULL DEFAULT 0,
+        repair_cost DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+        repair_notes TEXT NULL,
+        technician_name VARCHAR(100) NULL,
+        resolution TEXT NULL,
+        created_by INT NULL,
+        received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        repaired_at TIMESTAMP NULL DEFAULT NULL,
+        completed_at TIMESTAMP NULL DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE SET NULL,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB;
+    `);
+        console.log('Tabla "returns_claims" verificada.');
         // Insertar configuraciones por defecto si no existen
         await conn.query(`
       INSERT IGNORE INTO settings (settings_key, settings_value) VALUES 

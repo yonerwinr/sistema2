@@ -211,6 +211,46 @@ export interface CashDrop {
   created_at: string;
 }
 
+export interface ReturnClaim {
+  id: number;
+  code: string;
+  type: 'warranty' | 'return';
+  sale_id?: number | null;
+  product_id?: number | null;
+  product_name: string;
+  product_sku?: string | null;
+  customer_name: string;
+  customer_phone?: string | null;
+  customer_ci?: string | null;
+  customer_email?: string | null;
+  reason: string;
+  issue_description?: string | null;
+  status: 'pending' | 'in_repair' | 'repaired' | 'replaced' | 'refunded' | 'rejected' | 'completed';
+  is_repaired: number | boolean;
+  repair_cost: number;
+  repair_notes?: string | null;
+  technician_name?: string | null;
+  resolution?: string | null;
+  created_by?: number | null;
+  created_by_name?: string | null;
+  sale_total?: number | null;
+  sale_date?: string | null;
+  received_at: string;
+  repaired_at?: string | null;
+  completed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReturnClaimStats {
+  total: number;
+  warranties: number;
+  returns: number;
+  pending: number;
+  repaired: number;
+  total_repair_cost: number;
+}
+
 // API Endpoints
 export const api = {
   // Autenticación
@@ -503,6 +543,30 @@ export const api = {
       body: JSON.stringify(body),
     }),
     delete: (id: number) => request<{ message: string }>(`/suppliers/${id}`, {
+      method: 'DELETE',
+    }),
+  },
+
+  // Devoluciones o Reclamos de Garantía
+  returns: {
+    getAll: (filters?: { status?: string; type?: string; search?: string }) => {
+      const params = new URLSearchParams();
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.type) params.append('type', filters.type);
+      if (filters?.search) params.append('search', filters.search);
+      return request<ReturnClaim[]>(`/returns?${params.toString()}`);
+    },
+    getStats: () => request<ReturnClaimStats>('/returns/stats'),
+    getOne: (id: number) => request<ReturnClaim>(`/returns/${id}`),
+    create: (body: Partial<ReturnClaim>) => request<{ id: number; code: string; message: string }>('/returns', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    update: (id: number, body: Partial<ReturnClaim>) => request<{ message: string }>(`/returns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+    delete: (id: number) => request<{ message: string }>(`/returns/${id}`, {
       method: 'DELETE',
     }),
   },

@@ -4,7 +4,7 @@ export interface AuditLogData {
   userId?: number | null;
   userName?: string | null;
   userRole?: string | null;
-  actionType: 'sale_online' | 'sale_pos' | 'quotation' | 'staff_crud' | 'user_edit' | 'product_crud' | 'coupon_crud' | 'settings' | 'supplier_crud';
+  actionType: 'sale_online' | 'sale_pos' | 'quotation' | 'staff_crud' | 'user_edit' | 'product_crud' | 'coupon_crud' | 'settings' | 'supplier_crud' | 'returns_claims';
   title: string;
   details?: string | object | null;
 }
