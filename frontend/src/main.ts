@@ -6522,6 +6522,99 @@ async function renderAdminProducts() {
             <textarea class="form-control" id="prod-desc" rows="3" placeholder="Detalle del producto..."></textarea>
           </div>
 
+          <!-- Calculadora de Fraccionamiento, Conversión de Unidades & Empaque (Materia Prima a Porciones) -->
+          <div class="card mb-4" id="fraction-calc-card" style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.3); padding: 14px; border-radius: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none;" id="fraction-calc-header">
+              <div style="font-size: 13px; font-weight: 800; color: #10b981; display: flex; align-items: center; gap: 8px;">
+                <span>⚖️ Calculadora de Fraccionamiento, Conversión & Empaque</span>
+                <span style="font-size: 10px; background: rgba(16, 185, 129, 0.18); color: #10b981; padding: 2px 8px; border-radius: 20px; font-weight: 700;">Materia Prima ➔ Bolsitas/Envases</span>
+              </div>
+              <span id="fraction-calc-toggle-icon" style="font-size: 11px; color: #10b981; font-weight: 700; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 6px;">▲ Ocultar / Mostrar</span>
+            </div>
+            <p style="font-size: 11px; color: var(--text-secondary); margin: 6px 0 12px 0;">
+              Si compraste por bulto o al mayor (ej. <strong>1 Kilo de Bicarbonato</strong>) y lo vas a dividir en porciones (ej. <strong>100g</strong>), esta herramienta calcula automáticamente las unidades producidas, suma el costo de las bolsas/empaques y calcula el precio sugerido:
+            </p>
+
+            <div id="fraction-calc-body">
+              <div class="grid-3 gap-2 mb-3">
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 10px; font-weight: 700;">Unidad de Medida / Conversión</label>
+                  <select class="form-control" id="frac-unit-mode" style="font-size: 12px; padding: 6px 10px;">
+                    <option value="kg_to_g" selected>Kilogramos (Kg) ➔ Gramos (g)</option>
+                    <option value="l_to_ml">Litros (L) ➔ Mililitros (ml)</option>
+                    <option value="m_to_cm">Metros (m) ➔ Centímetros (cm)</option>
+                    <option value="lb_to_g">Libras (lb) ➔ Gramos (g)</option>
+                    <option value="bulk_to_unit">Cajas / Bultos ➔ Unidades individuales</option>
+                    <option value="direct">Directo (Misma unidad)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 10px; font-weight: 700;" id="frac-lbl-total-bought">Cantidad Total Comprada (Kg)</label>
+                  <input type="number" step="any" min="0.0001" class="form-control" id="frac-total-bought" value="1" placeholder="Ej. 1" style="font-size: 12px; padding: 6px 10px; font-weight: 700;">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 10px; font-weight: 700; color: #10b981;">Costo Total Compra del Bulto ($ USD)</label>
+                  <input type="number" step="any" min="0" class="form-control" id="frac-total-cost" placeholder="Ej. 10.00" style="font-size: 12px; padding: 6px 10px; border-color: rgba(16,185,129,0.4); color: #10b981; font-weight: 700;">
+                </div>
+              </div>
+
+              <div class="grid-3 gap-2 mb-3">
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 10px; font-weight: 700;" id="frac-lbl-portion-size">Tamaño de Cada Porción (g)</label>
+                  <input type="number" step="any" min="0.0001" class="form-control" id="frac-portion-size" value="100" placeholder="Ej. 100" style="font-size: 12px; padding: 6px 10px;">
+                  <small style="font-size: 9px; color: var(--text-muted);" id="frac-hint-portion">Ej. 100 gramos por bolsita</small>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 10px; font-weight: 700; color: #f59e0b;">Costo Bolsa / Empaque por Unidad ($)</label>
+                  <input type="number" step="any" min="0" class="form-control" id="frac-pack-cost" value="0.05" placeholder="0.00" style="font-size: 12px; padding: 6px 10px; border-color: rgba(245,158,11,0.4); color: #f59e0b; font-weight: 700;">
+                  <small style="font-size: 9px; color: var(--text-muted);">Bolsa plástica, envase, etiqueta, precinto, etc.</small>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" style="font-size: 10px; font-weight: 700;">Margen Ganancia Deseado (%)</label>
+                  <input type="number" step="any" min="0" class="form-control" id="frac-profit-margin" value="30" placeholder="30" style="font-size: 12px; padding: 6px 10px;">
+                </div>
+              </div>
+
+              <!-- Tarjetas de Resultados en Vivo -->
+              <div style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(16,185,129,0.35); border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+                <div class="grid-4 gap-2 mb-2" style="text-align: center;">
+                  <div style="background: rgba(16,185,129,0.08); padding: 8px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.15);">
+                    <div style="font-size: 10px; color: var(--text-secondary);">Stock Resultante</div>
+                    <div style="font-size: 18px; font-weight: 800; color: #10b981;" id="frac-res-units">10 un.</div>
+                  </div>
+                  <div style="background: rgba(255,255,255,0.02); padding: 8px; border-radius: 6px; border: 1px solid var(--border-glass);">
+                    <div style="font-size: 10px; color: var(--text-secondary);">Costo Materia Prima</div>
+                    <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);" id="frac-res-raw-cost">$0.00</div>
+                  </div>
+                  <div style="background: rgba(245,158,11,0.08); padding: 8px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.15);">
+                    <div style="font-size: 10px; color: #f59e0b;">Costo Bolsa / Empaque</div>
+                    <div style="font-size: 14px; font-weight: 700; color: #f59e0b;" id="frac-res-pack-cost">+$0.05</div>
+                  </div>
+                  <div style="background: rgba(99,102,241,0.08); padding: 8px; border-radius: 6px; border: 1px solid rgba(99,102,241,0.15);">
+                    <div style="font-size: 10px; color: var(--primary);">Costo Total Real</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--primary);" id="frac-res-total-cost">$0.05</div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05);">
+                  <div>
+                    <span style="font-size: 11px; color: var(--text-secondary);">Precio Venta Sugerido:</span>
+                    <strong style="font-size: 16px; color: #10b981; margin-left: 6px;" id="frac-res-sale-price">$0.07</strong>
+                    <span style="font-size: 10px; color: var(--text-muted); margin-left: 8px;" id="frac-res-profit-summary"></span>
+                  </div>
+
+                  <button type="button" class="btn btn-primary" id="apply-fraction-btn" style="font-size: 12px; padding: 8px 16px; background: #10b981; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                    ⚡ Aplicar Stock y Precio al Producto
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Calculadora Inteligente de Costo & Precio (Dólar Negro / Binance vs BCV) -->
           <div class="card mb-4" style="background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.25); padding: 14px; border-radius: 10px;">
             <div style="font-size: 13px; font-weight: 800; color: #f59e0b; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
@@ -6753,6 +6846,188 @@ function bindProductCRUDEvents() {
     updateProductPriceCalc();
     const prodPriceInput = document.getElementById('prod-price') as HTMLInputElement;
     if (prodPriceInput) prodPriceInput.focus();
+  });
+
+  // ==========================================================================
+  // Lógica de Calculadora de Fraccionamiento, Conversión y Empaque
+  // ==========================================================================
+  function updateFractionCalc() {
+    const unitModeSelect = document.getElementById('frac-unit-mode') as HTMLSelectElement | null;
+    const totalBoughtInput = document.getElementById('frac-total-bought') as HTMLInputElement | null;
+    const totalCostInput = document.getElementById('frac-total-cost') as HTMLInputElement | null;
+    const portionSizeInput = document.getElementById('frac-portion-size') as HTMLInputElement | null;
+    const packCostInput = document.getElementById('frac-pack-cost') as HTMLInputElement | null;
+    const profitMarginInput = document.getElementById('frac-profit-margin') as HTMLInputElement | null;
+
+    if (!unitModeSelect || !totalBoughtInput || !portionSizeInput) return;
+
+    const mode = unitModeSelect.value;
+    const totalBought = parseFloat(totalBoughtInput.value || '0') || 0;
+    const totalCost = parseFloat(totalCostInput?.value || '0') || 0;
+    const portionSize = parseFloat(portionSizeInput.value || '0') || 0;
+    const packCost = parseFloat(packCostInput?.value || '0') || 0;
+    const profitMargin = parseFloat(profitMarginInput?.value || '0') || 0;
+
+    let totalInBase = totalBought;
+    if (mode === 'kg_to_g' || mode === 'l_to_ml') totalInBase = totalBought * 1000;
+    else if (mode === 'm_to_cm') totalInBase = totalBought * 100;
+    else if (mode === 'lb_to_g') totalInBase = totalBought * 453.592;
+
+    let units = 0;
+    if (mode === 'bulk_to_unit') {
+      units = totalBought * (portionSize || 1);
+    } else if (portionSize > 0) {
+      units = totalInBase / portionSize;
+    }
+
+    const roundedUnits = Math.floor(units);
+    const rawCostPerUnit = (roundedUnits > 0 && totalCost > 0) ? (totalCost / roundedUnits) : 0;
+    const totalCostPerUnit = rawCostPerUnit + packCost;
+    const salePrice = totalCostPerUnit * (1 + profitMargin / 100);
+    const profitPerUnit = salePrice - totalCostPerUnit;
+    const totalBatchProfit = profitPerUnit * roundedUnits;
+
+    // Actualizar visuales
+    const resUnits = document.getElementById('frac-res-units');
+    const resRawCost = document.getElementById('frac-res-raw-cost');
+    const resPackCost = document.getElementById('frac-res-pack-cost');
+    const resTotalCost = document.getElementById('frac-res-total-cost');
+    const resSalePrice = document.getElementById('frac-res-sale-price');
+    const resProfitSummary = document.getElementById('frac-res-profit-summary');
+
+    if (resUnits) resUnits.innerText = `${roundedUnits > 0 ? roundedUnits : 0} un.`;
+    if (resRawCost) resRawCost.innerText = `$${roundDecimal(rawCostPerUnit, 3).toFixed(rawCostPerUnit > 0 && rawCostPerUnit < 0.01 ? 4 : 2)}`;
+    if (resPackCost) resPackCost.innerText = `+$${roundDecimal(packCost, 2).toFixed(2)}`;
+    if (resTotalCost) resTotalCost.innerText = `$${roundDecimal(totalCostPerUnit, 2).toFixed(2)}`;
+    if (resSalePrice) resSalePrice.innerText = `$${roundDecimal(salePrice, 2).toFixed(2)}`;
+    if (resProfitSummary) {
+      resProfitSummary.innerText = roundedUnits > 0 
+        ? `(Ganancia: $${roundDecimal(profitPerUnit, 2).toFixed(2)}/u. | Total Bulto: $${roundDecimal(totalBatchProfit, 2).toFixed(2)})`
+        : '';
+    }
+  }
+
+  const updateUnitLabels = () => {
+    const mode = (document.getElementById('frac-unit-mode') as HTMLSelectElement)?.value;
+    const lblTotal = document.getElementById('frac-lbl-total-bought');
+    const lblPortion = document.getElementById('frac-lbl-portion-size');
+    const hintPortion = document.getElementById('frac-hint-portion');
+
+    if (mode === 'kg_to_g') {
+      if (lblTotal) lblTotal.innerText = 'Cantidad Total Comprada (Kg)';
+      if (lblPortion) lblPortion.innerText = 'Tamaño de Cada Porción (g)';
+      if (hintPortion) hintPortion.innerText = 'Ej. 100 gramos por bolsita';
+    } else if (mode === 'l_to_ml') {
+      if (lblTotal) lblTotal.innerText = 'Cantidad Total Comprada (Litros - L)';
+      if (lblPortion) lblPortion.innerText = 'Tamaño de Cada Porción (ml)';
+      if (hintPortion) hintPortion.innerText = 'Ej. 250 ml por envase';
+    } else if (mode === 'm_to_cm') {
+      if (lblTotal) lblTotal.innerText = 'Cantidad Total Comprada (Metros - m)';
+      if (lblPortion) lblPortion.innerText = 'Tamaño de Cada Corte (cm)';
+      if (hintPortion) hintPortion.innerText = 'Ej. 50 cm por corte';
+    } else if (mode === 'lb_to_g') {
+      if (lblTotal) lblTotal.innerText = 'Cantidad Total Comprada (Libras - lb)';
+      if (lblPortion) lblPortion.innerText = 'Tamaño de Cada Porción (g)';
+      if (hintPortion) hintPortion.innerText = 'Ej. 100 gramos por bolsita';
+    } else if (mode === 'bulk_to_unit') {
+      if (lblTotal) lblTotal.innerText = 'Cantidad de Cajas / Bultos';
+      if (lblPortion) lblPortion.innerText = 'Unidades por Caja / Bulto';
+      if (hintPortion) hintPortion.innerText = 'Ej. 24 unidades que contiene la caja';
+    } else {
+      if (lblTotal) lblTotal.innerText = 'Cantidad Total Comprada';
+      if (lblPortion) lblPortion.innerText = 'Tamaño por Unidad / Porción';
+      if (hintPortion) hintPortion.innerText = 'En la misma unidad de medida';
+    }
+    updateFractionCalc();
+  };
+
+  document.getElementById('frac-unit-mode')?.addEventListener('change', updateUnitLabels);
+
+  ['frac-total-bought', 'frac-total-cost', 'frac-portion-size', 'frac-pack-cost', 'frac-profit-margin'].forEach(id => {
+    const el = document.getElementById(id);
+    el?.addEventListener('input', updateFractionCalc);
+    el?.addEventListener('change', updateFractionCalc);
+  });
+
+  document.getElementById('fraction-calc-header')?.addEventListener('click', () => {
+    const body = document.getElementById('fraction-calc-body');
+    const icon = document.getElementById('fraction-calc-toggle-icon');
+    if (body) {
+      const isHidden = body.style.display === 'none';
+      body.style.display = isHidden ? 'block' : 'none';
+      if (icon) icon.innerText = isHidden ? '▲ Ocultar' : '▼ Mostrar';
+    }
+  });
+
+  document.getElementById('apply-fraction-btn')?.addEventListener('click', () => {
+    updateFractionCalc();
+    const unitModeSelect = document.getElementById('frac-unit-mode') as HTMLSelectElement | null;
+    const totalBought = parseFloat((document.getElementById('frac-total-bought') as HTMLInputElement)?.value || '0') || 0;
+    const totalCost = parseFloat((document.getElementById('frac-total-cost') as HTMLInputElement)?.value || '0') || 0;
+    const portionSize = parseFloat((document.getElementById('frac-portion-size') as HTMLInputElement)?.value || '0') || 0;
+    const packCost = parseFloat((document.getElementById('frac-pack-cost') as HTMLInputElement)?.value || '0') || 0;
+    const profitMargin = parseFloat((document.getElementById('frac-profit-margin') as HTMLInputElement)?.value || '0') || 0;
+
+    const mode = unitModeSelect?.value || 'kg_to_g';
+    let totalInBase = totalBought;
+    if (mode === 'kg_to_g' || mode === 'l_to_ml') totalInBase = totalBought * 1000;
+    else if (mode === 'm_to_cm') totalInBase = totalBought * 100;
+    else if (mode === 'lb_to_g') totalInBase = totalBought * 453.592;
+
+    let units = 0;
+    if (mode === 'bulk_to_unit') {
+      units = totalBought * (portionSize || 1);
+    } else if (portionSize > 0) {
+      units = totalInBase / portionSize;
+    }
+
+    const roundedUnits = Math.floor(units);
+    const rawCostPerUnit = (roundedUnits > 0 && totalCost > 0) ? (totalCost / roundedUnits) : 0;
+    const totalCostPerUnit = rawCostPerUnit + packCost;
+    const salePrice = roundDecimal(totalCostPerUnit * (1 + profitMargin / 100), 2);
+
+    if (roundedUnits > 0) {
+      const stockInput = document.getElementById('prod-stock') as HTMLInputElement;
+      if (stockInput) stockInput.value = roundedUnits.toString();
+    }
+
+    if (totalCostPerUnit > 0) {
+      const bcvCostInput = document.getElementById('calc-bcv-cost') as HTMLInputElement;
+      if (bcvCostInput) bcvCostInput.value = roundDecimal(totalCostPerUnit, 2).toFixed(2);
+
+      const marginInput = document.getElementById('calc-profit-margin') as HTMLInputElement;
+      if (marginInput) marginInput.value = profitMargin.toString();
+    }
+
+    if (salePrice > 0) {
+      const prodPriceInput = document.getElementById('prod-price') as HTMLInputElement;
+      if (prodPriceInput) prodPriceInput.value = salePrice.toFixed(2);
+
+      const priceDisplay = document.getElementById('calc-result-price-display');
+      if (priceDisplay) priceDisplay.innerText = `$${salePrice.toFixed(2)}`;
+    }
+
+    // Auto-generar sugerencia en descripción si está vacía
+    const descInput = document.getElementById('prod-desc') as HTMLTextAreaElement;
+    if (descInput && !descInput.value.trim() && portionSize > 0) {
+      let unitStr = 'g';
+      if (mode === 'l_to_ml') unitStr = 'ml';
+      else if (mode === 'm_to_cm') unitStr = 'cm';
+      else if (mode === 'bulk_to_unit') unitStr = 'un.';
+      descInput.value = `Presentación en paquete/bolsa de ${portionSize}${unitStr}. Costo de empaque incluido.`;
+    }
+
+    // Mostrar feedback visual
+    const btnApply = document.getElementById('apply-fraction-btn') as HTMLButtonElement;
+    if (btnApply) {
+      const originalText = btnApply.innerHTML;
+      btnApply.innerHTML = `✓ ¡Stock (${roundedUnits}) y Precio ($${salePrice.toFixed(2)}) Aplicados!`;
+      btnApply.style.background = '#059669';
+      setTimeout(() => {
+        btnApply.innerHTML = originalText;
+        btnApply.style.background = '#10b981';
+      }, 2500);
+    }
   });
 
   const applyProductsSearch = () => {
