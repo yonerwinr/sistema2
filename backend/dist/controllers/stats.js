@@ -142,7 +142,7 @@ router.get('/', auth_1.authenticate, auth_1.isAdmin, async (_req, res) => {
 });
 // GET /reports: Reportes avanzados filtrables para administración y vendedores
 router.get('/reports', auth_1.authenticate, async (req, res) => {
-    let { seller_id, period = 'day', date } = req.query;
+    let { seller_id, period = 'day', date, start_date, end_date } = req.query;
     // Si el usuario es vendedor (seller), forzar que filtre solo por su propio ID
     if (req.user?.role === 'seller') {
         seller_id = String(req.user.id);
@@ -154,7 +154,18 @@ router.get('/reports', auth_1.authenticate, async (req, res) => {
         }
         let startDateStr = '';
         let endDateStr = '';
-        if (period === 'day') {
+        if (period === 'custom') {
+            let start = start_date || date || new Date().toISOString().slice(0, 10);
+            let end = end_date || start;
+            if (start > end) {
+                const tmp = start;
+                start = end;
+                end = tmp;
+            }
+            startDateStr = start.slice(0, 10) + ' 00:00:00';
+            endDateStr = end.slice(0, 10) + ' 23:59:59';
+        }
+        else if (period === 'day') {
             startDateStr = targetDate.toISOString().slice(0, 10) + ' 00:00:00';
             endDateStr = targetDate.toISOString().slice(0, 10) + ' 23:59:59';
         }
@@ -236,6 +247,9 @@ router.get('/reports', auth_1.authenticate, async (req, res) => {
         paymentQuery += " GROUP BY payment_method";
         const [paymentMethods] = await db_1.default.query(paymentQuery, paymentParams);
         res.json({
+            period,
+            startDate: startDateStr.slice(0, 10),
+            endDate: endDateStr.slice(0, 10),
             metrics: {
                 totalRevenue,
                 totalExpenses,

@@ -515,11 +515,13 @@ export const api = {
   // Estadísticas (Dashboard Admin)
   stats: {
     getDashboard: () => request<StatsData>('/stats'),
-    getReports: (filters: { seller_id?: string; period: string; date?: string }) => {
+    getReports: (filters: { seller_id?: string; period: string; date?: string; start_date?: string; end_date?: string }) => {
       const params = new URLSearchParams();
       if (filters.seller_id) params.append('seller_id', filters.seller_id);
       if (filters.period) params.append('period', filters.period);
       if (filters.date) params.append('date', filters.date);
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
       return request<any>(`/stats/reports?${params.toString()}`);
     },
   },

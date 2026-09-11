@@ -9877,10 +9877,21 @@ async function renderAdminReports() {
     // Inicializar filtros globales de reportes en window si no existen
     if (!(window as any).hasOwnProperty('reportsPeriod')) (window as any).reportsPeriod = 'day';
     if (!(window as any).hasOwnProperty('reportsDate')) (window as any).reportsDate = new Date().toISOString().slice(0, 10);
+    
+    // Rango personalizado por defecto: últimos 30 días hasta hoy
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
+
+    if (!(window as any).hasOwnProperty('reportsStartDate')) (window as any).reportsStartDate = thirtyDaysAgoStr;
+    if (!(window as any).hasOwnProperty('reportsEndDate')) (window as any).reportsEndDate = todayStr;
     if (!(window as any).hasOwnProperty('reportsSellerId')) (window as any).reportsSellerId = '';
 
     const period = (window as any).reportsPeriod;
     const date = (window as any).reportsDate;
+    const startDate = (window as any).reportsStartDate;
+    const endDate = (window as any).reportsEndDate;
     const sellerId = (window as any).reportsSellerId;
 
     // Obtener lista de personal (vendedores) para filtrar
@@ -9892,7 +9903,13 @@ async function renderAdminReports() {
     }
 
     // Obtener data de reportes desde el backend
-    const data = await api.stats.getReports({ period, date, seller_id: sellerId });
+    const data = await api.stats.getReports({ 
+      period, 
+      date, 
+      start_date: period === 'custom' ? startDate : undefined, 
+      end_date: period === 'custom' ? endDate : undefined, 
+      seller_id: sellerId 
+    });
     const { metrics, sales, paymentMethods } = data;
 
     panel.innerHTML = `
@@ -9909,23 +9926,35 @@ async function renderAdminReports() {
 
         <!-- Filtros del Reporte -->
         <div class="card mb-4" style="padding:16px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
-          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
-            <div class="form-group">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; align-items:end;">
+            <div class="form-group" style="margin-bottom:0;">
               <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Periodo:</label>
               <select class="form-control" id="report-period-select" style="padding:8px 12px; font-size:13px; font-weight:700;">
                 <option value="day" ${period === 'day' ? 'selected' : ''}>📅 Diario</option>
                 <option value="week" ${period === 'week' ? 'selected' : ''}>📅 Semanal (Últimos 7 días)</option>
                 <option value="month" ${period === 'month' ? 'selected' : ''}>📅 Mensual</option>
                 <option value="year" ${period === 'year' ? 'selected' : ''}>📅 Anual</option>
+                <option value="custom" ${period === 'custom' ? 'selected' : ''}>📆 Personalizado (Rango de Fechas)</option>
               </select>
             </div>
 
-            <div class="form-group">
-              <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Fecha Base:</label>
-              <input type="date" class="form-control" id="report-date-input" value="${date}" style="padding:8px 12px; font-size:13px;">
-            </div>
+            ${period === 'custom' ? `
+              <div class="form-group" style="margin-bottom:0;">
+                <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Fecha de Inicio:</label>
+                <input type="date" class="form-control" id="report-start-date-input" value="${startDate}" style="padding:8px 12px; font-size:13px;">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Fecha de Finalización:</label>
+                <input type="date" class="form-control" id="report-end-date-input" value="${endDate}" style="padding:8px 12px; font-size:13px;">
+              </div>
+            ` : `
+              <div class="form-group" style="margin-bottom:0;">
+                <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Fecha Base:</label>
+                <input type="date" class="form-control" id="report-date-input" value="${date}" style="padding:8px 12px; font-size:13px;">
+              </div>
+            `}
 
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom:0;">
               <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:block;">Vendedor / Canal:</label>
               ${currentUser?.role === 'seller' ? `
                 <select class="form-control" id="report-seller-select" disabled style="padding:8px 12px; font-size:13px; font-weight:700; opacity:0.75;">
@@ -10074,6 +10103,16 @@ async function renderAdminReports() {
       await renderAdminReports();
     });
 
+    document.getElementById('report-start-date-input')?.addEventListener('change', async (e) => {
+      (window as any).reportsStartDate = (e.target as HTMLInputElement).value;
+      await renderAdminReports();
+    });
+
+    document.getElementById('report-end-date-input')?.addEventListener('change', async (e) => {
+      (window as any).reportsEndDate = (e.target as HTMLInputElement).value;
+      await renderAdminReports();
+    });
+
     document.getElementById('report-seller-select')?.addEventListener('change', async (e) => {
       (window as any).reportsSellerId = (e.target as HTMLSelectElement).value;
       await renderAdminReports();
@@ -10110,7 +10149,7 @@ async function renderAdminReports() {
         }
       }
 
-      printReportPDF(metrics, sales, paymentMethods, period, date, selectedSellerName);
+      printReportPDF(metrics, sales, paymentMethods, period, date, selectedSellerName, startDate, endDate);
     });
 
   } catch (error) {
@@ -10119,7 +10158,7 @@ async function renderAdminReports() {
   }
 }
 
-function printReportPDF(metrics: any, sales: any[], paymentMethods: any[], period: string, date: string, sellerName: string) {
+function printReportPDF(metrics: any, sales: any[], paymentMethods: any[], period: string, date: string, sellerName: string, startDate?: string, endDate?: string) {
   let printContainer = document.getElementById('report-printable-area');
   if (!printContainer) {
     printContainer = document.createElement('div');
@@ -10127,7 +10166,10 @@ function printReportPDF(metrics: any, sales: any[], paymentMethods: any[], perio
     document.body.appendChild(printContainer);
   }
 
-  const periodLabel = period === 'day' ? 'Diario' : period === 'week' ? 'Semanal' : period === 'month' ? 'Mensual' : 'Anual';
+  const periodLabel = period === 'day' ? 'Diario' : period === 'week' ? 'Semanal' : period === 'month' ? 'Mensual' : period === 'year' ? 'Anual' : 'Personalizado';
+  const dateInfoText = period === 'custom'
+    ? `Rango: ${startDate || 'Inicio'} al ${endDate || 'Final'}`
+    : `Fecha Base: ${date}`;
 
   const htmlContent = `
     <div class="printable-report" style="padding: 20mm; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; color: #111827; background: #ffffff;">
@@ -10139,7 +10181,7 @@ function printReportPDF(metrics: any, sales: any[], paymentMethods: any[], perio
         </div>
         <div style="text-align: right;">
           <div style="font-size: 14px; font-weight: 700; color: #1f2937;">REPORTE ${periodLabel.toUpperCase()}</div>
-          <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">Fecha Base: ${date}</div>
+          <div style="font-size: 11px; color: #6b7280; margin-top: 2px;">${dateInfoText}</div>
           <div style="font-size: 11px; color: #6b7280;">Filtro Vendedor: ${sellerName}</div>
         </div>
       </div>

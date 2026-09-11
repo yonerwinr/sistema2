@@ -150,7 +150,7 @@ router.get('/', authenticate, isAdmin, async (_req: AuthRequest, res: Response) 
 
 // GET /reports: Reportes avanzados filtrables para administración y vendedores
 router.get('/reports', authenticate, async (req: AuthRequest, res: Response) => {
-  let { seller_id, period = 'day', date } = req.query;
+  let { seller_id, period = 'day', date, start_date, end_date } = req.query;
 
   // Si el usuario es vendedor (seller), forzar que filtre solo por su propio ID
   if (req.user?.role === 'seller') {
@@ -166,7 +166,17 @@ router.get('/reports', authenticate, async (req: AuthRequest, res: Response) => 
     let startDateStr = '';
     let endDateStr = '';
 
-    if (period === 'day') {
+    if (period === 'custom') {
+      let start = (start_date as string) || (date as string) || new Date().toISOString().slice(0, 10);
+      let end = (end_date as string) || start;
+      if (start > end) {
+        const tmp = start;
+        start = end;
+        end = tmp;
+      }
+      startDateStr = start.slice(0, 10) + ' 00:00:00';
+      endDateStr = end.slice(0, 10) + ' 23:59:59';
+    } else if (period === 'day') {
       startDateStr = targetDate.toISOString().slice(0, 10) + ' 00:00:00';
       endDateStr = targetDate.toISOString().slice(0, 10) + ' 23:59:59';
     } else if (period === 'week') {
@@ -260,6 +270,9 @@ router.get('/reports', authenticate, async (req: AuthRequest, res: Response) => 
     const [paymentMethods]: any = await pool.query(paymentQuery, paymentParams);
 
     res.json({
+      period,
+      startDate: startDateStr.slice(0, 10),
+      endDate: endDateStr.slice(0, 10),
       metrics: {
         totalRevenue,
         totalExpenses,
