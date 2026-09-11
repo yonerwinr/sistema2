@@ -582,6 +582,14 @@ async function loadExchangeRates() {
 // ENRUTADOR (Navegación SPA)
 // ==========================================================================
 function navigate(view: 'store' | 'auth' | 'admin' | 'info', updateUrl: boolean = true) {
+  // Proteger acceso a panel administrativo
+  if (view === 'admin') {
+    if (!isSessionValid() || !currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller' && currentUser.role !== 'billing')) {
+      logoutSession('Debes iniciar sesión para acceder al panel de administración.', false);
+      view = 'auth';
+    }
+  }
+
   currentView = view;
   try {
     localStorage.setItem('facilito_last_view', view);
@@ -801,15 +809,10 @@ function bindGeneralEvents() {
   document.getElementById('link-login')?.addEventListener('click', () => navigate('auth'));
 
   document.getElementById('link-logout')?.addEventListener('click', () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('facilito_last_view');
-    localStorage.removeItem('facilito_last_admin_view');
-    sessionStorage.removeItem('facilito_cash_session');
-    currentUser = null;
+    logoutSession('Has cerrado sesión exitosamente.', false);
     cart = [];
     localStorage.removeItem('cart');
-    navigate('store');
+    navigate('auth');
   });
 
   // Sidebar del Carrito
@@ -2949,6 +2952,11 @@ let resetPreviewUrl = '';
 let cachedGoogleClientId: string | null = null;
 
 function renderAuthView(): string {
+  const authNotice = sessionStorage.getItem('auth_notice');
+  if (authNotice) {
+    sessionStorage.removeItem('auth_notice');
+  }
+
   return `
     <div class="auth-container">
       <div class="card auth-card animate-on-scroll animate-zoom-in">
@@ -2957,6 +2965,11 @@ function renderAuthView(): string {
           <h2 style="font-weight:900; margin-top:10px; font-size: 24px; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing:-0.5px;">FacilitoApp</h2>
           <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">¡Ingresa y disfruta del control total de tus ventas! 🐒</p>
         </div>
+        ${authNotice ? `
+          <div style="font-size:12px; padding:10px 14px; border-radius:8px; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.3); color:#f87171; margin-bottom:16px; text-align:center; line-height:1.4;">
+            ⚠️ ${authNotice}
+          </div>
+        ` : ''}
         <div class="auth-tabs">
           <button class="auth-tab-btn ${activeAuthTab === 'login' ? 'active' : ''}" id="tab-login-btn">Iniciar Sesion</button>
           <button class="auth-tab-btn ${activeAuthTab === 'register' ? 'active' : ''}" id="tab-register-btn">Registrarse</button>
@@ -3151,13 +3164,9 @@ function bindAuthEvents() {
 
     try {
       const res = await api.auth.login({ email, password });
-      localStorage.setItem('token', res.token);
-      currentUser = res.user;
-      try {
-        localStorage.setItem('user', JSON.stringify(res.user));
-      } catch (e) {}
+      establishUserSession(res.token, res.user);
 
-      if (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') {
+      if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
         const lastAdmin = (localStorage.getItem('facilito_last_admin_view') as AdminSubView);
         activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'seller' ? 'pos' : (lastAdmin || 'pos'));
         navigate('admin');
@@ -3195,11 +3204,7 @@ function bindAuthEvents() {
 
     try {
       const res = await api.auth.register({ name, email, password, phone, ci });
-      localStorage.setItem('token', res.token);
-      currentUser = res.user;
-      try {
-        localStorage.setItem('user', JSON.stringify(res.user));
-      } catch (e) {}
+      establishUserSession(res.token, res.user);
       navigate('store');
     } catch (error: any) {
       alert(error.message || 'Error en el registro');
@@ -3231,13 +3236,9 @@ function bindAuthEvents() {
             if (googleBtn) googleBtn.style.pointerEvents = 'none';
 
             const res = await api.auth.loginGoogle(credential);
-            localStorage.setItem('token', res.token);
-            currentUser = res.user;
-            try {
-              localStorage.setItem('user', JSON.stringify(res.user));
-            } catch (e) {}
+            establishUserSession(res.token, res.user);
 
-            if (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') {
+            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
               const lastAdmin = (localStorage.getItem('facilito_last_admin_view') as AdminSubView);
               activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'seller' ? 'pos' : (lastAdmin || 'pos'));
               navigate('admin');

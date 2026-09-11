@@ -41,7 +41,7 @@ router.post('/register', async (req, res) => {
         const [result] = await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, ?, ?, ?, ?)', [name, email, hashedPassword, 'customer', phone || null, ci]);
         const userId = result.insertId;
         // Generar token JWT
-        const token = jsonwebtoken_1.default.sign({ id: userId, email, role: 'customer', name }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jsonwebtoken_1.default.sign({ id: userId, email, role: 'customer', name }, JWT_SECRET, { expiresIn: '8h' });
         res.status(201).json({
             token,
             user: { id: userId, name, email, role: 'customer', phone, ci }
@@ -70,8 +70,8 @@ router.post('/login', async (req, res) => {
         if (!isMatch) {
             return res.status(400).json({ message: 'Credenciales invalidas' });
         }
-        // Generar token JWT
-        const token = jsonwebtoken_1.default.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
+        // Generar token JWT (Vigencia de 8 horas)
+        const token = jsonwebtoken_1.default.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '8h' });
         res.json({
             token,
             user: {
@@ -128,8 +128,8 @@ router.post('/google', async (req, res) => {
             const [newUsers] = await db_1.default.query('SELECT * FROM users WHERE id = ?', [userId]);
             user = newUsers[0];
         }
-        // Generar token JWT del sistema
-        const token = jsonwebtoken_1.default.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '7d' });
+        // Generar token JWT del sistema (Vigencia de 8 horas)
+        const token = jsonwebtoken_1.default.sign({ id: user.id, email: user.email, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: '8h' });
         res.json({
             token,
             user: {
