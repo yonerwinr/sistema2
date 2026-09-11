@@ -847,7 +847,7 @@ function renderStoreView(): string {
 
   if (productsLoading && productsList.length === 0) {
     return `
-      <div class="store-page-clean animate-on-scroll animate-fade-in">
+      <div class="store-page-clean" style="opacity: 1 !important; visibility: visible !important;">
         <div class="container store-container" style="padding: 24px 0 48px;">
           <div style="min-height:220px; display:flex; flex-direction:column; justify-content:center; gap:16px;">
             <div style="width: 220px; height: 24px; border-radius: 999px; background: rgba(255,255,255,0.08);"></div>
@@ -932,11 +932,11 @@ function renderStoreView(): string {
   }).join('');
 
   return `
-    <div class="store-page-clean animate-on-scroll animate-fade-in">
+    <div class="store-page-clean" style="opacity: 1 !important; visibility: visible !important;">
       <div class="container store-container" style="display:flex; flex-direction:column; gap:20px; padding: 24px 0 48px;">
         
         <!-- HEADER COMPACTO Y ELEGANTE DE TIENDA -->
-        <header class="store-header-clean animate-fade-up">
+        <header class="store-header-clean">
           <div class="store-header-info">
             <div class="store-header-pill">
               <span class="pulsing-dot"></span>
@@ -962,7 +962,7 @@ function renderStoreView(): string {
         </header>
 
         <!-- DASHBOARD DE BÚSQUEDA Y FILTROS PREMIUM -->
-        <div class="store-filter-dashboard animate-fade-up">
+        <div class="store-filter-dashboard">
           <!-- Fila Superior: Categorías en Horizontal con Iconos -->
           <div class="store-categories-scroll">
             ${categories.map(cat => {

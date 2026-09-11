@@ -1955,6 +1955,9 @@ select option:hover {
 .store-page-clean {
   width: 100%;
   min-height: 80vh;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
 }
 
 .store-header-clean {
