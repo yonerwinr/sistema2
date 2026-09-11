@@ -3153,7 +3153,51 @@ function renderAdminDashboard(): string {
   return `
     <div class="dashboard-layout">
       <!-- Sidebar de Administracion -->
-      <aside class="dashboard-sidebar" style="display:flex; flex-direction:column; justify-content:space-between; min-height: 500px;">
+      <aside class="dashboard-sidebar">
+        
+        <!-- Recuadro Anclado de Tasas BCV & Binance (Siempre en la misma posición fija para todos los módulos) -->
+        <div class="card rates-widget-sidebar">
+          <div class="rates-widget-header">
+            <div class="rates-widget-title">
+              💵 Tasas BCV & Binance
+            </div>
+            <div class="rates-widget-badge">
+              <span class="pulsing-dot" style="width:5px; height:5px;"></span> EN VIVO
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div class="rates-input-row">
+              <span class="rates-input-label">🇺🇸 $ BCV:</span>
+              <input type="number" step="0.0001" inputmode="decimal" id="rate-usd-input" class="rates-input-field" value="${formatRate(rateUsdToVes)}" ${currentUser?.role !== 'admin' ? 'readonly style="opacity:0.85; cursor:default;"' : ''}>
+            </div>
+            <div class="rates-input-row">
+              <span class="rates-input-label">🇪🇺 € BCV:</span>
+              <input type="number" step="0.0001" inputmode="decimal" id="rate-eur-input" class="rates-input-field" value="${formatRate(rateEurToVes)}" ${currentUser?.role !== 'admin' ? 'readonly style="opacity:0.85; cursor:default;"' : ''}>
+            </div>
+            <div class="rates-input-row">
+              <span class="rates-input-label" style="color:#fbbf24;">🟡 Binance:</span>
+              <input type="number" step="0.0001" inputmode="decimal" id="rate-binance-input" class="rates-input-field binance" value="${formatRate(rateBinanceToVes)}" ${currentUser?.role !== 'admin' ? 'readonly style="opacity:0.85; cursor:default;"' : ''}>
+            </div>
+            ${currentUser?.role === 'admin' ? `
+              <div class="rates-actions-row">
+                <button type="button" class="btn btn-secondary" id="sync-rates-btn" style="padding:4px 6px; font-size:10.5px; width:45%; background:rgba(255,255,255,0.05); color:white; border-color:var(--border-glass);" title="Sincronizar automáticamente con el BCV y Binance P2P">
+                  🔄 Auto
+                </button>
+                <button type="button" class="btn btn-primary" id="save-rates-btn" style="padding:4px 6px; font-size:10.5px; width:55%;">
+                  Guardar
+                </button>
+              </div>
+            ` : `
+              <div style="font-size:9.5px; color:var(--text-muted); text-align:center; margin-top:2px;">
+                Tasa oficial del sistema
+              </div>
+            `}
+          </div>
+        </div>
+
+        <div class="sidebar-section-divider"></div>
+        <div class="sidebar-section-label">Módulos del Sistema</div>
+
         <div class="sidebar-nav-group">
           ${hasPermission('online_billing') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'online_billing' ? 'active' : ''}" id="admin-tab-online-billing">
@@ -3226,45 +3270,16 @@ function renderAdminDashboard(): string {
         </div>
 
         ${currentUser.role === 'admin' ? `
-          <!-- Tasas de Cambio Widget -->
-          <div class="card rates-widget-sidebar" style="margin-top: 20px; padding: 12px; font-size:11px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
-            <div style="font-weight:700; margin-bottom: 8px; display:flex; align-items:center; gap:4px; color:var(--primary);">
-              💵 Tasas BCV & Binance
+          <!-- Diagnóstico SMTP Widget (al final del menú) -->
+          <div class="card smtp-widget-sidebar" style="margin-top: 8px; padding: 10px; font-size:10.5px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass); border-radius:12px;">
+            <div style="font-weight:700; margin-bottom: 6px; display:flex; align-items:center; gap:4px; color:#10b981; font-size:11px;">
+              ✉️ Diagnóstico SMTP
             </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                <span>$ BCV:</span>
-                <input type="number" step="0.0001" inputmode="decimal" id="rate-usd-input" value="${formatRate(rateUsdToVes)}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                <span>€ BCV:</span>
-                <input type="number" step="0.0001" inputmode="decimal" id="rate-eur-input" value="${formatRate(rateEurToVes)}" style="width:70px; padding:2px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; text-align:right; font-size:11px;">
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; color:#f59e0b;">
-                <span>🟡 Binance:</span>
-                <input type="number" step="0.0001" inputmode="decimal" id="rate-binance-input" value="${formatRate(rateBinanceToVes)}" style="width:70px; padding:2px 6px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:4px; color:#f59e0b; text-align:right; font-size:11px; font-weight:700;">
-              </div>
-              <div style="display:flex; gap:4px;">
-                <button type="button" class="btn btn-secondary" id="sync-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:45%; background:rgba(255,255,255,0.05); color:white; border-color:var(--border-glass);" title="Sincronizar automáticamente con el BCV y Binance P2P">
-                  🔄 Auto
-                </button>
-                <button type="button" class="btn btn-primary" id="save-rates-btn" style="padding:4px 6px; font-size:10px; margin-top:4px; width:55%;">
-                  Guardar
-                </button>
-              </div>
-            </div>
-            
-            <!-- Diagnóstico SMTP Widget -->
-            <div class="card smtp-widget-sidebar" style="margin-top: 14px; padding: 12px; font-size:11px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass);">
-              <div style="font-weight:700; margin-bottom: 8px; display:flex; align-items:center; gap:4px; color:#10b981;">
-                ✉️ Diagnóstico SMTP
-              </div>
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <input type="email" id="smtp-test-email-input" placeholder="correo@test.com" style="width:100%; padding:4px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; font-size:11px;">
-                <button type="button" class="btn btn-primary" id="run-smtp-diag-btn" style="padding:4px 6px; font-size:10px; margin-top:2px; width:100%; background:#10b981; border:none; color:white; font-weight:700; cursor:pointer;">
-                  Probar Correo
-                </button>
-              </div>
+            <div style="display:flex; flex-direction:column; gap:5px;">
+              <input type="email" id="smtp-test-email-input" placeholder="correo@test.com" style="width:100%; padding:3px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; font-size:10.5px;">
+              <button type="button" class="btn btn-primary" id="run-smtp-diag-btn" style="padding:4px 6px; font-size:10px; width:100%; background:#10b981; border:none; color:white; font-weight:700; cursor:pointer;">
+                Probar Correo
+              </button>
             </div>
           </div>
         ` : ''}

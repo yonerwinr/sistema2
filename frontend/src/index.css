@@ -941,8 +941,9 @@ select option:hover {
 
 .dashboard-layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 260px 1fr;
   min-height: calc(100vh - 73px);
+  align-items: start;
 }
 
 @media (max-width: 768px) {
@@ -954,10 +955,150 @@ select option:hover {
 .dashboard-sidebar {
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-glass);
-  padding: 24px 16px;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 73px;
+  height: calc(100vh - 73px);
+  max-height: calc(100vh - 73px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+.dashboard-sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.dashboard-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+/* Recuadro Anclado de Tasas BCV & Binance */
+.rates-widget-sidebar {
+  background: rgba(18, 24, 39, 0.75) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(0, 119, 246, 0.28) !important;
+  border-radius: 16px !important;
+  padding: 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+  margin: 0 !important;
+}
+
+.rates-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rates-widget-title {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #60a5fa;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.3px;
+}
+
+.rates-widget-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 50px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rates-input-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 8px;
+  font-size: 11px;
+}
+
+.rates-input-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.rates-input-field {
+  width: 84px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  border-radius: 6px;
+  color: #ffffff;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.rates-input-field:focus {
+  border-color: var(--primary);
+  background: rgba(0, 119, 246, 0.1);
+  box-shadow: 0 0 10px rgba(0, 119, 246, 0.25);
+}
+
+.rates-input-field.binance {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.rates-input-field.binance:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+.rates-actions-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sidebar-section-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 4px 0;
+  flex-shrink: 0;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.sidebar-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .sidebar-nav-btn {
@@ -1340,14 +1481,25 @@ select option:hover {
   }
   
   .dashboard-sidebar {
-    flex-direction: row !important;
-    min-height: auto !important;
-    overflow-x: auto !important;
-    white-space: nowrap !important;
+    position: static !important;
+    height: auto !important;
+    max-height: none !important;
+    flex-direction: column !important;
     padding: 10px 12px !important;
     border-right: none !important;
     border-bottom: 1px solid var(--border-glass) !important;
-    gap: 8px !important;
+    gap: 10px !important;
+  }
+
+  .rates-widget-sidebar {
+    display: block !important;
+    width: 100% !important;
+    margin-bottom: 4px !important;
+  }
+
+  .sidebar-section-divider,
+  .sidebar-section-label {
+    display: none !important;
   }
 
   .sidebar-nav-group {
@@ -1356,6 +1508,8 @@ select option:hover {
     overflow-x: auto !important;
     width: 100% !important;
     gap: 8px !important;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .sidebar-nav-btn {
@@ -1365,10 +1519,6 @@ select option:hover {
     font-size: 13px !important;
     display: inline-flex !important;
     flex-shrink: 0 !important;
-  }
-
-  .rates-widget-sidebar {
-    display: none !important; /* Ocultar el widget de tasas en móvil para ahorrar espacio */
   }
 
   .dashboard-content {
