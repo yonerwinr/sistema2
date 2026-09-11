@@ -236,6 +236,92 @@ const icons = {
 };
 
 // ==========================================================================
+// CONTROL DE SESIÓN Y VIGENCIA DE ACCESO (Seguridad y Turnos de Trabajo)
+// ==========================================================================
+const SESSION_MAX_DURATION_MS = 8 * 60 * 60 * 1000; // 8 horas máximo por turno de trabajo
+const SESSION_INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 horas de inactividad máxima
+
+function isSessionValid(): boolean {
+  const token = localStorage.getItem('token');
+  const user = localStorage.getItem('user');
+  const expiresAt = localStorage.getItem('session_expires_at');
+  const lastActivity = localStorage.getItem('session_last_activity');
+
+  if (!token || !user || !expiresAt) {
+    return false;
+  }
+
+  const now = Date.now();
+  // 1. Expiración total por tiempo máximo (8 horas de turno)
+  if (now > Number(expiresAt)) {
+    return false;
+  }
+
+  // 2. Expiración por inactividad prolongada (2 horas sin uso)
+  if (lastActivity && (now - Number(lastActivity) > SESSION_INACTIVITY_LIMIT_MS)) {
+    return false;
+  }
+
+  return true;
+}
+
+function recordUserActivity() {
+  if (currentUser) {
+    try {
+      localStorage.setItem('session_last_activity', Date.now().toString());
+    } catch (e) {}
+  }
+}
+
+function establishUserSession(token: string, user: User) {
+  const now = Date.now();
+  currentUser = user;
+  localStorage.setItem('token', token);
+  try {
+    localStorage.setItem('user', JSON.stringify(user));
+  } catch (e) {}
+  localStorage.setItem('session_login_time', now.toString());
+  localStorage.setItem('session_last_activity', now.toString());
+  localStorage.setItem('session_expires_at', (now + SESSION_MAX_DURATION_MS).toString());
+}
+
+function logoutSession(reason?: string, redirect: boolean = false) {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('session_expires_at');
+  localStorage.removeItem('session_last_activity');
+  localStorage.removeItem('session_login_time');
+  sessionStorage.removeItem('facilito_cash_session');
+  currentUser = null;
+  activeCashSession = null;
+
+  if (reason) {
+    sessionStorage.setItem('auth_notice', reason);
+  }
+
+  if (redirect) {
+    navigate('auth');
+  }
+}
+
+// Registro global de actividad del usuario
+['mousedown', 'keydown', 'touchstart'].forEach(evt => {
+  window.addEventListener(evt, () => recordUserActivity(), { passive: true });
+});
+
+// Listener cuando el backend retorna 401
+window.addEventListener('facilito:session-expired', (e: any) => {
+  logoutSession(e.detail || 'Tu sesión ha expirado por seguridad. Por favor ingresa nuevamente.', true);
+});
+
+// Verificador periódico de expiración (cada 60 segundos)
+setInterval(() => {
+  if (currentUser && !isSessionValid()) {
+    logoutSession('Tu sesión ha expirado por tiempo límite o inactividad. Por favor inicia sesión nuevamente.', true);
+  }
+}, 60000);
+
+// ==========================================================================
 // HIDRATACIÓN INSTANTÁNEA DESDE CACHÉ (Arranque Inmediato a 0ms en F5)
 // ==========================================================================
 function hydrateStateFromCache() {
@@ -285,29 +371,31 @@ function hydrateStateFromCache() {
     }
   } catch (e) {}
 
-  // 5. Restaurar usuario: Administradores y Vendedores SIEMPRE abren en el sistema Admin
-  const token = localStorage.getItem('token');
-  if (token) {
+  // 5. Restaurar usuario: SOLO si la sesión se encuentra dentro del tiempo válido
+  if (isSessionValid()) {
     try {
       const cachedUser = localStorage.getItem('user');
       if (cachedUser) {
         currentUser = JSON.parse(cachedUser);
         if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
-          // Administradores y Vendedores SIEMPRE abren en el sistema Admin
-          currentView = 'admin';
           const lastAdminView = localStorage.getItem('facilito_last_admin_view') as AdminSubView;
           if (currentUser.role === 'billing') {
             activeAdminView = 'online_billing';
           } else if (currentUser.role === 'seller') {
-            activeAdminView = 'pos'; // Vendedores directo a Caja POS
+            activeAdminView = 'pos';
           } else if (lastAdminView) {
             activeAdminView = lastAdminView;
           } else {
-            activeAdminView = 'pos'; // Administradores por defecto a Caja POS
+            activeAdminView = 'pos';
           }
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      logoutSession();
+    }
+  } else {
+    // Si no es válida o expiró, limpiar datos para no dejar sesión abierta
+    logoutSession();
   }
 }
 
@@ -325,12 +413,17 @@ window.addEventListener('DOMContentLoaded', async () => {
   const isLoginRoute = initialPath === '/login' || initialPath.endsWith('/login') || window.location.hash === '#login';
   const isAdminRoute = initialPath === '/admin' || initialPath.endsWith('/admin') || window.location.hash === '#admin';
 
-  if (isStoreRoute) {
+  if (isAdminRoute) {
+    if (!isSessionValid() || !currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller' && currentUser.role !== 'billing')) {
+      logoutSession('Debes iniciar sesión para acceder al panel administrativo.', false);
+      currentView = 'auth';
+    } else {
+      currentView = 'admin';
+    }
+  } else if (isStoreRoute) {
     currentView = 'store';
   } else if (isLoginRoute) {
     currentView = 'auth';
-  } else if (isAdminRoute) {
-    currentView = 'admin';
   } else if (isInfoRoute) {
     currentView = 'info';
   } else {
@@ -356,7 +449,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Sincronización en segundo plano: Sesión de usuario
   const token = localStorage.getItem('token');
-  if (token) {
+  if (token && isSessionValid()) {
     void (async () => {
       try {
         const freshUser = await api.auth.me();
@@ -376,6 +469,8 @@ window.addEventListener('DOMContentLoaded', async () => {
             navigate('admin');
           } else if (isStoreRoute) {
             navigate('store');
+          } else if (isLoginRoute) {
+            navigate('admin');
           } else {
             // Al abrir la aplicación principal (/), mostrar la web de info
             navigate('info');
@@ -387,14 +482,19 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
       } catch (e) {
         // Token corrupto o expirado
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        currentUser = null;
-        navigate('info');
+        logoutSession('Tu sesión ha expirado. Por favor ingresa nuevamente.', false);
+        if (isAdminRoute) {
+          navigate('auth');
+        } else {
+          navigate('info');
+        }
       }
     })();
   } else {
-    if (isStoreRoute) {
+    if (isAdminRoute) {
+      logoutSession('Debes iniciar sesión para acceder al panel administrativo.', false);
+      navigate('auth', false);
+    } else if (isStoreRoute) {
       navigate('store', false);
     } else if (isLoginRoute) {
       navigate('auth', false);
@@ -416,7 +516,12 @@ window.addEventListener('popstate', () => {
   } else if (path === '/login' || path.endsWith('/login') || window.location.hash === '#login') {
     navigate('auth', false);
   } else if (path === '/admin' || path.endsWith('/admin') || window.location.hash === '#admin') {
-    navigate('admin', false);
+    if (!isSessionValid() || !currentUser) {
+      logoutSession('Debes iniciar sesión para acceder al panel.', false);
+      navigate('auth', false);
+    } else {
+      navigate('admin', false);
+    }
   } else if (path === '/tienda' || path === '/store' || path.endsWith('/tienda') || window.location.hash === '#tienda') {
     navigate('store', false);
   } else {

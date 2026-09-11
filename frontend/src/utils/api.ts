@@ -38,6 +38,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
+    if (response.status === 401 && !path.includes('/auth/login') && !path.includes('/auth/register')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('session_expires_at');
+      localStorage.removeItem('session_last_activity');
+      localStorage.removeItem('session_login_time');
+      sessionStorage.removeItem('facilito_cash_session');
+      window.dispatchEvent(new CustomEvent('facilito:session-expired', { detail: data?.message || 'Sesión expirada' }));
+    }
     const errorObj = new Error(data?.message || `Error ${response.status} en la petición`);
     if (data && typeof data === 'object') {
       Object.assign(errorObj, data);

@@ -52,7 +52,7 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign(
       { id: userId, email, role: 'customer', name },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '8h' }
     );
 
     res.status(201).json({
@@ -88,11 +88,11 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Credenciales invalidas' });
     }
 
-    // Generar token JWT
+    // Generar token JWT (Vigencia de 8 horas)
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, name: user.name },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '8h' }
     );
 
     res.json({
@@ -163,11 +163,11 @@ router.post('/google', async (req, res) => {
       user = newUsers[0];
     }
 
-    // Generar token JWT del sistema
+    // Generar token JWT del sistema (Vigencia de 8 horas)
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, name: user.name },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '8h' }
     );
 
     res.json({
