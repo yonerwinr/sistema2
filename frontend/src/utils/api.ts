@@ -240,6 +240,8 @@ export interface ReturnClaim {
   completed_at?: string | null;
   created_at: string;
   updated_at: string;
+  supervisorEmail?: string;
+  supervisorPassword?: string;
 }
 
 export interface ReturnClaimStats {

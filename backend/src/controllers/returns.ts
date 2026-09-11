@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import pool from '../config/db';
 import { authenticate, AuthRequest, isAdmin } from '../middleware/auth';
 import { logAuditEvent } from '../services/audit';
@@ -154,6 +155,36 @@ router.post('/', authenticate, canManageReturns, async (req: AuthRequest, res: R
     });
   }
 
+  // Si la solicitud es una Devolución, verificar autorización obligatoria de Administrador o Encargado de Caja
+  if (type === 'return') {
+    if (req.user?.role !== 'admin') {
+      const { supervisorEmail, supervisorPassword } = req.body;
+      if (!supervisorEmail || !supervisorPassword) {
+        return res.status(401).json({ 
+          message: 'Se requiere la clave del administrador o encargado de cajas para autorizar una devolución.' 
+        });
+      }
+
+      const [supervisors]: any = await pool.query(
+        'SELECT id, name, email, password, role FROM users WHERE email = ? LIMIT 1',
+        [supervisorEmail]
+      );
+      if (supervisors.length === 0) {
+        return res.status(401).json({ message: 'Credenciales del administrador o encargado inválidas' });
+      }
+
+      const supervisor = supervisors[0];
+      if (supervisor.role !== 'admin') {
+        return res.status(403).json({ message: 'El usuario no tiene privilegios de administrador o encargado de caja' });
+      }
+
+      const isMatch = await bcrypt.compare(supervisorPassword, supervisor.password);
+      if (!isMatch) {
+        return res.status(401).json({ message: 'Clave del administrador o encargado incorrecta' });
+      }
+    }
+  }
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -256,6 +287,34 @@ router.put('/:id', authenticate, canManageReturns, async (req: AuthRequest, res:
 
     if (existingRows.length === 0) {
       return res.status(404).json({ message: 'Reclamo o devolución no encontrado' });
+    }
+
+    // Si se cambia el tipo a devolución o el estado a reembolsado, exigir clave de administrador/encargado
+    if ((type === 'return' || status === 'refunded') && req.user?.role !== 'admin') {
+      const { supervisorEmail, supervisorPassword } = req.body;
+      if (!supervisorEmail || !supervisorPassword) {
+        return res.status(401).json({ 
+          message: 'Se requiere la clave del administrador o encargado de cajas para autorizar esta devolución.' 
+        });
+      }
+
+      const [supervisors]: any = await pool.query(
+        'SELECT id, name, email, password, role FROM users WHERE email = ? LIMIT 1',
+        [supervisorEmail]
+      );
+      if (supervisors.length === 0) {
+        return res.status(401).json({ message: 'Credenciales del administrador o encargado inválidas' });
+      }
+
+      const supervisor = supervisors[0];
+      if (supervisor.role !== 'admin') {
+        return res.status(403).json({ message: 'El usuario no tiene privilegios de administrador o encargado de caja' });
+      }
+
+      const isMatch = await bcrypt.compare(supervisorPassword, supervisor.password);
+      if (!isMatch) {
+        return res.status(401).json({ message: 'Clave del administrador o encargado incorrecta' });
+      }
     }
 
     const current = existingRows[0];

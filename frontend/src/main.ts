@@ -3257,8 +3257,8 @@ function renderAdminDashboard(): string {
             </button>
           ` : ''}
           ${hasPermission('returns') ? `
-            <button class="sidebar-nav-btn ${activeAdminView === 'returns' ? 'active' : ''}" id="admin-tab-returns">
-              🛠️ Devoluciones o Reclamos de Garantía
+            <button class="sidebar-nav-btn ${activeAdminView === 'returns' ? 'active' : ''}" id="admin-tab-returns" title="Devoluciones o Reclamos de Garantía">
+              🛠️ Devoluciones y Garantías
             </button>
           ` : ''}
           ${currentUser.role === 'admin' ? `
@@ -9519,7 +9519,7 @@ function bindCustomersEvents() {
 // FUNCIONES AUXILIARES: CONTROL DE CAJA Y SUPERVISOR OVERRIDE
 // ==========================================================================
 
-function requestSupervisorAuth(action: () => void | Promise<void>) {
+function requestSupervisorAuth(action: (credentials?: { email: string; password: string }) => void | Promise<void>) {
   if (currentUser?.role === 'admin') {
     void Promise.resolve(action());
     return;
@@ -9575,7 +9575,7 @@ function requestSupervisorAuth(action: () => void | Promise<void>) {
       // de lo contrario se limpia inmediatamente. El llamador decide si limpia.
       // Limpiamos y llamamos la acción.
       cleanUp();
-      await Promise.resolve(action());
+      await Promise.resolve(action({ email, password }));
     } catch (err: any) {
       alert(err.message || 'Error al validar credenciales del supervisor.');
       if (submitBtn) {
@@ -11093,30 +11093,48 @@ function openNewReturnModal() {
       const techName = (document.getElementById('new-return-tech-name') as HTMLInputElement)?.value.trim() || '';
       const repairNotes = (document.getElementById('new-return-repair-notes') as HTMLTextAreaElement)?.value.trim() || '';
 
-      const resp = await api.returns.create({
-        type: typeVal,
-        sale_id: selectedSaleId,
-        product_id: selectedProductId,
-        product_name: productName,
-        product_sku: productSku || null,
-        customer_name: customerName,
-        customer_ci: customerCi || null,
-        customer_phone: customerPhone || null,
-        customer_email: customerEmail || null,
-        reason,
-        issue_description: issueDesc || null,
-        status: statusVal,
-        is_repaired: isRep ? 1 : 0,
-        repair_cost: repairCost,
-        technician_name: techName || null,
-        repair_notes: repairNotes || null
-      });
+      const doSave = async (creds?: { email: string; password: string }) => {
+        try {
+          const resp = await api.returns.create({
+            type: typeVal,
+            sale_id: selectedSaleId,
+            product_id: selectedProductId,
+            product_name: productName,
+            product_sku: productSku || null,
+            customer_name: customerName,
+            customer_ci: customerCi || null,
+            customer_phone: customerPhone || null,
+            customer_email: customerEmail || null,
+            reason,
+            issue_description: issueDesc || null,
+            status: statusVal,
+            is_repaired: isRep ? 1 : 0,
+            repair_cost: repairCost,
+            technician_name: techName || null,
+            repair_notes: repairNotes || null,
+            supervisorEmail: creds?.email,
+            supervisorPassword: creds?.password
+          });
 
-      alert(`¡Caso registrado exitosamente!\n\nNúmero de Ticket: ${resp.code}`);
-      closeModal();
-      void renderAdminReturns();
+          alert(`¡Caso registrado exitosamente!\n\nNúmero de Ticket: ${resp.code}`);
+          closeModal();
+          void renderAdminReturns();
+        } catch (err: any) {
+          alert(`Error al guardar caso: ${err.message}`);
+          btnSubmit.disabled = false;
+          btnSubmit.innerText = 'Guardar Caso';
+        }
+      };
+
+      if (typeVal === 'return' && currentUser?.role !== 'admin') {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = 'Guardar Caso';
+        requestSupervisorAuth((creds) => doSave(creds));
+      } else {
+        await doSave();
+      }
     } catch (err: any) {
-      alert(`Error al guardar caso: ${err.message}`);
+      alert(`Error al procesar formulario: ${err.message}`);
       btnSubmit.disabled = false;
       btnSubmit.innerText = 'Guardar Caso';
     }
@@ -11300,20 +11318,38 @@ function openManageReturnModal(item: ReturnClaim) {
       const repairNotesVal = (document.getElementById('manage-repair-notes') as HTMLTextAreaElement)?.value.trim() || '';
       const resolutionVal = (document.getElementById('manage-resolution') as HTMLTextAreaElement)?.value.trim() || '';
 
-      await api.returns.update(item.id, {
-        status: updatedStatus as any,
-        is_repaired: isRepairedVal ? 1 : 0,
-        repair_cost: repairCostVal,
-        technician_name: technicianVal || null,
-        repair_notes: repairNotesVal || null,
-        resolution: resolutionVal || null
-      });
+      const doUpdate = async (creds?: { email: string; password: string }) => {
+        try {
+          await api.returns.update(item.id, {
+            status: updatedStatus as any,
+            is_repaired: isRepairedVal ? 1 : 0,
+            repair_cost: repairCostVal,
+            technician_name: technicianVal || null,
+            repair_notes: repairNotesVal || null,
+            resolution: resolutionVal || null,
+            supervisorEmail: creds?.email,
+            supervisorPassword: creds?.password
+          });
 
-      alert('¡Caso actualizado exitosamente!');
-      closeModal();
-      void renderAdminReturns();
+          alert('¡Caso actualizado exitosamente!');
+          closeModal();
+          void renderAdminReturns();
+        } catch (err: any) {
+          alert(`Error al actualizar caso: ${err.message}`);
+          btnSave.disabled = false;
+          btnSave.innerText = 'Guardar Cambios';
+        }
+      };
+
+      if ((item.type === 'return' || updatedStatus === 'refunded') && currentUser?.role !== 'admin') {
+        btnSave.disabled = false;
+        btnSave.innerText = 'Guardar Cambios';
+        requestSupervisorAuth((creds) => doUpdate(creds));
+      } else {
+        await doUpdate();
+      }
     } catch (err: any) {
-      alert(`Error al actualizar caso: ${err.message}`);
+      alert(`Error al procesar formulario: ${err.message}`);
       btnSave.disabled = false;
       btnSave.innerText = 'Guardar Cambios';
     }

@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
 const audit_1 = require("../services/audit");
@@ -123,6 +124,29 @@ router.post('/', auth_1.authenticate, canManageReturns, async (req, res) => {
             message: 'Nombre del producto, nombre del cliente y motivo son campos obligatorios.'
         });
     }
+    // Si la solicitud es una Devolución, verificar autorización obligatoria de Administrador o Encargado de Caja
+    if (type === 'return') {
+        if (req.user?.role !== 'admin') {
+            const { supervisorEmail, supervisorPassword } = req.body;
+            if (!supervisorEmail || !supervisorPassword) {
+                return res.status(401).json({
+                    message: 'Se requiere la clave del administrador o encargado de cajas para autorizar una devolución.'
+                });
+            }
+            const [supervisors] = await db_1.default.query('SELECT id, name, email, password, role FROM users WHERE email = ? LIMIT 1', [supervisorEmail]);
+            if (supervisors.length === 0) {
+                return res.status(401).json({ message: 'Credenciales del administrador o encargado inválidas' });
+            }
+            const supervisor = supervisors[0];
+            if (supervisor.role !== 'admin') {
+                return res.status(403).json({ message: 'El usuario no tiene privilegios de administrador o encargado de caja' });
+            }
+            const isMatch = await bcryptjs_1.default.compare(supervisorPassword, supervisor.password);
+            if (!isMatch) {
+                return res.status(401).json({ message: 'Clave del administrador o encargado incorrecta' });
+            }
+        }
+    }
     const conn = await db_1.default.getConnection();
     try {
         await conn.beginTransaction();
@@ -193,6 +217,27 @@ router.put('/:id', auth_1.authenticate, canManageReturns, async (req, res) => {
         const [existingRows] = await db_1.default.query('SELECT * FROM returns_claims WHERE id = ?', [id]);
         if (existingRows.length === 0) {
             return res.status(404).json({ message: 'Reclamo o devolución no encontrado' });
+        }
+        // Si se cambia el tipo a devolución o el estado a reembolsado, exigir clave de administrador/encargado
+        if ((type === 'return' || status === 'refunded') && req.user?.role !== 'admin') {
+            const { supervisorEmail, supervisorPassword } = req.body;
+            if (!supervisorEmail || !supervisorPassword) {
+                return res.status(401).json({
+                    message: 'Se requiere la clave del administrador o encargado de cajas para autorizar esta devolución.'
+                });
+            }
+            const [supervisors] = await db_1.default.query('SELECT id, name, email, password, role FROM users WHERE email = ? LIMIT 1', [supervisorEmail]);
+            if (supervisors.length === 0) {
+                return res.status(401).json({ message: 'Credenciales del administrador o encargado inválidas' });
+            }
+            const supervisor = supervisors[0];
+            if (supervisor.role !== 'admin') {
+                return res.status(403).json({ message: 'El usuario no tiene privilegios de administrador o encargado de caja' });
+            }
+            const isMatch = await bcryptjs_1.default.compare(supervisorPassword, supervisor.password);
+            if (!isMatch) {
+                return res.status(401).json({ message: 'Clave del administrador o encargado incorrecta' });
+            }
         }
         const current = existingRows[0];
         const updatedType = type || current.type;

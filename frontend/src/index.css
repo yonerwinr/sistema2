@@ -975,6 +975,7 @@ select option:hover {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.3s ease;
+  text-align: left;
 }
 
 .sidebar-nav-btn:hover, .sidebar-nav-btn.active {

@@ -24,11 +24,14 @@ router.get('/', auth_1.authenticate, auth_1.isAdmin, async (_req, res) => {
       SELECT COUNT(*) as low_stock_count FROM products WHERE stock < 5
     `);
         const lowStockCount = lowStockResult[0].low_stock_count;
-        // Gastos Totales y Ganancias Netas
+        // Gastos Totales (Operativos + Costos de Reparación en Garantías) y Ganancias Netas
         const [expensesResult] = await db_1.default.query(`
       SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses
     `);
-        const totalExpenses = Number(expensesResult[0]?.total_expenses || 0);
+        const [repairCostsResult] = await db_1.default.query(`
+      SELECT COALESCE(SUM(repair_cost), 0) as total_repair_cost FROM returns_claims
+    `);
+        const totalExpenses = Number(expensesResult[0]?.total_expenses || 0) + Number(repairCostsResult[0]?.total_repair_cost || 0);
         const totalRevenue = Number(summary.total_revenue || 0);
         const totalProfit = totalRevenue - totalExpenses;
         const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0;
@@ -205,9 +208,10 @@ router.get('/reports', auth_1.authenticate, async (req, res) => {
         let newCustomers = 0;
         // Solo los administradores pueden ver datos financieros consolidados y clientes nuevos globales
         if (req.user?.role !== 'seller') {
-            // Obtener gastos totales en el rango (son globales, no por vendedor)
+            // Obtener gastos totales y costos de reparación en garantías en el rango (son globales)
             const [expensesRows] = await db_1.default.query('SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE is_active = 1 AND created_at >= ? AND created_at <= ?', [startDateStr, endDateStr]);
-            totalExpenses = Number(expensesRows[0]?.total_expenses || 0);
+            const [repairRows] = await db_1.default.query('SELECT COALESCE(SUM(repair_cost), 0) as total_repair_cost FROM returns_claims WHERE created_at >= ? AND created_at <= ?', [startDateStr, endDateStr]);
+            totalExpenses = Number(expensesRows[0]?.total_expenses || 0) + Number(repairRows[0]?.total_repair_cost || 0);
             netProfit = totalRevenue - totalExpenses;
             // Obtener cantidad de clientes nuevos registrados
             const [customersRows] = await db_1.default.query('SELECT COUNT(*) as count FROM users WHERE role = "customer" AND created_at >= ? AND created_at <= ?', [startDateStr, endDateStr]);
