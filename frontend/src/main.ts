@@ -2,6 +2,8 @@ import { Chart, registerables } from 'chart.js';
 import { api } from './utils/api';
 import type { Product, User, SaleDetail, AuditLog, Sale, CashSession, ReturnClaim, ReturnClaimStats } from './utils/api';
 import { initScrollAnimations } from './utils/scroll-animation';
+import { getMonkeyAvatarSvg } from './components/MonkeyAvatarSvg';
+import { initMonkeyAnimation, type MonkeyController } from './utils/monkeyAnimation';
 import './index.css';
 
 Chart.register(...registerables);
@@ -2796,9 +2798,12 @@ function renderAuthView(): string {
   return `
     <div class="auth-container">
       <div class="card auth-card animate-on-scroll animate-zoom-in">
-        <div style="text-align:center; margin-bottom: 20px;">
-          <img src="/logo.png" class="animate-float" style="width: 76px; height: 76px; border-radius:50%; border:2px solid var(--primary); box-shadow: 0 4px 15px rgba(255,122,0,0.25); background:var(--bg-secondary); object-fit:contain;" alt="Logo">
-          <h2 style="font-weight:900; margin-top:10px; font-size: 24px; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing:-0.5px;">FacilitoApp</h2>
+        <div style="text-align:center; margin-bottom: 16px;">
+          <!-- AVATAR INTERACTIVO ANIMADO DEL MONITO FACILITO -->
+          <div class="monkey-avatar-container">
+            ${getMonkeyAvatarSvg()}
+          </div>
+          <h2 style="font-weight:900; margin-top:6px; font-size: 24px; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing:-0.5px;">FacilitoApp</h2>
           <p style="font-size:12px; color:var(--text-secondary); margin-top:2px;">¡Ingresa y disfruta del control total de tus ventas! 🐒</p>
         </div>
         ${authNotice ? `
@@ -2815,11 +2820,16 @@ function renderAuthView(): string {
           <form id="login-form">
             <div class="form-group">
               <label class="form-label" for="login-email">Correo Electronico</label>
-              <input type="email" class="form-control" id="login-email" required placeholder="admin@sistema.com o cliente@correo.com">
+              <input type="email" class="form-control" id="login-email" required placeholder="admin@sistema.com o cliente@correo.com" autocomplete="username">
             </div>
             <div class="form-group">
               <label class="form-label" for="login-password">Contraseña</label>
-              <input type="password" class="form-control" id="login-password" required placeholder="••••••••">
+              <div class="password-input-wrap">
+                <input type="password" class="form-control" id="login-password" required placeholder="••••••••" autocomplete="current-password">
+                <button type="button" class="btn-toggle-pass" id="btn-toggle-login-pass" title="Mostrar u ocultar contraseña" aria-label="Mostrar u ocultar contraseña">
+                  <span id="icon-toggle-login-pass">👁️</span>
+                </button>
+              </div>
               <div style="text-align: right; margin-top: 6px;">
                 <a href="#" id="link-forgot-pass" style="font-size: 12px; color: var(--primary); font-weight: 600; text-decoration: none;">¿Olvidaste tu contraseña?</a>
               </div>
@@ -2846,11 +2856,16 @@ function renderAuthView(): string {
             </div>
             <div class="form-group">
               <label class="form-label" for="reg-email">Correo Electronico</label>
-              <input type="email" class="form-control" id="reg-email" required placeholder="Ej. juan@correo.com">
+              <input type="email" class="form-control" id="reg-email" required placeholder="Ej. juan@correo.com" autocomplete="username">
             </div>
             <div class="form-group">
-              <label class="form-label" for="reg-password">Contrasena</label>
-              <input type="password" class="form-control" id="reg-password" required minlength="6" placeholder="Minimo 6 caracteres">
+              <label class="form-label" for="reg-password">Contraseña</label>
+              <div class="password-input-wrap">
+                <input type="password" class="form-control" id="reg-password" required minlength="6" placeholder="Minimo 6 caracteres" autocomplete="new-password">
+                <button type="button" class="btn-toggle-pass" id="btn-toggle-reg-pass" title="Mostrar u ocultar contraseña" aria-label="Mostrar u ocultar contraseña">
+                  <span id="icon-toggle-reg-pass">👁️</span>
+                </button>
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label" for="reg-phone">WhatsApp / Telefono</label>
@@ -2918,7 +2933,62 @@ function renderAuthView(): string {
   `;
 }
 
+let currentMonkeyController: MonkeyController | null = null;
+
 function bindAuthEvents() {
+  if (currentMonkeyController) {
+    currentMonkeyController.destroy();
+    currentMonkeyController = null;
+  }
+
+  // Inicializar cinemática del avatar del Monito FacilitoApp
+  const monkeyContainer = document.querySelector('.monkey-avatar-wrap') as HTMLElement | null;
+  if (monkeyContainer) {
+    if (activeAuthTab === 'login') {
+      const emailInput = document.getElementById('login-email') as HTMLInputElement | null;
+      const passInput = document.getElementById('login-password') as HTMLInputElement | null;
+      const toggleBtn = document.getElementById('btn-toggle-login-pass') as HTMLButtonElement | null;
+
+      toggleBtn?.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // Evita perder el foco del input de contraseña
+      });
+
+      toggleBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (passInput) {
+          const isPass = passInput.type === 'password';
+          passInput.type = isPass ? 'text' : 'password';
+          const icon = document.getElementById('icon-toggle-login-pass');
+          if (icon) icon.textContent = isPass ? '🙈' : '👁️';
+          currentMonkeyController?.peek(isPass);
+        }
+      });
+
+      currentMonkeyController = initMonkeyAnimation(monkeyContainer, emailInput, passInput, toggleBtn);
+    } else if (activeAuthTab === 'register') {
+      const emailInput = document.getElementById('reg-email') as HTMLInputElement | null;
+      const passInput = document.getElementById('reg-password') as HTMLInputElement | null;
+      const toggleBtn = document.getElementById('btn-toggle-reg-pass') as HTMLButtonElement | null;
+
+      toggleBtn?.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // Evita perder el foco del input de contraseña
+      });
+
+      toggleBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (passInput) {
+          const isPass = passInput.type === 'password';
+          passInput.type = isPass ? 'text' : 'password';
+          const icon = document.getElementById('icon-toggle-reg-pass');
+          if (icon) icon.textContent = isPass ? '🙈' : '👁️';
+          currentMonkeyController?.peek(isPass);
+        }
+      });
+
+      currentMonkeyController = initMonkeyAnimation(monkeyContainer, emailInput, passInput, toggleBtn);
+    }
+  }
+
   document.getElementById('tab-login-btn')?.addEventListener('click', () => {
     activeAuthTab = 'login';
     renderApp();
@@ -3000,6 +3070,7 @@ function bindAuthEvents() {
 
     try {
       const res = await api.auth.login({ email, password });
+      currentMonkeyController?.celebrate();
       establishUserSession(res.token, res.user);
 
       if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
@@ -3010,6 +3081,7 @@ function bindAuthEvents() {
         navigate('store');
       }
     } catch (error: any) {
+      currentMonkeyController?.resetFace();
       alert(error.message || 'Error en el inicio de sesion');
       btn.disabled = false;
       btn.innerText = 'Ingresar';

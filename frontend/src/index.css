@@ -1402,6 +1402,95 @@ select option:hover {
   border-bottom-color: var(--primary);
 }
 
+/* ==========================================================================
+   MONKEY AVATAR LOGIN ANIMADO (ESTILO CODEWITHRANDOM / FACILITO)
+   ========================================================================== */
+.monkey-avatar-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.monkey-avatar-wrap {
+  position: relative;
+  width: 154px;
+  height: 154px;
+  margin: 0 auto;
+}
+
+.monkey-badge-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 142px;
+  height: 142px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 115, 0, 0.45) 0%, rgba(0, 119, 246, 0.35) 60%, transparent 80%);
+  filter: blur(14px);
+  z-index: 0;
+  pointer-events: none;
+  animation: monkeyGlowPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes monkeyGlowPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 1;
+  }
+}
+
+.monkey-svg {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45));
+  user-select: none;
+}
+
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrap .form-control {
+  padding-right: 48px !important;
+}
+
+.btn-toggle-pass {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  z-index: 2;
+  user-select: none;
+}
+
+.btn-toggle-pass:hover {
+  color: var(--primary);
+  background: rgba(255, 115, 0, 0.12);
+}
+
 /* Modales e Interfaces de Factura Excitosa */
 .success-invoice-box {
   text-align: center;
