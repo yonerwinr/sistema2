@@ -88,9 +88,20 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Credenciales invalidas' });
     }
 
+    // Obtener información del negocio asociado
+    let businessInfo = null;
+    const targetBusinessId = user.business_id || 1;
+    const [bRows]: any = await pool.query(
+      'SELECT id, name, slug, logo_url, license_status, license_expires_at, is_active FROM businesses WHERE id = ? LIMIT 1',
+      [targetBusinessId]
+    );
+    if (bRows.length > 0) {
+      businessInfo = bRows[0];
+    }
+
     // Generar token JWT (Vigencia de 8 horas)
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name },
+      { id: user.id, email: user.email, role: user.role, name: user.name, business_id: targetBusinessId },
       JWT_SECRET,
       { expiresIn: '8h' }
     );
@@ -102,7 +113,9 @@ router.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        phone: user.phone
+        phone: user.phone,
+        business_id: targetBusinessId,
+        business: businessInfo
       }
     });
   } catch (error) {

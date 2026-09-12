@@ -1,12 +1,30 @@
 const API_BASE = (import.meta.env.VITE_API_URL as string) || '/api';
 
+let activeBusinessSlug: string = localStorage.getItem('facilito_business_slug') || '';
+
+export function setActiveBusinessSlug(slug: string) {
+  activeBusinessSlug = (slug || '').trim().toLowerCase();
+  if (activeBusinessSlug) {
+    localStorage.setItem('facilito_business_slug', activeBusinessSlug);
+  } else {
+    localStorage.removeItem('facilito_business_slug');
+  }
+}
+
+export function getActiveBusinessSlug(): string {
+  return activeBusinessSlug;
+}
+
 function getHeaders(): HeadersInit {
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
   const token = localStorage.getItem('token');
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (activeBusinessSlug) {
+    headers['x-business-slug'] = activeBusinessSlug;
   }
   return headers;
 }
@@ -57,15 +75,57 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
-// Interfaces de datos
+// Interfaces de datos Multi-Tenant y SaaS
+export interface BusinessProfile {
+  id: number;
+  name: string;
+  slug: string;
+  rif: string | null;
+  legal_name: string | null;
+  logo_url: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  ticket_message: string | null;
+  license_status: 'trial' | 'active' | 'expired' | 'suspended';
+  license_plan: 'basic' | 'pro' | 'enterprise';
+  license_expires_at: string | null;
+  price_monthly?: number;
+  google_sheet_url: string | null;
+  google_sheets_webhook_url?: string | null;
+  is_active: number;
+  daysRemaining?: number | null;
+  isExpired?: boolean;
+}
+
+export interface SuperAdminMetrics {
+  totalBusinesses: number;
+  activeLicenses: number;
+  trialLicenses: number;
+  expiredLicenses: number;
+  suspendedLicenses: number;
+  estimatedMRR: number;
+  globalSalesCount: number;
+  globalRevenue: number;
+}
+
+export interface SuperAdminBusiness extends BusinessProfile {
+  total_users: number;
+  total_products: number;
+  total_sales: number;
+  total_revenue: number;
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'customer' | 'seller' | 'billing';
+  role: 'superadmin' | 'admin' | 'customer' | 'seller' | 'billing';
   phone?: string;
   ci?: string;
   address?: string | null;
+  business_id?: number;
+  business?: BusinessProfile;
   client_type?: 'natural' | 'juridico' | 'gubernamental';
   representative_name?: string | null;
   representative_ci?: string | null;
@@ -582,5 +642,40 @@ export const api = {
     delete: (id: number) => request<{ message: string }>(`/returns/${id}`, {
       method: 'DELETE',
     }),
+  },
+
+  // Gestión de Licencias y Comercios (SuperAdmin)
+  superadmin: {
+    getMetrics: () => request<{ metrics: SuperAdminMetrics }>('/superadmin/metrics'),
+    getBusinesses: () => request<{ businesses: SuperAdminBusiness[] }>('/superadmin/businesses'),
+    createBusiness: (body: any) => request<{ message: string; business: any }>('/superadmin/businesses', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    updateLicense: (id: number, body: { action?: string; add_days?: number; license_status?: string; license_plan?: string; is_active?: boolean; price_monthly?: number }) => request<any>(`/superadmin/businesses/${id}/license`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  },
+
+  // Perfil del Comercio y Google Sheets
+  business: {
+    getProfile: () => request<{ business: BusinessProfile }>('/business/profile'),
+    getMyProfile: async (): Promise<BusinessProfile> => {
+      const res = await api.business.getProfile();
+      return res.business;
+    },
+    updateProfile: (body: Partial<BusinessProfile>) => request<{ message: string }>('/business/profile', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+    autoProvisionSheet: () => request<{ message: string; sheetUrl: string; isSimulated: boolean }>('/business/google-sheet', {
+      method: 'POST',
+    }),
+    getPublicProfile: (slug: string) => request<{ business: BusinessProfile }>(`/business/public/${slug}`),
+    getBySlug: async (slug: string): Promise<BusinessProfile> => {
+      const res = await api.business.getPublicProfile(slug);
+      return res.business;
+    },
   },
 };

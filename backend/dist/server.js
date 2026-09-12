@@ -18,6 +18,10 @@ const expenses_1 = __importDefault(require("./controllers/expenses"));
 const cash_1 = __importDefault(require("./controllers/cash"));
 const suppliers_1 = __importDefault(require("./controllers/suppliers"));
 const returns_1 = __importDefault(require("./controllers/returns"));
+const superadmin_1 = __importDefault(require("./controllers/superadmin"));
+const business_1 = __importDefault(require("./controllers/business"));
+const tenant_1 = require("./middleware/tenant");
+const multiTenantMigration_1 = require("./db/multiTenantMigration");
 const reminders_1 = require("./services/reminders");
 const rates_1 = require("./services/rates");
 dotenv_1.default.config();
@@ -36,9 +40,12 @@ if (!fs_1.default.existsSync(invoicesDir)) {
 app.use((0, compression_1.default)());
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
+app.use(tenant_1.tenantMiddleware);
 // Servir imagenes estaticas o assets si es necesario
 app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
 // Rutas de la API
+app.use('/api/superadmin', superadmin_1.default);
+app.use('/api/business', business_1.default);
 app.use('/api/auth', auth_1.default);
 app.use('/api/products', products_1.default);
 app.use('/api/sales', sales_1.default);
@@ -63,6 +70,8 @@ async function runMigrations() {
     const conn = await db_1.default.getConnection();
     try {
         console.log('Iniciando migraciones de base de datos...');
+        // Ejecutar migración Multi-Tenant (crea tabla businesses y agrega business_id)
+        await (0, multiTenantMigration_1.runMultiTenantMigration)(conn);
         // Modificar columna role para permitir 'seller' y 'billing'
         try {
             await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'customer', 'seller', 'billing') DEFAULT 'customer'");

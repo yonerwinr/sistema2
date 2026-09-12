@@ -1,9 +1,11 @@
 import { Chart, registerables } from 'chart.js';
-import { api } from './utils/api';
-import type { Product, User, SaleDetail, AuditLog, Sale, CashSession, ReturnClaim, ReturnClaimStats } from './utils/api';
+import { api, setActiveBusinessSlug } from './utils/api';
+import type { Product, User, SaleDetail, AuditLog, Sale, CashSession, ReturnClaim, ReturnClaimStats, BusinessProfile } from './utils/api';
 import { initScrollAnimations } from './utils/scroll-animation';
 import { getMonkeyAvatarSvg } from './components/MonkeyAvatarSvg';
 import { initMonkeyAnimation, type MonkeyController } from './utils/monkeyAnimation';
+import { renderSuperAdminView, setupSuperAdminEvents } from './components/SuperAdminView';
+import { renderBusinessProfileHtml, setupBusinessProfileEvents } from './components/BusinessProfileView';
 import './index.css';
 
 Chart.register(...registerables);
@@ -11,8 +13,9 @@ Chart.register(...registerables);
 // ==========================================================================
 // ESTADO GLOBAL DE LA APP
 // ==========================================================================
-let currentView: 'store' | 'auth' | 'admin' | 'info' = 'info';
+let currentView: 'store' | 'auth' | 'admin' | 'info' | 'superadmin' = 'info';
 let currentUser: User | null = null;
+let currentBusinessProfile: BusinessProfile | null = null;
 let productsList: Product[] = [];
 let activeCashSession: CashSession | null = null;
 let posCashLimit = 500.00;
@@ -157,7 +160,7 @@ function smartMatch(target: string | undefined | null, query: string | undefined
 }
 
 // Vista activa dentro de Administración
-type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports' | 'suppliers' | 'online_billing' | 'returns';
+type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports' | 'suppliers' | 'online_billing' | 'returns' | 'business_profile';
 let activeAdminView: AdminSubView = 'pos';
 
 // Nuevas variables de estado para el control en POS
@@ -278,6 +281,12 @@ function recordUserActivity() {
 function establishUserSession(token: string, user: User) {
   const now = Date.now();
   currentUser = user;
+  if ((user as any).business) {
+    currentBusinessProfile = (user as any).business;
+    if ((user as any).business.slug) {
+      setActiveBusinessSlug((user as any).business.slug);
+    }
+  }
   localStorage.setItem('token', token);
   try {
     localStorage.setItem('user', JSON.stringify(user));
@@ -295,6 +304,7 @@ function logoutSession(reason?: string, redirect: boolean = false) {
   localStorage.removeItem('session_login_time');
   sessionStorage.removeItem('facilito_cash_session');
   currentUser = null;
+  currentBusinessProfile = null;
   activeCashSession = null;
 
   if (reason) {
@@ -408,15 +418,29 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Cargar estado instantáneo de la memoria antes de renderizar
   hydrateStateFromCache();
 
+  // Extraer slug de comercio de la URL (?b=slug o ?empresa=slug)
+  const urlParams = new URLSearchParams(window.location.search);
+  const slugParam = urlParams.get('b') || urlParams.get('empresa') || urlParams.get('negocio');
+  if (slugParam) {
+    setActiveBusinessSlug(slugParam);
+  }
+
   // Detectar si el usuario ingresó por una ruta específica
   const initialPath = window.location.pathname.toLowerCase();
+  const isSuperAdminRoute = initialPath === '/superadmin' || initialPath.endsWith('/superadmin') || window.location.hash === '#superadmin';
   const isInfoRoute = initialPath === '/info' || initialPath.endsWith('/info') || window.location.hash === '#info';
   const isStoreRoute = initialPath === '/tienda' || initialPath === '/store' || initialPath.endsWith('/tienda') || window.location.hash === '#tienda';
   const isLoginRoute = initialPath === '/login' || initialPath.endsWith('/login') || window.location.hash === '#login';
   const isAdminRoute = initialPath === '/admin' || initialPath.endsWith('/admin') || window.location.hash === '#admin';
 
-  if (isAdminRoute) {
-    if (!isSessionValid() || !currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller' && currentUser.role !== 'billing')) {
+  if (isSuperAdminRoute) {
+    if (!isSessionValid() || !currentUser || currentUser.role !== 'superadmin') {
+      currentView = 'auth';
+    } else {
+      currentView = 'superadmin';
+    }
+  } else if (isAdminRoute) {
+    if (!isSessionValid() || !currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller' && currentUser.role !== 'billing' && currentUser.role !== 'superadmin')) {
       logoutSession('Debes iniciar sesión para acceder al panel administrativo.', false);
       currentView = 'auth';
     } else {
@@ -458,7 +482,24 @@ window.addEventListener('DOMContentLoaded', async () => {
         currentUser = freshUser;
         localStorage.setItem('user', JSON.stringify(freshUser));
 
-        if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
+        if ((freshUser as any).business) {
+          currentBusinessProfile = (freshUser as any).business;
+        } else if (freshUser.role === 'admin') {
+          try {
+            currentBusinessProfile = await api.business.getMyProfile();
+          } catch (e) {}
+        }
+
+        if (currentUser && currentUser.role === 'superadmin') {
+          if (isAdminRoute) {
+            currentView = 'admin';
+            navigate('admin');
+          } else if (isStoreRoute) {
+            navigate('store');
+          } else {
+            navigate('superadmin');
+          }
+        } else if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
           if (isAdminRoute) {
             currentView = 'admin';
             if (currentUser.role === 'billing') {
@@ -583,10 +624,15 @@ async function loadExchangeRates() {
 // ==========================================================================
 // ENRUTADOR (Navegación SPA)
 // ==========================================================================
-function navigate(view: 'store' | 'auth' | 'admin' | 'info', updateUrl: boolean = true) {
-  // Proteger acceso a panel administrativo
-  if (view === 'admin') {
-    if (!isSessionValid() || !currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller' && currentUser.role !== 'billing')) {
+function navigate(view: 'store' | 'auth' | 'admin' | 'info' | 'superadmin', updateUrl: boolean = true) {
+  // Proteger acceso a paneles administrativos
+  if (view === 'superadmin') {
+    if (!isSessionValid() || !currentUser || currentUser.role !== 'superadmin') {
+      alert('Acceso exclusivo para el Super Administrador del Sistema.');
+      view = 'auth';
+    }
+  } else if (view === 'admin') {
+    if (!isSessionValid() || !currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'seller' && currentUser.role !== 'billing' && currentUser.role !== 'superadmin')) {
       logoutSession('Debes iniciar sesión para acceder al panel de administración.', false);
       view = 'auth';
     }
@@ -607,6 +653,8 @@ function navigate(view: 'store' | 'auth' | 'admin' | 'info', updateUrl: boolean 
         window.history.pushState({ view: 'auth' }, '', '/login');
       } else if (view === 'admin') {
         window.history.pushState({ view: 'admin' }, '', '/admin');
+      } else if (view === 'superadmin') {
+        window.history.pushState({ view: 'superadmin' }, '', '#superadmin');
       }
     } catch (e) {}
   }
@@ -655,6 +703,46 @@ function renderApp() {
   const appDiv = document.getElementById('app');
   if (!appDiv) return;
 
+  // Si la cuenta está suspendida y el usuario no es superadmin
+  const isSuspended = currentUser && currentUser.role !== 'superadmin' && currentBusinessProfile && (currentBusinessProfile.license_status === 'suspended' || currentBusinessProfile.license_status === 'expired');
+
+  if (isSuspended && currentView === 'admin') {
+    appDiv.innerHTML = `
+      ${renderNavbar()}
+      <main id="main-content" style="flex-grow: 1;">
+        <div style="min-height: 75vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding: 40px 20px;">
+          <div style="width: 130px; height: 130px; margin-bottom: 24px; animation: bounce 2s infinite;">
+            <img src="/logo.png" style="width:100%; height:100%; object-fit:contain; filter: drop-shadow(0 10px 25px rgba(255,115,0,0.4));" alt="Mono Facilito" />
+          </div>
+          <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 18px; font-weight:700; border-radius: 9999px; margin-bottom: 16px; font-size:13px;">
+            ⚠️ LICENCIA TEMPORALMENTE PAUSADA O VENCIDA
+          </span>
+          <h2 style="font-size: 28px; font-weight: 800; color: white; margin-bottom: 12px;">¡Hola! El acceso de ${currentBusinessProfile?.name || 'tu negocio'} está en pausa 🐒</h2>
+          <p style="max-width: 540px; color: var(--text-secondary); font-size: 15px; line-height: 1.6; margin-bottom: 28px;">
+            Tu suscripción a FacilitoApp ha expirado o se encuentra suspendida.
+            Tus datos, ventas y respaldos en Google Sheets están totalmente protegidos.
+            Para renovar tu membresía y continuar operando, por favor comunícate con el soporte oficial.
+          </p>
+          <div style="display:flex; gap: 14px; flex-wrap:wrap; justify-content:center;">
+            <a href="https://wa.me/584120000000?text=Hola,%20deseo%20renovar%20la%20licencia%20de%20FacilitoApp%20para%20${encodeURIComponent(currentBusinessProfile?.name || '')}" target="_blank" class="btn btn-primary" style="background: #25d366; border:none; padding: 14px 28px; font-weight:800; font-size:15px; display:flex; align-items:center; gap:8px; box-shadow: 0 4px 16px rgba(37,211,102,0.3);">
+              📲 Contactar por WhatsApp
+            </a>
+            <button class="btn btn-secondary" id="suspended-logout-btn" style="padding: 14px 24px; font-size:14px; font-weight:600;">
+              Cerrar Sesión
+            </button>
+          </div>
+        </div>
+      </main>
+      ${renderFooter()}
+    `;
+    bindGeneralEvents();
+    document.getElementById('suspended-logout-btn')?.addEventListener('click', () => {
+      logoutSession('Sesión finalizada.');
+      navigate('auth');
+    });
+    return;
+  }
+
   appDiv.innerHTML = `
     ${renderNavbar()}
     <main id="main-content" style="flex-grow: 1;">
@@ -662,6 +750,7 @@ function renderApp() {
       ${currentView === 'info' ? renderInfoView() : ''}
       ${currentView === 'auth' ? renderAuthView() : ''}
       ${currentView === 'admin' ? renderAdminDashboard() : ''}
+      ${currentView === 'superadmin' ? '<div id="superadmin-container" style="min-height: 85vh; padding: 20px 0;"></div>' : ''}
     </main>
     ${renderFooter()}
     ${renderCartSidebar()}
@@ -678,7 +767,13 @@ function renderApp() {
   bindSuccessEvents();
   bindSaleDetailEvents();
 
-  if (currentView === 'store') {
+  if (currentView === 'superadmin') {
+    const saContainer = document.getElementById('superadmin-container');
+    if (saContainer) {
+      renderSuperAdminView(saContainer);
+      setupSuperAdminEvents(saContainer);
+    }
+  } else if (currentView === 'store') {
     bindStoreEvents();
   } else if (currentView === 'info') {
     bindInfoEvents();
@@ -727,9 +822,14 @@ function renderNavbar(): string {
           <a class="nav-link ${currentView === 'info' ? 'active' : ''}" id="link-info">Información</a>
           
           ${currentUser ? `
-            ${(currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing') ? `
-              <a class="nav-link ${currentView === 'admin' ? 'active' : ''}" id="link-admin">
-                <span style="display:inline-flex; align-items:center; gap:4px;">${icons.dashboard} ${currentUser.role === 'admin' ? 'Panel Admin' : (currentUser.role === 'billing' ? 'Facturación' : 'Caja POS')}</span>
+            ${currentUser.role === 'superadmin' ? `
+              <a class="nav-link ${currentView === 'superadmin' ? 'active' : ''}" id="link-superadmin" style="background: linear-gradient(135deg, rgba(255,115,0,0.15), rgba(0,119,246,0.15)); border: 1px solid rgba(255,115,0,0.3); border-radius: 8px; padding: 4px 10px; color: #ff9100; font-weight: 700; cursor:pointer;">
+                👑 SuperAdmin SaaS
+              </a>
+            ` : ''}
+            ${(currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing' || (currentUser as any).role === 'superadmin') ? `
+              <a class="nav-link ${currentView === 'admin' ? 'active' : ''}" id="link-admin" style="cursor:pointer;">
+                <span style="display:inline-flex; align-items:center; gap:4px;">${icons.dashboard} ${(currentUser as any).role === 'superadmin' ? 'Panel POS/Admin' : (currentUser.role === 'admin' ? 'Panel Admin' : (currentUser.role === 'billing' ? 'Facturación' : 'Caja POS'))}</span>
               </a>
             ` : ''}
             <span class="nav-link" style="color: var(--primary); font-weight: 600; cursor: default;">
@@ -802,6 +902,9 @@ function bindGeneralEvents() {
     setTimeout(() => {
       document.getElementById('info-faq-anchor')?.scrollIntoView({ behavior: 'smooth' });
     }, 150);
+  });
+  document.getElementById('link-superadmin')?.addEventListener('click', () => {
+    navigate('superadmin');
   });
   document.getElementById('link-admin')?.addEventListener('click', () => {
     activeAdminView = 'stats';
@@ -2072,9 +2175,9 @@ function drawCode128OnCanvas(ctx: CanvasRenderingContext2D, codeText: string, x:
 
 function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    // Cargar la imagen del logotipo
+    // Cargar la imagen del logotipo del comercio o predeterminado
     const logoImg = new Image();
-    logoImg.src = '/logo.png';
+    logoImg.src = currentBusinessProfile?.logo_url || '/logo.png';
 
     const onLogoLoaded = (loaded: boolean) => {
       const canvas = document.createElement('canvas');
@@ -2083,7 +2186,7 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       const width = 450;
       const rowHeight = 30;
-      const headerHeight = loaded ? 220 : 130;
+      const headerHeight = loaded ? 240 : 150;
       const clientHeight = 110;
       const footerHeight = 100;
       const itemsHeight = items.length * rowHeight;
@@ -2097,6 +2200,8 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       if (couponCode) extraHeight += 18;
       if (sale.concept) extraHeight += 40;
       if (sale.note) extraHeight += 40;
+      if (currentBusinessProfile?.rif) extraHeight += 16;
+      if (currentBusinessProfile?.address) extraHeight += 16;
       
       const height = headerHeight + clientHeight + itemsHeight + 100 + footerHeight + extraHeight + 40 + 80;
 
@@ -2134,12 +2239,25 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       ctx.fillStyle = '#e65c00'; // Naranja
       ctx.font = 'bold 15px Outfit, Segoe UI';
-      ctx.fillText('FACILITOAPP 🐒', width / 2, textY + 25);
+      const merchantName = (currentBusinessProfile?.name || 'FACILITOAPP 🐒').toUpperCase();
+      ctx.fillText(merchantName, width / 2, textY + 25);
 
-      ctx.fillStyle = '#475569'; // Gris oscuro
-      ctx.font = '13px Outfit, Segoe UI';
-      ctx.fillText(`${sale.is_quotation === 1 ? 'Cotización' : 'Factura'}: #${sale.id}`, width / 2, textY + 50);
-      ctx.fillText(`Fecha: ${new Date(sale.created_at || new Date()).toLocaleString('es-ES')}`, width / 2, textY + 70);
+      let bInfoY = textY + 46;
+      ctx.fillStyle = '#475569';
+      ctx.font = '11px Outfit, Segoe UI';
+      if (currentBusinessProfile?.rif) {
+        ctx.fillText(`RIF: ${currentBusinessProfile.rif}`, width / 2, bInfoY);
+        bInfoY += 16;
+      }
+      if (currentBusinessProfile?.address) {
+        let bAddr = currentBusinessProfile.address;
+        if (bAddr.length > 52) bAddr = bAddr.substring(0, 49) + '...';
+        ctx.fillText(bAddr, width / 2, bInfoY);
+        bInfoY += 16;
+      }
+
+      ctx.fillText(`${sale.is_quotation === 1 ? 'Cotización' : 'Factura'}: #${sale.id}`, width / 2, bInfoY);
+      ctx.fillText(`Fecha: ${new Date(sale.created_at || new Date()).toLocaleString('es-ES')}`, width / 2, bInfoY + 18);
 
       // Dibujar Línea divisoria
       ctx.strokeStyle = 'rgba(0,0,0,0.1)';
@@ -2379,12 +2497,13 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 13px Outfit, Segoe UI';
-      ctx.fillText(sale.is_quotation === 1 ? 'Cotización válida por 15 días.' : '¡Gracias por tu compra!', width / 2, y);
+      const bFooter = currentBusinessProfile?.ticket_message || (sale.is_quotation === 1 ? 'Cotización válida por 15 días.' : '¡Gracias por tu compra!');
+      ctx.fillText(bFooter, width / 2, y);
 
       y += 20;
       ctx.fillStyle = '#475569';
       ctx.font = '10px Outfit, Segoe UI';
-      ctx.fillText('Documento digital generado por FacilitoApp.', width / 2, y);
+      ctx.fillText(`Documento digital generado por ${currentBusinessProfile?.name || 'FacilitoApp'}.`, width / 2, y);
 
       // Convertir canvas a Blob y retornar
       canvas.toBlob((blob) => {
@@ -3073,7 +3192,9 @@ function bindAuthEvents() {
       currentMonkeyController?.celebrate();
       establishUserSession(res.token, res.user);
 
-      if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
+      if (res.user.role === 'superadmin') {
+        navigate('superadmin');
+      } else if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
         const lastAdmin = (localStorage.getItem('facilito_last_admin_view') as AdminSubView);
         activeAdminView = currentUser.role === 'billing' ? 'online_billing' : (currentUser.role === 'seller' ? 'pos' : (lastAdmin || 'pos'));
         navigate('admin');
@@ -3338,6 +3459,14 @@ function renderAdminDashboard(): string {
             <button class="sidebar-nav-btn ${activeAdminView === 'stats' ? 'active' : ''}" id="admin-tab-stats">
               ${icons.dashboard} Estadísticas
             </button>
+            <button class="sidebar-nav-btn ${activeAdminView === 'business_profile' ? 'active' : ''}" id="admin-tab-business-profile">
+              🏢 Mi Negocio & Factura
+            </button>
+          ` : ''}
+          ${(currentUser as any).role === 'superadmin' ? `
+            <button class="sidebar-nav-btn" id="admin-tab-superadmin" style="background: linear-gradient(135deg, rgba(255,115,0,0.18), rgba(0,119,246,0.18)); border: 1px solid rgba(255,115,0,0.4); color: #ff9100; font-weight: 700; margin-top: 6px;">
+              👑 Consola SuperAdmin SaaS
+            </button>
           ` : ''}
         </div>
 
@@ -3367,6 +3496,39 @@ function renderAdminDashboard(): string {
   `;
 }
 
+async function renderAdminBusinessProfile() {
+  const container = document.getElementById('dashboard-content-panel');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
+      <div style="font-size: 32px; margin-bottom: 12px; animation: spin 1s linear infinite;">🐒</div>
+      <p style="font-size: 15px; font-weight: 600; color: white;">Cargando perfil comercial y respaldo en Google Sheets...</p>
+    </div>
+  `;
+
+  try {
+    const profile = await api.business.getMyProfile();
+    currentBusinessProfile = profile;
+    container.innerHTML = renderBusinessProfileHtml(profile);
+    setupBusinessProfileEvents(container, (updated: BusinessProfile) => {
+      currentBusinessProfile = updated;
+      if (updated.name) {
+        document.title = `${updated.name} - Sistema FacilitoApp 🐒`;
+      }
+    });
+  } catch (err: any) {
+    container.innerHTML = `
+      <div class="card" style="padding: 24px; border: 1px solid var(--danger); background: rgba(239,68,68,0.06); margin: 20px;">
+        <h4 style="color: var(--danger); margin-bottom: 8px;">Error al cargar información del negocio</h4>
+        <p style="color: var(--text-secondary); font-size: 13px;">${err.message || 'No se pudo obtener el perfil del comercio.'}</p>
+        <button class="btn btn-secondary" id="retry-business-profile-btn" style="margin-top: 12px; width: fit-content;">Reintentar</button>
+      </div>
+    `;
+    document.getElementById('retry-business-profile-btn')?.addEventListener('click', () => renderAdminBusinessProfile());
+  }
+}
+
 async function bindAdminEvents() {
   // Sidebar tabs
   const tabStats = document.getElementById('admin-tab-stats');
@@ -3383,6 +3545,8 @@ async function bindAdminEvents() {
   const tabSuppliers = document.getElementById('admin-tab-suppliers');
   const tabOnlineBilling = document.getElementById('admin-tab-online-billing');
   const tabReturns = document.getElementById('admin-tab-returns');
+  const tabBusinessProfile = document.getElementById('admin-tab-business-profile');
+  const tabSuperAdminLink = document.getElementById('admin-tab-superadmin');
 
   const clearActiveTabs = () => {
     tabStats?.classList.remove('active');
@@ -3399,6 +3563,7 @@ async function bindAdminEvents() {
     tabSuppliers?.classList.remove('active');
     tabOnlineBilling?.classList.remove('active');
     tabReturns?.classList.remove('active');
+    tabBusinessProfile?.classList.remove('active');
   };
 
   const switchAdminSubView = (view: AdminSubView) => {
@@ -3520,6 +3685,18 @@ async function bindAdminEvents() {
     await renderAdminReturns();
   });
 
+  tabBusinessProfile?.addEventListener('click', async () => {
+    clearActiveTabs();
+    tabBusinessProfile.classList.add('active');
+    switchAdminSubView('business_profile');
+    destroyCharts();
+    await renderAdminBusinessProfile();
+  });
+
+  tabSuperAdminLink?.addEventListener('click', () => {
+    navigate('superadmin');
+  });
+
   // Renderizar la subvista por defecto al cargar
   if (activeAdminView === 'stats') {
     await renderAdminStats();
@@ -3549,6 +3726,8 @@ async function bindAdminEvents() {
     await renderOnlineBilling();
   } else if (activeAdminView === 'returns') {
     await renderAdminReturns();
+  } else if (activeAdminView === 'business_profile') {
+    await renderAdminBusinessProfile();
   }
 
   // Guardar Tasas de Cambio Manuales (BCV & Binance)

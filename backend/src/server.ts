@@ -13,6 +13,10 @@ import expenseRoutes from './controllers/expenses';
 import cashRoutes from './controllers/cash';
 import supplierRoutes from './controllers/suppliers';
 import returnRoutes from './controllers/returns';
+import superadminRoutes from './controllers/superadmin';
+import businessRoutes from './controllers/business';
+import { tenantMiddleware } from './middleware/tenant';
+import { runMultiTenantMigration } from './db/multiTenantMigration';
 import { startReminderCron } from './services/reminders';
 import { startRatesCron } from './services/rates';
 
@@ -35,11 +39,14 @@ if (!fs.existsSync(invoicesDir)) {
 app.use(compression());
 app.use(cors());
 app.use(express.json());
+app.use(tenantMiddleware);
 
 // Servir imagenes estaticas o assets si es necesario
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Rutas de la API
+app.use('/api/superadmin', superadminRoutes);
+app.use('/api/business', businessRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', saleRoutes);
@@ -68,10 +75,13 @@ async function runMigrations() {
   try {
     console.log('Iniciando migraciones de base de datos...');
 
+    // Ejecutar migración Multi-Tenant (crea tabla businesses y agrega business_id)
+    await runMultiTenantMigration(conn);
+
     // Modificar columna role para permitir 'seller' y 'billing'
     try {
-      await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'customer', 'seller', 'billing') DEFAULT 'customer'");
-      console.log('Columna "role" de la tabla users modificada para incluir "seller" y "billing".');
+      await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('superadmin', 'admin', 'customer', 'seller', 'billing') DEFAULT 'customer'");
+      console.log('Columna "role" de la tabla users modificada para incluir "superadmin", "seller" y "billing".');
     } catch (err: any) {
       console.error('Error al modificar columna role:', err.message);
     }

@@ -7,15 +7,16 @@ export interface AuthRequest extends Request {
   user?: {
     id: number;
     email: string;
-    role: 'admin' | 'customer' | 'seller' | 'billing';
+    role: 'superadmin' | 'admin' | 'customer' | 'seller' | 'billing';
     name: string;
+    business_id?: number;
   };
 }
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'No autorizado, token no proveido' });
+    return res.status(401).json({ message: 'No autorizado, token no proveído' });
   }
 
   const token = authHeader.split(' ')[1];
@@ -24,13 +25,20 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(401).json({ message: 'Token invalido o expirado' });
+    return res.status(401).json({ message: 'Token inválido o expirado' });
   }
 }
 
 export function isAdmin(req: AuthRequest, res: Response, next: NextFunction) {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'superadmin')) {
     return res.status(403).json({ message: 'Acceso denegado, se requieren privilegios de administrador' });
+  }
+  next();
+}
+
+export function isSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user || req.user.role !== 'superadmin') {
+    return res.status(403).json({ message: 'Acceso denegado, se requieren privilegios de Super Administrador' });
   }
   next();
 }
