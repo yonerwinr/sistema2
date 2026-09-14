@@ -304,10 +304,36 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Obtener el Client ID de Google configurado en el servidor
-router.get('/google-client-id', (_req, res) => {
-  const clientId = process.env.GOOGLE_CLIENT_ID || '1008719970978-hb24n2dstb40o45upg4689qqt56n74hs.apps.googleusercontent.com';
+// Obtener el Client ID de Google configurado en el servidor o base de datos
+router.get('/google-client-id', async (_req, res) => {
+  let clientId = process.env.GOOGLE_CLIENT_ID || '366254145584-utq2m6sir1cq6v09au1ojj8gik2vr7f8.apps.googleusercontent.com';
+  try {
+    const [rows]: any = await pool.query("SELECT settings_value FROM settings WHERE settings_key = 'google_client_id' LIMIT 1");
+    if (rows.length > 0 && rows[0].settings_value && !rows[0].settings_value.includes('1008719970978')) {
+      clientId = rows[0].settings_value;
+    }
+  } catch (e) {
+    console.warn('Error al consultar google_client_id de settings:', e);
+  }
   res.json({ clientId });
+});
+
+// Guardar o actualizar el Client ID de Google en base de datos
+router.post('/google-client-id', async (req, res) => {
+  const { clientId } = req.body;
+  if (!clientId || !clientId.trim()) {
+    return res.status(400).json({ message: 'El Client ID es obligatorio' });
+  }
+  try {
+    await pool.query(
+      "INSERT INTO settings (settings_key, settings_value) VALUES ('google_client_id', ?) ON DUPLICATE KEY UPDATE settings_value = ?",
+      [clientId.trim(), clientId.trim()]
+    );
+    res.json({ message: 'Google Client ID guardado exitosamente', clientId: clientId.trim() });
+  } catch (err) {
+    console.error('Error guardando google_client_id:', err);
+    res.status(500).json({ message: 'Error interno al guardar la configuración' });
+  }
 });
 
 // Autenticación con Google (Login / Registro integrado)

@@ -3128,7 +3128,7 @@ function renderAuthView(): string {
             <span style="flex-grow: 1; height: 1px; background: var(--border-glass);"></span>
           </div>
 
-          <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 10px;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 10px;">
             <button type="button" class="btn btn-google-auth w-100" id="btn-custom-google-auth" title="Abrir ventana de Google para autenticarse">
               <svg width="20" height="20" viewBox="0 0 48 48" style="margin-right: 10px; flex-shrink: 0;">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -3139,6 +3139,9 @@ function renderAuthView(): string {
               <span>${activeAuthTab === 'login' ? 'Iniciar sesión con Google' : 'Registrarse con Google'}</span>
             </button>
             <div id="google-signin-btn" style="width: 100%; display: flex; justify-content: center;"></div>
+            <a href="#" id="link-configure-google" style="font-size: 11px; color: var(--text-muted); text-decoration: none; margin-top: 2px;">
+              ⚙️ ¿Problemas con Google? Configurar Client ID
+            </a>
           </div>
         ` : ''}
       </div>
@@ -3418,7 +3421,7 @@ function bindAuthEvents() {
           cachedGoogleClientId = res.clientId;
         } catch (e) {
           console.warn('No se pudo obtener el Google Client ID del backend, usando valor por defecto:', e);
-          cachedGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '1008719970978-hb24n2dstb40o45upg4689qqt56n74hs.apps.googleusercontent.com';
+          cachedGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '366254145584-utq2m6sir1cq6v09au1ojj8gik2vr7f8.apps.googleusercontent.com';
         }
       }
 
@@ -3464,6 +3467,93 @@ function bindAuthEvents() {
     }
   };
 
+  function showGoogleOAuthSetupModal(onSavedCallback?: () => void) {
+    const existing = document.getElementById('google-config-modal-backdrop');
+    if (existing) existing.remove();
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'google-config-modal-backdrop';
+    backdrop.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(4px);';
+
+    const currentOrigin = window.location.origin;
+
+    backdrop.innerHTML = `
+      <div class="card animate-on-scroll animate-zoom-in visible" style="max-width: 520px; width: 100%; padding: 26px; border-radius: 16px; background: var(--bg-surface); border: 1px solid var(--border-glass); box-shadow: 0 20px 40px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto;">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <span style="font-size: 38px;">🔑</span>
+          <h3 style="font-size: 18px; font-weight: 800; margin-top: 6px; color: var(--text-primary);">Configurar Google Sign-In & Registro</h3>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4;">
+            Google devolvió el error <code>401: invalid_client</code> porque no existe un Client ID registrado en Google Cloud para tu aplicación.
+          </p>
+        </div>
+
+        <div style="background: rgba(255, 122, 0, 0.08); border: 1px solid rgba(255, 122, 0, 0.25); border-radius: 10px; padding: 12px; font-size: 11.5px; line-height: 1.5; margin-bottom: 16px; color: var(--text-primary);">
+          <strong style="color: var(--primary);">📋 Pasos para configurarlo en 1 minuto:</strong>
+          <ol style="margin: 6px 0 0 16px; padding: 0;">
+            <li>Entra en <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-weight: 700; text-decoration: underline;">Google Cloud Console &rarr; Credenciales</a>.</li>
+            <li>Clic en <strong>Crear credenciales &rarr; ID de cliente de OAuth</strong> (Tipo: <em>Aplicación web</em>).</li>
+            <li>En <strong>Orígenes de JavaScript autorizados</strong> agrega:<br>
+              <code style="background: rgba(0,0,0,0.25); padding: 2px 5px; border-radius: 4px; font-size: 11px;">http://localhost:3000</code><br>
+              <code style="background: rgba(0,0,0,0.25); padding: 2px 5px; border-radius: 4px; font-size: 11px;">${currentOrigin}</code>
+            </li>
+            <li>Copia tu <strong>ID de cliente</strong> y pégalo aquí:</li>
+          </ol>
+        </div>
+
+        <form id="google-config-form">
+          <div class="form-group mb-3">
+            <label class="form-label" for="google-client-id-input">ID de Cliente de Google (OAuth Client ID):</label>
+            <input type="text" class="form-control" id="google-client-id-input" required placeholder="Ej. 123456789-abcdef.apps.googleusercontent.com" style="font-size: 12px; font-family: monospace;" value="${cachedGoogleClientId || '366254145584-utq2m6sir1cq6v09au1ojj8gik2vr7f8.apps.googleusercontent.com'}">
+          </div>
+
+          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px;">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-google-config">Cerrar</button>
+            <button type="submit" class="btn btn-primary" id="btn-save-google-config">Guardar y Conectar</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+
+    document.getElementById('btn-cancel-google-config')?.addEventListener('click', () => {
+      backdrop.remove();
+    });
+
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) backdrop.remove();
+    });
+
+    document.getElementById('google-config-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const idInput = (document.getElementById('google-client-id-input') as HTMLInputElement).value.trim();
+      if (!idInput) {
+        alert('Por favor ingresa un Client ID válido');
+        return;
+      }
+      const saveBtn = document.getElementById('btn-save-google-config') as HTMLButtonElement;
+      saveBtn.disabled = true;
+      saveBtn.innerText = 'Guardando...';
+
+      try {
+        await api.auth.saveGoogleClientId(idInput);
+        cachedGoogleClientId = idInput;
+        localStorage.setItem('google_client_id_override', idInput);
+        backdrop.remove();
+        alert('✅ ¡Google Client ID guardado exitosamente! Ahora abriremos la ventana de inicio de sesión con Google.');
+        if (onSavedCallback) {
+          onSavedCallback();
+        } else {
+          triggerGooglePopup();
+        }
+      } catch (err: any) {
+        alert(err.message || 'Error al guardar configuración');
+        saveBtn.disabled = false;
+        saveBtn.innerText = 'Guardar y Conectar';
+      }
+    });
+  }
+
   const triggerGooglePopup = async () => {
     const btn = document.getElementById('btn-custom-google-auth') as HTMLButtonElement | null;
     if (btn) {
@@ -3471,16 +3561,24 @@ function bindAuthEvents() {
       btn.style.opacity = '0.7';
     }
 
-    if (!cachedGoogleClientId) {
+    const localOverride = localStorage.getItem('google_client_id_override');
+    if (localOverride) {
+      cachedGoogleClientId = localOverride;
+    } else if (!cachedGoogleClientId) {
       try {
         const res = await api.auth.getGoogleClientId();
         cachedGoogleClientId = res.clientId;
       } catch (e) {
-        cachedGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '1008719970978-hb24n2dstb40o45upg4689qqt56n74hs.apps.googleusercontent.com';
+        cachedGoogleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '366254145584-utq2m6sir1cq6v09au1ojj8gik2vr7f8.apps.googleusercontent.com';
       }
     }
 
-    const clientId = cachedGoogleClientId || '1008719970978-hb24n2dstb40o45upg4689qqt56n74hs.apps.googleusercontent.com';
+    // Si el Client ID no existe o está vacío
+    if (!cachedGoogleClientId || cachedGoogleClientId.trim() === '') {
+      cachedGoogleClientId = '366254145584-utq2m6sir1cq6v09au1ojj8gik2vr7f8.apps.googleusercontent.com';
+    }
+
+    const clientId = cachedGoogleClientId;
     const google = (window as any).google;
 
     // 1. Intentar con Google Identity Services tokenClient (Diseñado para ventanas emergentes de Google)
@@ -3496,6 +3594,10 @@ function bindAuthEvents() {
             }
             if (tokenResponse.error) {
               console.error('Error en Google OAuth:', tokenResponse);
+              if (tokenResponse.error === 'invalid_client' || (tokenResponse.error_description && tokenResponse.error_description.includes('invalid_client'))) {
+                showGoogleOAuthSetupModal();
+                return;
+              }
               alert('No se pudo autenticar con Google: ' + (tokenResponse.error_description || tokenResponse.error));
               return;
             }
@@ -3583,6 +3685,11 @@ function bindAuthEvents() {
   document.getElementById('btn-custom-google-auth')?.addEventListener('click', (e) => {
     e.preventDefault();
     triggerGooglePopup();
+  });
+
+  document.getElementById('link-configure-google')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    showGoogleOAuthSetupModal();
   });
 
   initGoogleBtn();
