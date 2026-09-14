@@ -3388,6 +3388,74 @@ function renderAdminDashboard(): string {
           </div>
         </div>
 
+        <!-- Tarjeta de Suscripción del Sistema para el Comercio -->
+        ${(() => {
+          if (!currentBusinessProfile) return '';
+          let days = currentBusinessProfile.daysRemaining;
+          if (days === undefined || days === null) {
+            if (currentBusinessProfile.license_expires_at) {
+              const exp = new Date(currentBusinessProfile.license_expires_at);
+              days = Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+            }
+          }
+          const isExp = currentBusinessProfile.isExpired || (days !== undefined && days !== null && days < 0);
+          const isSusp = currentBusinessProfile.license_status === 'suspended' || currentBusinessProfile.is_active === 0;
+
+          let badgeBg = 'rgba(16,185,129,0.08)';
+          let badgeBorder = 'rgba(16,185,129,0.25)';
+          let badgeColor = '#10b981';
+          let statusText = '🟢 Activa';
+          let daysDesc = days !== undefined && days !== null ? `${days} días restantes` : 'Sin límite';
+
+          if (isSusp) {
+            badgeBg = 'rgba(239,68,68,0.08)';
+            badgeBorder = 'rgba(239,68,68,0.3)';
+            badgeColor = '#ef4444';
+            statusText = '⛔ Suspendida';
+            daysDesc = 'Servicio pausado';
+          } else if (isExp) {
+            badgeBg = 'rgba(239,68,68,0.08)';
+            badgeBorder = 'rgba(239,68,68,0.3)';
+            badgeColor = '#ef4444';
+            statusText = '⚠️ Vencida';
+            daysDesc = 'Requiere renovación';
+          } else if (days !== undefined && days !== null && days <= 15) {
+            badgeBg = 'rgba(245,158,11,0.08)';
+            badgeBorder = 'rgba(245,158,11,0.3)';
+            badgeColor = '#f59e0b';
+            statusText = '🟡 Por Vencer';
+            daysDesc = `¡Quedan ${days} días!`;
+          }
+
+          const expDateFormatted = currentBusinessProfile.license_expires_at
+            ? new Date(currentBusinessProfile.license_expires_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+            : 'Indefinido';
+
+          let planName = (currentBusinessProfile.license_plan || 'PRO').toUpperCase();
+          if (planName.includes('2YEARS') || planName.includes('2_YEARS')) planName = '2 AÑOS';
+          else if (planName.includes('ANNUAL') || planName.includes('ANUAL')) planName = 'ANUAL';
+
+          return `
+            <div class="card subscription-widget-sidebar" style="margin-top: 8px; padding: 10px 12px; background: ${badgeBg}; border: 1px solid ${badgeBorder}; border-radius: 12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                <span style="font-size:10.5px; font-weight:800; text-transform:uppercase; color:${badgeColor}; display:flex; align-items:center; gap:4px;">
+                  🛡️ Suscripción
+                </span>
+                <span style="font-size:9.5px; font-weight:700; color:${badgeColor};">
+                  ${statusText}
+                </span>
+              </div>
+              <div style="font-size:12.5px; font-weight:800; color:var(--text-primary); margin-bottom: 2px;">
+                ${daysDesc}
+              </div>
+              <div style="font-size:10px; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
+                <span>Vence: <strong style="color:var(--text-secondary);">${expDateFormatted}</strong></span>
+                <span style="color:var(--brand-orange); font-weight:700; background:rgba(255,115,0,0.12); padding:1px 5px; border-radius:4px;">${planName}</span>
+              </div>
+            </div>
+          `;
+        })()}
+
         <div class="sidebar-section-divider"></div>
         <div class="sidebar-section-label">Módulos del Sistema</div>
 

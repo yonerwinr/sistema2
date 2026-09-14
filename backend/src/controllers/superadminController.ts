@@ -130,6 +130,7 @@ export async function createBusiness(req: Request, res: Response) {
       ticket_message,
       license_plan = 'pro',
       license_days = 30,
+      expires_at,
       price_monthly = 25.00,
       admin_name,
       admin_email,
@@ -155,9 +156,13 @@ export async function createBusiness(req: Request, res: Response) {
       return res.status(400).json({ error: `El identificador/slug "${cleanSlug}" ya está en uso por otro comercio.` });
     }
 
-    // Calcular fecha de vencimiento
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + Number(license_days || 30));
+    // Calcular fecha de vencimiento (por fecha específica o días de duración)
+    let finalExpiresAt = new Date();
+    if (expires_at) {
+      finalExpiresAt = new Date(expires_at);
+    } else {
+      finalExpiresAt.setDate(finalExpiresAt.getDate() + Number(license_days || 30));
+    }
 
     // Aprovisionar automáticamente Google Sheets para el nuevo comercio
     const targetEmail = admin_email || email || '';
@@ -182,7 +187,7 @@ export async function createBusiness(req: Request, res: Response) {
       address || null,
       ticket_message || `¡Gracias por tu compra en ${name}! 🐒`,
       license_plan,
-      expiresAt,
+      finalExpiresAt,
       price_monthly,
       sheetInfo.sheetId,
       sheetInfo.sheetUrl
@@ -233,7 +238,7 @@ export async function createBusiness(req: Request, res: Response) {
 export async function updateBusinessLicense(req: Request, res: Response) {
   try {
     const businessId = Number(req.params.id);
-    const { action, add_days, license_status, license_plan, is_active, price_monthly } = req.body;
+    const { action, add_days, expires_at, license_status, license_plan, is_active, price_monthly } = req.body;
 
     const [rows]: any = await pool.query('SELECT * FROM businesses WHERE id = ? LIMIT 1', [businessId]);
     if (rows.length === 0) {
@@ -245,8 +250,13 @@ export async function updateBusinessLicense(req: Request, res: Response) {
     let newStatus = license_status || business.license_status;
     let newIsActive = typeof is_active === 'boolean' ? (is_active ? 1 : 0) : (is_active !== undefined ? is_active : business.is_active);
 
-    // Si la acción es extender días (ej. +30 días por pago)
-    if (action === 'extend' || add_days) {
+    // Si se especificó una fecha exacta de expiración (ej. seleccionada en calendario)
+    if (expires_at) {
+      newExpiresAt = new Date(expires_at);
+      newStatus = 'active';
+      newIsActive = 1;
+    } else if (action === 'extend' || action === 'renew' || add_days) {
+      // Si la acción es extender días (ej. +30 días, +365 días, +730 días)
       const daysToAdd = Number(add_days || 30);
       // Si ya estaba vencido, extender a partir de hoy
       if (newExpiresAt < new Date()) {

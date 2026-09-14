@@ -120,7 +120,7 @@ async function getBusinessesList(_req, res) {
 async function createBusiness(req, res) {
     const conn = await db_1.default.getConnection();
     try {
-        const { name, slug, rif, legal_name, phone, email, address, ticket_message, license_plan = 'pro', license_days = 30, price_monthly = 25.00, admin_name, admin_email, admin_password } = req.body;
+        const { name, slug, rif, legal_name, phone, email, address, ticket_message, license_plan = 'pro', license_days = 30, expires_at, price_monthly = 25.00, admin_name, admin_email, admin_password } = req.body;
         if (!name) {
             return res.status(400).json({ error: 'El nombre del negocio es obligatorio.' });
         }
@@ -137,9 +137,14 @@ async function createBusiness(req, res) {
         if (existing.length > 0) {
             return res.status(400).json({ error: `El identificador/slug "${cleanSlug}" ya está en uso por otro comercio.` });
         }
-        // Calcular fecha de vencimiento
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + Number(license_days || 30));
+        // Calcular fecha de vencimiento (por fecha específica o días de duración)
+        let finalExpiresAt = new Date();
+        if (expires_at) {
+            finalExpiresAt = new Date(expires_at);
+        }
+        else {
+            finalExpiresAt.setDate(finalExpiresAt.getDate() + Number(license_days || 30));
+        }
         // Aprovisionar automáticamente Google Sheets para el nuevo comercio
         const targetEmail = admin_email || email || '';
         const sheetInfo = await (0, googleSheetsAuto_1.provisionBusinessSheet)(name, targetEmail);
@@ -161,7 +166,7 @@ async function createBusiness(req, res) {
             address || null,
             ticket_message || `¡Gracias por tu compra en ${name}! 🐒`,
             license_plan,
-            expiresAt,
+            finalExpiresAt,
             price_monthly,
             sheetInfo.sheetId,
             sheetInfo.sheetUrl
@@ -208,7 +213,7 @@ async function createBusiness(req, res) {
 async function updateBusinessLicense(req, res) {
     try {
         const businessId = Number(req.params.id);
-        const { action, add_days, license_status, license_plan, is_active, price_monthly } = req.body;
+        const { action, add_days, expires_at, license_status, license_plan, is_active, price_monthly } = req.body;
         const [rows] = await db_1.default.query('SELECT * FROM businesses WHERE id = ? LIMIT 1', [businessId]);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Comercio no encontrado.' });
@@ -217,8 +222,14 @@ async function updateBusinessLicense(req, res) {
         let newExpiresAt = business.license_expires_at ? new Date(business.license_expires_at) : new Date();
         let newStatus = license_status || business.license_status;
         let newIsActive = typeof is_active === 'boolean' ? (is_active ? 1 : 0) : (is_active !== undefined ? is_active : business.is_active);
-        // Si la acción es extender días (ej. +30 días por pago)
-        if (action === 'extend' || add_days) {
+        // Si se especificó una fecha exacta de expiración (ej. seleccionada en calendario)
+        if (expires_at) {
+            newExpiresAt = new Date(expires_at);
+            newStatus = 'active';
+            newIsActive = 1;
+        }
+        else if (action === 'extend' || action === 'renew' || add_days) {
+            // Si la acción es extender días (ej. +30 días, +365 días, +730 días)
             const daysToAdd = Number(add_days || 30);
             // Si ya estaba vencido, extender a partir de hoy
             if (newExpiresAt < new Date()) {

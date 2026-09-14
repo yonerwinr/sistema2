@@ -74,8 +74,8 @@ async function runMigrations() {
         await (0, multiTenantMigration_1.runMultiTenantMigration)(conn);
         // Modificar columna role para permitir 'seller' y 'billing'
         try {
-            await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'customer', 'seller', 'billing') DEFAULT 'customer'");
-            console.log('Columna "role" de la tabla users modificada para incluir "seller" y "billing".');
+            await conn.query("ALTER TABLE users MODIFY COLUMN role ENUM('superadmin', 'admin', 'customer', 'seller', 'billing') DEFAULT 'customer'");
+            console.log('Columna "role" de la tabla users modificada para incluir "superadmin", "seller" y "billing".');
         }
         catch (err) {
             console.error('Error al modificar columna role:', err.message);

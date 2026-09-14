@@ -88,7 +88,7 @@ export interface BusinessProfile {
   address: string | null;
   ticket_message: string | null;
   license_status: 'trial' | 'active' | 'expired' | 'suspended';
-  license_plan: 'basic' | 'pro' | 'enterprise';
+  license_plan: string;
   license_expires_at: string | null;
   price_monthly?: number;
   google_sheet_url: string | null;
@@ -652,7 +652,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-    updateLicense: (id: number, body: { action?: string; add_days?: number; license_status?: string; license_plan?: string; is_active?: boolean; price_monthly?: number }) => request<any>(`/superadmin/businesses/${id}/license`, {
+    updateLicense: (id: number, body: { action?: string; add_days?: number; expires_at?: string; license_status?: string; license_plan?: string; is_active?: boolean; price_monthly?: number }) => request<any>(`/superadmin/businesses/${id}/license`, {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
@@ -669,6 +669,19 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
+    uploadLogo: async (formData: FormData): Promise<{ message: string; imageUrl: string }> => {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/business/upload-logo`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Error al subir el logotipo');
+      }
+      return data;
+    },
     autoProvisionSheet: () => request<{ message: string; sheetUrl: string; isSimulated: boolean }>('/business/google-sheet', {
       method: 'POST',
     }),

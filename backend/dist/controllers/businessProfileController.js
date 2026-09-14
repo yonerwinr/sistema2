@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getBusinessProfile = getBusinessProfile;
 exports.updateBusinessProfile = updateBusinessProfile;
 exports.autoProvisionSheet = autoProvisionSheet;
+exports.uploadBusinessLogo = uploadBusinessLogo;
 const db_1 = __importDefault(require("../config/db"));
 const googleSheetsAuto_1 = require("../services/googleSheetsAuto");
 /**
@@ -108,5 +109,27 @@ async function autoProvisionSheet(req, res) {
     catch (error) {
         console.error('[BUSINESS PROFILE] Error aprovisionando hoja de Google Sheets:', error);
         res.status(500).json({ error: 'Error al generar la hoja de Google Sheets.' });
+    }
+}
+/**
+ * Sube y vincula una imagen/logotipo local para la empresa y facturación
+ */
+async function uploadBusinessLogo(req, res) {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo de imagen.' });
+        }
+        const imageUrl = `/uploads/${req.file.filename}`;
+        const businessId = req.businessId || (req.user && req.user.business_id) || 1;
+        // Actualizar directamente en la base de datos el logo del comercio
+        await db_1.default.query('UPDATE businesses SET logo_url = ? WHERE id = ?', [imageUrl, businessId]);
+        res.json({
+            message: 'Logotipo subido y guardado exitosamente.',
+            imageUrl
+        });
+    }
+    catch (error) {
+        console.error('[BUSINESS PROFILE] Error subiendo logotipo:', error);
+        res.status(500).json({ error: error.message || 'Error al procesar la imagen.' });
     }
 }

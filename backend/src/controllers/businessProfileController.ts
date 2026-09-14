@@ -124,3 +124,28 @@ export async function autoProvisionSheet(req: Request, res: Response) {
     res.status(500).json({ error: 'Error al generar la hoja de Google Sheets.' });
   }
 }
+
+/**
+ * Sube y vincula una imagen/logotipo local para la empresa y facturación
+ */
+export async function uploadBusinessLogo(req: Request, res: Response) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se subió ningún archivo de imagen.' });
+    }
+    const imageUrl = `/uploads/${req.file.filename}`;
+    const businessId = (req as any).businessId || ((req as any).user && (req as any).user.business_id) || 1;
+
+    // Actualizar directamente en la base de datos el logo del comercio
+    await pool.query('UPDATE businesses SET logo_url = ? WHERE id = ?', [imageUrl, businessId]);
+
+    res.json({
+      message: 'Logotipo subido y guardado exitosamente.',
+      imageUrl
+    });
+  } catch (error: any) {
+    console.error('[BUSINESS PROFILE] Error subiendo logotipo:', error);
+    res.status(500).json({ error: error.message || 'Error al procesar la imagen.' });
+  }
+}
+

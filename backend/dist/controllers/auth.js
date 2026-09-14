@@ -73,9 +73,20 @@ router.post('/login', async (req, res) => {
         // Obtener información del negocio asociado
         let businessInfo = null;
         const targetBusinessId = user.business_id || 1;
-        const [bRows] = await db_1.default.query('SELECT id, name, slug, logo_url, license_status, license_expires_at, is_active FROM businesses WHERE id = ? LIMIT 1', [targetBusinessId]);
+        const [bRows] = await db_1.default.query('SELECT id, name, slug, rif, legal_name, logo_url, phone, email, address, ticket_message, license_status, license_plan, license_expires_at, price_monthly, google_sheet_url, is_active FROM businesses WHERE id = ? LIMIT 1', [targetBusinessId]);
         if (bRows.length > 0) {
-            businessInfo = bRows[0];
+            const b = bRows[0];
+            let daysRemaining = null;
+            if (b.license_expires_at) {
+                const exp = new Date(b.license_expires_at);
+                const diffMs = exp.getTime() - new Date().getTime();
+                daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            }
+            businessInfo = {
+                ...b,
+                daysRemaining,
+                isExpired: b.license_status === 'expired' || (daysRemaining !== null && daysRemaining < 0)
+            };
         }
         // Generar token JWT (Vigencia de 8 horas)
         const token = jsonwebtoken_1.default.sign({ id: user.id, email: user.email, role: user.role, name: user.name, business_id: targetBusinessId }, JWT_SECRET, { expiresIn: '8h' });
@@ -161,11 +172,32 @@ router.get('/me', auth_1.authenticate, async (req, res) => {
     try {
         if (!req.user)
             return res.status(401).json({ message: 'No autenticado' });
-        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, ci, permissions, created_at FROM users WHERE id = ?', [req.user.id]);
+        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, ci, permissions, business_id, created_at FROM users WHERE id = ?', [req.user.id]);
         if (users.length === 0) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
-        res.json(users[0]);
+        const u = users[0];
+        let businessInfo = null;
+        const targetBusinessId = u.business_id || 1;
+        const [bRows] = await db_1.default.query('SELECT id, name, slug, rif, legal_name, logo_url, phone, email, address, ticket_message, license_status, license_plan, license_expires_at, price_monthly, google_sheet_url, is_active FROM businesses WHERE id = ? LIMIT 1', [targetBusinessId]);
+        if (bRows.length > 0) {
+            const b = bRows[0];
+            let daysRemaining = null;
+            if (b.license_expires_at) {
+                const exp = new Date(b.license_expires_at);
+                const diffMs = exp.getTime() - new Date().getTime();
+                daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            }
+            businessInfo = {
+                ...b,
+                daysRemaining,
+                isExpired: b.license_status === 'expired' || (daysRemaining !== null && daysRemaining < 0)
+            };
+        }
+        res.json({
+            ...u,
+            business: businessInfo
+        });
     }
     catch (error) {
         console.error('Error en /me:', error);

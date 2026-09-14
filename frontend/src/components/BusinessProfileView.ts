@@ -3,8 +3,36 @@ import { api } from '../utils/api';
 
 /**
  * BusinessProfileView.ts
- * Formulario para que cada comercio configure sus datos fiscales, logotipo, mensaje de factura y Google Sheet.
+ * Formulario para que cada comercio configure sus datos fiscales, logotipo (subida local o URL),
+ * visualice el estado y vencimiento de su licencia, mensaje de factura y Google Sheet.
  */
+
+function formatPlanName(plan: string | undefined): string {
+  if (!plan) return 'PRO';
+  const clean = plan.toLowerCase();
+  if (clean === 'basic') return 'Básico';
+  if (clean === 'pro') return 'Pro Mensual';
+  if (clean === 'enterprise') return 'Enterprise';
+  if (clean.includes('annual') || clean.includes('anual')) return 'Plan Anual';
+  if (clean.includes('2years') || clean.includes('2_years') || clean.includes('2 anos') || clean.includes('2 años')) return 'Plan 2 Años';
+  if (clean.includes('3years') || clean.includes('3_years') || clean.includes('3 anos') || clean.includes('3 años')) return 'Plan 3 Años';
+  return plan.toUpperCase();
+}
+
+function formatExpirationDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return 'Indefinido';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Indefinido';
+    return d.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  } catch {
+    return 'Indefinido';
+  }
+}
 
 export function renderBusinessProfileHtml(business: BusinessProfile | null): string {
   const b = business || {
@@ -21,16 +49,55 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
     license_status: 'active',
     license_plan: 'pro',
     license_expires_at: null,
+    price_monthly: 25,
     google_sheet_url: null,
     google_sheets_webhook_url: '',
     is_active: 1
   };
 
+  // Calcular días restantes si no viene precalculado
+  let daysRemaining = b.daysRemaining;
+  if (daysRemaining === undefined || daysRemaining === null) {
+    if (b.license_expires_at) {
+      const exp = new Date(b.license_expires_at);
+      const diffMs = exp.getTime() - new Date().getTime();
+      daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    }
+  }
+
+  const isExpired = b.isExpired || b.license_status === 'expired' || (daysRemaining !== null && daysRemaining !== undefined && daysRemaining < 0);
+  const isSuspended = b.license_status === 'suspended' || b.is_active === 0;
+
+  let statusBadgeColor = 'var(--success)';
+  let statusBadgeBg = 'rgba(16,185,129,0.12)';
+  let statusBorder = 'rgba(16,185,129,0.3)';
+  let statusText = '🟢 Licencia Activa';
+
+  if (isSuspended) {
+    statusBadgeColor = 'var(--danger)';
+    statusBadgeBg = 'rgba(239,68,68,0.12)';
+    statusBorder = 'rgba(239,68,68,0.3)';
+    statusText = '⛔ Licencia Suspendida';
+  } else if (isExpired) {
+    statusBadgeColor = 'var(--danger)';
+    statusBadgeBg = 'rgba(239,68,68,0.12)';
+    statusBorder = 'rgba(239,68,68,0.3)';
+    statusText = '⚠️ Licencia Vencida';
+  } else if (daysRemaining !== null && daysRemaining !== undefined && daysRemaining <= 15) {
+    statusBadgeColor = '#f59e0b';
+    statusBadgeBg = 'rgba(245,158,11,0.12)';
+    statusBorder = 'rgba(245,158,11,0.3)';
+    statusText = `🟡 Por Vencer (${daysRemaining} días restantes)`;
+  }
+
+  const formattedExpiration = formatExpirationDate(b.license_expires_at);
+  const planDisplay = formatPlanName(b.license_plan);
+
   return `
-    <div class="business-profile-container animate-fade-in" style="max-width: 960px; margin: 0 auto; padding: 20px 0;">
+    <div class="business-profile-container animate-fade-in" style="max-width: 1020px; margin: 0 auto; padding: 20px 0;">
       
       <!-- ENCABEZADO -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
         <div>
           <h2 style="font-size: 22px; font-weight: 800; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 10px;">
             🏢 Perfil de Empresa & Facturación
@@ -40,20 +107,52 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
           </p>
         </div>
 
-        <!-- Estado de Licencia del Comercio -->
-        <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); padding: 8px 14px; border-radius: 12px;">
-          <div style="text-align: right;">
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Estado de Licencia</div>
-            <div style="font-size: 13px; font-weight: 700; color: ${b.is_active ? 'var(--success)' : 'var(--danger)'};">
-              ${b.is_active ? '🟢 Activa (' + (b.license_plan || 'PRO').toUpperCase() + ')' : '🔴 Suspendida'}
+        <a href="https://wa.me/584120000000?text=${encodeURIComponent(`Hola, deseo consultar sobre mi suscripción de FacilitoApp para el comercio "${b.name}"`)}" target="_blank" class="btn btn-secondary" style="font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; border-radius: 10px; text-decoration: none;">
+          <span>💬</span> Soporte / Renovar
+        </a>
+      </div>
+
+      <!-- TARJETA DESTACADA: ESTADO Y VENCIMIENTO DE LA SUSCRIPCIÓN -->
+      <div class="card" style="padding: 20px 24px; border-radius: 18px; background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%); border: 1px solid ${statusBorder}; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+          
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="width: 52px; height: 52px; border-radius: 14px; background: ${statusBadgeBg}; border: 1px solid ${statusBorder}; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;">
+              ${isExpired || isSuspended ? '⚠️' : '🛡️'}
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 20px; background: ${statusBadgeBg}; color: ${statusBadgeColor}; border: 1px solid ${statusBorder};">
+                  ${statusText}
+                </span>
+                <span style="font-size: 12px; font-weight: 700; color: var(--brand-orange); background: rgba(255,115,0,0.12); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(255,115,0,0.25);">
+                  ${planDisplay}
+                </span>
+              </div>
+              <div style="font-size: 15px; font-weight: 800; color: var(--text-primary); margin-top: 6px;">
+                ${daysRemaining !== null && daysRemaining !== undefined 
+                  ? (daysRemaining > 0 ? `Te quedan ${daysRemaining} días de servicio activo` : (daysRemaining === 0 ? '¡Tu licencia vence hoy!' : `Licencia expiró hace ${Math.abs(daysRemaining)} días`))
+                  : 'Suscripción sin fecha límite'}
+              </div>
             </div>
           </div>
+
+          <div style="text-align: right; background: rgba(0,0,0,0.25); padding: 10px 16px; border-radius: 12px; border: 1px solid var(--border-glass);">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Fecha de Vencimiento</div>
+            <div style="font-size: 15px; font-weight: 800; color: ${isExpired ? 'var(--danger)' : 'var(--text-primary)'}; margin-top: 2px;">
+              ${formattedExpiration}
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+              ${b.price_monthly ? `Tarifa: $${Number(b.price_monthly).toFixed(2)}` : ''}
+            </div>
+          </div>
+
         </div>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start;">
         
-        <!-- FORMULARIO DE DATOS FISCALES -->
+        <!-- FORMULARIO DE DATOS FISCALES Y LOGO -->
         <div class="card" style="padding: 24px; border-radius: 18px; background: var(--bg-glass); border: 1px solid var(--border-glass);">
           
           <form id="form-business-profile">
@@ -89,15 +188,53 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
               </div>
             </div>
 
-            <div class="form-group" style="margin-bottom: 14px;">
+            <div class="form-group" style="margin-bottom: 16px;">
               <label class="form-label" for="prof-address">Dirección Fiscal / Ubicación del Local</label>
               <textarea class="form-control" id="prof-address" rows="2" placeholder="Ej. Calle 4 con Carrera 12, Local N° 3, Frente a la Plaza Bolívar">${b.address || ''}</textarea>
             </div>
 
-            <div class="form-group" style="margin-bottom: 14px;">
-              <label class="form-label" for="prof-logo">URL del Logotipo (PNG / JPG)</label>
-              <input type="url" class="form-control" id="prof-logo" value="${b.logo_url || ''}" placeholder="https://ejemplo.com/mi-logo.png">
-              <small style="color: var(--text-muted); font-size: 11px;">Aparecerá en el encabezado de tus facturas y en tu tienda online.</small>
+            <!-- SECCIÓN LOGOTIPO: SUBIDA LOCAL Y ENLACE -->
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--brand-blue); margin-bottom: 14px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+              <span>🖼️</span> Logotipo de la Empresa y Factura
+            </h3>
+
+            <div style="background: rgba(0, 119, 246, 0.05); border: 1px dashed rgba(0, 119, 246, 0.35); border-radius: 14px; padding: 18px; margin-bottom: 16px;">
+              
+              <!-- Zona de Subida Local con Drag & Drop y Botón -->
+              <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                
+                <div id="prof-logo-preview-box" style="width: 80px; height: 80px; border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                  ${b.logo_url 
+                    ? `<img src="${b.logo_url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Logotipo">` 
+                    : '<span style="font-size: 30px;">🏪</span>'}
+                </div>
+
+                <div style="flex-grow: 1; min-width: 220px;">
+                  <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                    Adjuntar Foto o Logotipo desde tus Archivos Locales
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px;">
+                    Formatos admitidos: PNG, JPG, JPEG, WEBP o SVG (Máx. 5MB). Se imprimirá en tus tickets y tienda online.
+                  </div>
+
+                  <input type="file" id="prof-logo-file-input" accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml" style="display: none;">
+                  
+                  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-sm btn-primary" id="btn-browse-logo" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 8px 14px; border-radius: 8px;">
+                      <span>📁</span> Subir desde el Equipo
+                    </button>
+                    <span id="prof-logo-upload-status" style="font-size: 12px; color: var(--text-muted);"></span>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Opción alternativa: URL directa -->
+              <div class="form-group" style="margin-top: 14px; margin-bottom: 0;">
+                <label class="form-label" for="prof-logo" style="font-size: 12px; color: var(--text-secondary);">O ingresa enlace / URL directo del logo (Opcional):</label>
+                <input type="url" class="form-control" id="prof-logo" value="${b.logo_url || ''}" placeholder="https://ejemplo.com/mi-logo.png" style="font-size: 12px;">
+              </div>
+
             </div>
 
             <div class="form-group" style="margin-bottom: 20px;">
@@ -168,7 +305,7 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
 
           <div style="font-size: 11px; margin-bottom: 12px;">
             <div>FACTURA #00123</div>
-            <div>FECHA: 12/09/2026 10:45 AM</div>
+            <div>FECHA: ${new Date().toLocaleDateString('es-ES')} 10:45 AM</div>
             <div>CAJERO: Juan Pérez</div>
           </div>
 
@@ -203,13 +340,20 @@ export function setupBusinessProfileEvents(
   container: HTMLElement,
   onProfileUpdated?: (updated: BusinessProfile) => void
 ) {
-  const nameInput = container.querySelector('#bus-name') as HTMLInputElement | null;
-  const rifInput = container.querySelector('#bus-rif') as HTMLInputElement | null;
-  const addressInput = container.querySelector('#bus-address') as HTMLInputElement | null;
-  const phoneInput = container.querySelector('#bus-phone') as HTMLInputElement | null;
-  const msgInput = container.querySelector('#bus-ticket-message') as HTMLInputElement | null;
-  const logoInput = container.querySelector('#bus-logo-url') as HTMLInputElement | null;
-  const sheetInput = container.querySelector('#bus-sheet-url') as HTMLInputElement | null;
+  const nameInput = container.querySelector('#prof-name') as HTMLInputElement | null;
+  const rifInput = container.querySelector('#prof-rif') as HTMLInputElement | null;
+  const legalInput = container.querySelector('#prof-legal') as HTMLInputElement | null;
+  const addressInput = container.querySelector('#prof-address') as HTMLInputElement | null;
+  const phoneInput = container.querySelector('#prof-phone') as HTMLInputElement | null;
+  const emailInput = container.querySelector('#prof-email') as HTMLInputElement | null;
+  const msgInput = container.querySelector('#prof-ticket-msg') as HTMLTextAreaElement | null;
+  const logoInput = container.querySelector('#prof-logo') as HTMLInputElement | null;
+  const sheetWebhookInput = container.querySelector('#prof-sheet-webhook') as HTMLInputElement | null;
+
+  const fileInput = container.querySelector('#prof-logo-file-input') as HTMLInputElement | null;
+  const browseBtn = container.querySelector('#btn-browse-logo') as HTMLButtonElement | null;
+  const uploadStatus = container.querySelector('#prof-logo-upload-status') as HTMLElement | null;
+  const logoPreviewBox = container.querySelector('#prof-logo-preview-box') as HTMLElement | null;
 
   const previewName = container.querySelector('#preview-ticket-name');
   const previewRif = container.querySelector('#preview-ticket-rif');
@@ -218,7 +362,7 @@ export function setupBusinessProfileEvents(
   const previewFooter = container.querySelector('#preview-ticket-footer');
   const previewLogo = container.querySelector('#preview-ticket-logo');
 
-  // Vista previa interactiva en tiempo real
+  // Vista previa interactiva en tiempo real del ticket térmico
   nameInput?.addEventListener('input', () => {
     if (previewName) previewName.textContent = nameInput.value.trim() || 'NOMBRE DE EMPRESA';
   });
@@ -234,35 +378,97 @@ export function setupBusinessProfileEvents(
   msgInput?.addEventListener('input', () => {
     if (previewFooter) previewFooter.textContent = msgInput.value.trim() || '¡Gracias por su compra!';
   });
-  logoInput?.addEventListener('input', () => {
+
+  const updateLogoDisplay = (url: string) => {
+    if (logoPreviewBox) {
+      logoPreviewBox.innerHTML = url
+        ? `<img src="${url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Logo">`
+        : '<span style="font-size: 30px;">🏪</span>';
+    }
     if (previewLogo) {
-      const url = logoInput.value.trim();
-      previewLogo.innerHTML = url ? `<img src="${url}" style="max-width: 80px; max-height: 80px; object-fit: contain;" alt="Logo">` : '<div style="font-size: 32px;">🛒</div>';
+      previewLogo.innerHTML = url
+        ? `<img src="${url}" style="max-width: 80px; max-height: 80px; object-fit: contain;" alt="Logo">`
+        : '<div style="font-size: 32px;">🛒</div>';
+    }
+  };
+
+  logoInput?.addEventListener('input', () => {
+    updateLogoDisplay(logoInput.value.trim());
+  });
+
+  // SUBIDA LOCAL DE ARCHIVO DE LOGOTIPO
+  browseBtn?.addEventListener('click', () => {
+    fileInput?.click();
+  });
+
+  fileInput?.addEventListener('change', async () => {
+    if (!fileInput.files || fileInput.files.length === 0) return;
+    const file = fileInput.files[0];
+
+    // Validar tipo y tamaño (5MB)
+    if (!file.type.startsWith('image/')) {
+      alert('⚠️ Por favor selecciona un archivo de imagen válido (PNG, JPG, WEBP, SVG).');
+      fileInput.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('⚠️ La imagen no debe superar 5MB de tamaño.');
+      fileInput.value = '';
+      return;
+    }
+
+    if (uploadStatus) uploadStatus.textContent = 'Subiendo foto... ⏳';
+    if (browseBtn) browseBtn.disabled = true;
+
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const res = await api.business.uploadLogo(formData);
+      if (logoInput) logoInput.value = res.imageUrl;
+      updateLogoDisplay(res.imageUrl);
+
+      if (uploadStatus) {
+        uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Foto subida y guardada!</span>';
+        setTimeout(() => {
+          if (uploadStatus) uploadStatus.textContent = '';
+        }, 4000);
+      }
+
+      // Notificar actualización de perfil
+      const updated = await api.business.getMyProfile();
+      if (onProfileUpdated) onProfileUpdated(updated);
+    } catch (err: any) {
+      console.error('Error subiendo logo:', err);
+      if (uploadStatus) uploadStatus.innerHTML = `<span style="color: var(--danger);">❌ ${err.message || 'Error al subir'}</span>`;
+      alert(`❌ Error al subir la imagen: ${err.message || 'Error desconocido'}`);
+    } finally {
+      if (browseBtn) browseBtn.disabled = false;
+      fileInput.value = '';
     }
   });
 
   // Aprovisionamiento automático de Google Sheet
-  const autoSheetBtn = container.querySelector('#btn-auto-sheet') as HTMLButtonElement | null;
-  autoSheetBtn?.addEventListener('click', async () => {
-    const originalText = autoSheetBtn.innerHTML;
-    autoSheetBtn.disabled = true;
-    autoSheetBtn.innerHTML = 'Aprovisionando Google Sheets... ⏳';
+  const provisionBtn = container.querySelector('#btn-provision-sheet') as HTMLButtonElement | null;
+  provisionBtn?.addEventListener('click', async () => {
+    const originalText = provisionBtn.innerHTML;
+    provisionBtn.disabled = true;
+    provisionBtn.innerHTML = 'Aprovisionando Google Sheets... ⏳';
 
     try {
       const res = await api.business.autoProvisionSheet();
-      if (sheetInput) sheetInput.value = res.sheetUrl;
-      alert(`✅ ¡Hoja de Google Sheets configurada con éxito!\n\nSe ha generado y vinculado tu respaldo para ventas, caja e inventario.\n\nEnlace: ${res.sheetUrl}`);
+      alert(`✅ ¡Hoja de Google Sheets configurada con éxito!\n\nSe ha vinculado tu respaldo para ventas y facturación.\n\nEnlace: ${res.sheetUrl}`);
       const current = await api.business.getMyProfile();
       if (onProfileUpdated) onProfileUpdated(current);
     } catch (err: any) {
       alert(`⚠️ Error al aprovisionar Google Sheet: ${err.message || 'Error desconocido'}`);
     } finally {
-      autoSheetBtn.disabled = false;
-      autoSheetBtn.innerHTML = originalText;
+      provisionBtn.disabled = false;
+      provisionBtn.innerHTML = originalText;
     }
   });
 
-  // Envío del formulario
+  // Guardado general del formulario
   const form = container.querySelector('#form-business-profile') as HTMLFormElement | null;
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -276,13 +482,13 @@ export function setupBusinessProfileEvents(
       const payload: Partial<BusinessProfile> = {
         name: nameInput?.value.trim(),
         rif: rifInput?.value.trim(),
-        legal_name: (container.querySelector('#bus-legal-name') as HTMLInputElement)?.value.trim(),
+        legal_name: legalInput?.value.trim(),
         phone: phoneInput?.value.trim(),
-        email: (container.querySelector('#bus-email') as HTMLInputElement)?.value.trim(),
+        email: emailInput?.value.trim(),
         address: addressInput?.value.trim(),
         ticket_message: msgInput?.value.trim(),
         logo_url: logoInput?.value.trim() || null,
-        google_sheet_url: sheetInput?.value.trim() || null,
+        google_sheets_webhook_url: sheetWebhookInput?.value.trim() || null
       };
 
       await api.business.updateProfile(payload);

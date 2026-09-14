@@ -97,6 +97,16 @@ async function runMultiTenantMigration(conn) {
     catch (err) {
         console.warn('[MULTI-TENANT] Advertencia al actualizar roles en users:', err.message);
     }
+    // 4b. Asegurar que license_plan en businesses admita planes anuales, 2 años y personalizados (VARCHAR 50)
+    try {
+        await conn.query(`
+      ALTER TABLE businesses MODIFY COLUMN license_plan VARCHAR(50) DEFAULT 'pro'
+    `);
+        console.log('[MULTI-TENANT] Columna license_plan actualizada a VARCHAR(50) para soportar planes multianuales.');
+    }
+    catch (err) {
+        console.warn('[MULTI-TENANT] Advertencia al actualizar license_plan en businesses:', err.message);
+    }
     // 5. Crear usuario SuperAdmin por defecto si no existe (superadmin@facilito.com / admin123)
     try {
         const [existingSuper] = await conn.query("SELECT id FROM users WHERE email = 'superadmin@facilito.com' LIMIT 1");

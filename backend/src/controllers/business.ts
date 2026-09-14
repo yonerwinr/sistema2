@@ -1,13 +1,42 @@
 import { Router } from 'express';
+import multer from 'multer';
+import path from 'path';
 import { authenticate, isAdmin } from '../middleware/auth';
 import {
   getBusinessProfile,
   updateBusinessProfile,
-  autoProvisionSheet
+  autoProvisionSheet,
+  uploadBusinessLogo
 } from './businessProfileController';
 import pool from '../config/db';
 
 const router = Router();
+
+// Configuración de almacenamiento para Logotipos Locales
+const logoStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, path.join(__dirname, '../../uploads'));
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const uniqueSuffix = 'logo-' + Date.now() + '-' + Math.round(Math.random() * 1e6) + ext;
+    cb(null, uniqueSuffix);
+  }
+});
+
+const uploadLogo = multer({
+  storage: logoStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp|svg\+xml|svg/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname || mimetype) {
+      return cb(null, true);
+    }
+    cb(new Error('Solo se permiten imágenes (PNG, JPG, JPEG, WEBP, SVG)'));
+  }
+});
 
 // Obtener perfil público de una empresa por su slug (para tienda online y POS)
 router.get('/public/:slug', async (req, res) => {
@@ -38,7 +67,11 @@ router.get('/profile', getBusinessProfile);
 // Actualizar datos fiscales y perfil (requiere Admin del comercio)
 router.put('/profile', authenticate as any, isAdmin as any, updateBusinessProfile);
 
+// Subida de imagen/logotipo local para la empresa y facturación
+router.post('/upload-logo', authenticate as any, isAdmin as any, uploadLogo.single('logo'), uploadBusinessLogo);
+
 // Aprovisionar automáticamente Google Sheets para el comercio
 router.post('/google-sheet', authenticate as any, isAdmin as any, autoProvisionSheet);
 
 export default router;
+
