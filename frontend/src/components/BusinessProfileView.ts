@@ -3,8 +3,8 @@ import { api } from '../utils/api';
 
 /**
  * BusinessProfileView.ts
- * Formulario para que cada comercio configure sus datos fiscales, logotipo (subida local o URL),
- * visualice el estado y vencimiento de su licencia, mensaje de factura y Google Sheet.
+ * Formulario para que cada comercio configure sus datos fiscales, logotipo local,
+ * visualice el estado y vencimiento de su licencia, copie el enlace de Google Sheets y configure facturas.
  */
 
 function formatPlanName(plan: string | undefined): string {
@@ -188,51 +188,54 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
               </div>
             </div>
 
-            <div class="form-group" style="margin-bottom: 16px;">
+            <div class="form-group" style="margin-bottom: 18px;">
               <label class="form-label" for="prof-address">Dirección Fiscal / Ubicación del Local</label>
               <textarea class="form-control" id="prof-address" rows="2" placeholder="Ej. Calle 4 con Carrera 12, Local N° 3, Frente a la Plaza Bolívar">${b.address || ''}</textarea>
             </div>
 
-            <!-- SECCIÓN LOGOTIPO: SUBIDA LOCAL Y ENLACE -->
+            <!-- SECCIÓN LOGOTIPO: SUBIDA LOCAL DIRECTA (SIN MOSTRAR ENLACES CONFUSOS) -->
             <h3 style="font-size: 15px; font-weight: 700; color: var(--brand-blue); margin-bottom: 14px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-              <span>🖼️</span> Logotipo de la Empresa y Factura
+              <span>🖼️</span> Foto de Perfil & Logotipo del Comercio
             </h3>
 
-            <div style="background: rgba(0, 119, 246, 0.05); border: 1px dashed rgba(0, 119, 246, 0.35); border-radius: 14px; padding: 18px; margin-bottom: 16px;">
+            <!-- Campo oculto donde se guarda la ruta interna sin exponer el texto del link al usuario -->
+            <input type="hidden" id="prof-logo" value="${b.logo_url || ''}">
+
+            <div style="background: rgba(0, 119, 246, 0.05); border: 1px dashed rgba(0, 119, 246, 0.35); border-radius: 14px; padding: 18px; margin-bottom: 18px;">
               
-              <!-- Zona de Subida Local con Drag & Drop y Botón -->
-              <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+              <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
                 
-                <div id="prof-logo-preview-box" style="width: 80px; height: 80px; border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                <!-- Caja de Vista Previa del Logo -->
+                <div id="prof-logo-preview-box" style="width: 88px; height: 88px; border-radius: 14px; background: rgba(0,0,0,0.35); border: 2px solid var(--border-glass); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
                   ${b.logo_url 
                     ? `<img src="${b.logo_url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Logotipo">` 
-                    : '<span style="font-size: 30px;">🏪</span>'}
+                    : '<span style="font-size: 36px;">🏪</span>'}
                 </div>
 
-                <div style="flex-grow: 1; min-width: 220px;">
-                  <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
-                    Adjuntar Foto o Logotipo desde tus Archivos Locales
+                <div style="flex-grow: 1; min-width: 240px;">
+                  <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+                    Foto de Perfil del Comercio
                   </div>
-                  <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px;">
-                    Formatos admitidos: PNG, JPG, JPEG, WEBP o SVG (Máx. 5MB). Se imprimirá en tus tickets y tienda online.
+                  <div style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4;">
+                    Selecciona una foto o logotipo desde tu equipo (PNG, JPG, WEBP o SVG). Se almacena localmente y aparecerá en el encabezado de tus facturas y tienda.
                   </div>
 
+                  <!-- Input de archivo real (oculto) -->
                   <input type="file" id="prof-logo-file-input" accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml" style="display: none;">
                   
                   <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-sm btn-primary" id="btn-browse-logo" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 8px 14px; border-radius: 8px;">
-                      <span>📁</span> Subir desde el Equipo
+                    <button type="button" class="btn btn-sm btn-primary" id="btn-browse-logo" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 8px 16px; border-radius: 8px;">
+                      <span>📁</span> ${b.logo_url ? 'Cambiar Foto de Perfil' : 'Subir Foto desde tu Equipo'}
                     </button>
-                    <span id="prof-logo-upload-status" style="font-size: 12px; color: var(--text-muted);"></span>
+
+                    <button type="button" class="btn btn-sm btn-secondary" id="btn-remove-logo" style="display: ${b.logo_url ? 'inline-flex' : 'none'}; align-items: center; gap: 6px; color: var(--danger); border-color: rgba(239,68,68,0.3); border-radius: 8px; padding: 8px 14px;">
+                      <span>🗑️</span> Quitar Foto
+                    </button>
+
+                    <span id="prof-logo-upload-status" style="font-size: 12px; font-weight: 600;"></span>
                   </div>
                 </div>
 
-              </div>
-
-              <!-- Opción alternativa: URL directa -->
-              <div class="form-group" style="margin-top: 14px; margin-bottom: 0;">
-                <label class="form-label" for="prof-logo" style="font-size: 12px; color: var(--text-secondary);">O ingresa enlace / URL directo del logo (Opcional):</label>
-                <input type="url" class="form-control" id="prof-logo" value="${b.logo_url || ''}" placeholder="https://ejemplo.com/mi-logo.png" style="font-size: 12px;">
               </div>
 
             </div>
@@ -243,17 +246,20 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
             </div>
 
             <!-- SECCIÓN GOOGLE SHEETS -->
-            <h3 style="font-size: 15px; font-weight: 700; color: #10b981; margin-bottom: 16px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;">
-              📊 Respaldo en Vivo en Google Sheets
+            <h3 style="font-size: 15px; font-weight: 700; color: #10b981; margin-bottom: 16px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+              <span>📊</span> Respaldo en Vivo en Google Sheets
             </h3>
 
-            <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 14px; padding: 16px; margin-bottom: 16px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                <span style="font-size: 13px; font-weight: 700; color: #10b981;">Hoja Vinculada de la Empresa</span>
+            <div id="google-sheets-section-wrapper" style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.25); border-radius: 14px; padding: 18px; margin-bottom: 18px;">
+              
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <span style="font-size: 13px; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 6px;">
+                  <span>📑</span> Hoja de Google Sheets del Comercio
+                </span>
                 ${b.google_sheet_url ? `
-                  <a href="${b.google_sheet_url}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-success" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
-                    <span>📊</span> Abrir en Google Sheets
-                  </a>
+                  <span style="font-size: 11px; background: rgba(16,185,129,0.18); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 3px 8px; border-radius: 6px; font-weight: 700;">
+                    🟢 Vinculada en Vivo
+                  </span>
                 ` : `
                   <button type="button" class="btn btn-sm btn-primary" id="btn-provision-sheet">
                     Generar Hoja Automáticamente 🚀
@@ -261,15 +267,26 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
                 `}
               </div>
 
-              ${b.google_sheet_url ? `
-                <div style="font-size: 12px; color: var(--text-secondary); word-break: break-all; margin-bottom: 10px;">
-                  🔗 Enlace: <a href="${b.google_sheet_url}" target="_blank" style="color: #60a5fa;">${b.google_sheet_url}</a>
-                </div>
-              ` : `
-                <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 10px 0;">
-                  Aún no tienes una hoja de Google Sheets generada para respaldar tus ventas automáticamente.
-                </p>
-              `}
+              <div id="sheet-url-controls-container">
+                ${b.google_sheet_url ? `
+                  <!-- Control con enlace, botón de copiar y botón de abrir -->
+                  <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;">
+                    <input type="text" readonly id="prof-sheet-url-display" class="form-control" value="${b.google_sheet_url}" style="font-size: 12px; background: rgba(0,0,0,0.3); color: #60a5fa; font-family: monospace; height: 38px; min-width: 220px; flex-grow: 1;" title="Enlace directo a Google Sheets">
+                    
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-sheet-url" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 8px;" title="Copiar enlace al portapapeles">
+                      <span>📋</span> <span id="copy-sheet-btn-text">Copiar Enlace</span>
+                    </button>
+
+                    <a href="${b.google_sheet_url}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 0 14px; border-radius: 8px;" title="Abrir Google Sheets en pestaña nueva">
+                      <span>↗️</span> Abrir
+                    </a>
+                  </div>
+                ` : `
+                  <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 14px 0;">
+                    Aún no tienes una hoja de Google Sheets generada. Haz clic en "Generar Hoja Automáticamente" para crear y vincular tu respaldo de ventas.
+                  </p>
+                `}
+              </div>
 
               <div class="form-group" style="margin: 0;">
                 <label class="form-label" for="prof-sheet-webhook" style="font-size: 12px;">Webhook Personalizado (Opcional - Google Apps Script)</label>
@@ -347,11 +364,12 @@ export function setupBusinessProfileEvents(
   const phoneInput = container.querySelector('#prof-phone') as HTMLInputElement | null;
   const emailInput = container.querySelector('#prof-email') as HTMLInputElement | null;
   const msgInput = container.querySelector('#prof-ticket-msg') as HTMLTextAreaElement | null;
-  const logoInput = container.querySelector('#prof-logo') as HTMLInputElement | null;
+  const logoHiddenInput = container.querySelector('#prof-logo') as HTMLInputElement | null;
   const sheetWebhookInput = container.querySelector('#prof-sheet-webhook') as HTMLInputElement | null;
 
   const fileInput = container.querySelector('#prof-logo-file-input') as HTMLInputElement | null;
   const browseBtn = container.querySelector('#btn-browse-logo') as HTMLButtonElement | null;
+  const removeLogoBtn = container.querySelector('#btn-remove-logo') as HTMLButtonElement | null;
   const uploadStatus = container.querySelector('#prof-logo-upload-status') as HTMLElement | null;
   const logoPreviewBox = container.querySelector('#prof-logo-preview-box') as HTMLElement | null;
 
@@ -383,18 +401,20 @@ export function setupBusinessProfileEvents(
     if (logoPreviewBox) {
       logoPreviewBox.innerHTML = url
         ? `<img src="${url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Logo">`
-        : '<span style="font-size: 30px;">🏪</span>';
+        : '<span style="font-size: 36px;">🏪</span>';
     }
     if (previewLogo) {
       previewLogo.innerHTML = url
         ? `<img src="${url}" style="max-width: 80px; max-height: 80px; object-fit: contain;" alt="Logo">`
         : '<div style="font-size: 32px;">🛒</div>';
     }
+    if (browseBtn) {
+      browseBtn.innerHTML = `<span>📁</span> ${url ? 'Cambiar Foto de Perfil' : 'Subir Foto desde tu Equipo'}`;
+    }
+    if (removeLogoBtn) {
+      removeLogoBtn.style.display = url ? 'inline-flex' : 'none';
+    }
   };
-
-  logoInput?.addEventListener('input', () => {
-    updateLogoDisplay(logoInput.value.trim());
-  });
 
   // SUBIDA LOCAL DE ARCHIVO DE LOGOTIPO
   browseBtn?.addEventListener('click', () => {
@@ -417,7 +437,7 @@ export function setupBusinessProfileEvents(
       return;
     }
 
-    if (uploadStatus) uploadStatus.textContent = 'Subiendo foto... ⏳';
+    if (uploadStatus) uploadStatus.innerHTML = '<span style="color: var(--brand-blue); font-weight:700;">Subiendo foto... ⏳</span>';
     if (browseBtn) browseBtn.disabled = true;
 
     try {
@@ -425,11 +445,13 @@ export function setupBusinessProfileEvents(
       formData.append('logo', file);
 
       const res = await api.business.uploadLogo(formData);
-      if (logoInput) logoInput.value = res.imageUrl;
+      
+      // Guardar en el input oculto (sin mostrar texto de enlace confuso al usuario)
+      if (logoHiddenInput) logoHiddenInput.value = res.imageUrl;
       updateLogoDisplay(res.imageUrl);
 
       if (uploadStatus) {
-        uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Foto subida y guardada!</span>';
+        uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Foto guardada exitosamente!</span>';
         setTimeout(() => {
           if (uploadStatus) uploadStatus.textContent = '';
         }, 4000);
@@ -448,6 +470,56 @@ export function setupBusinessProfileEvents(
     }
   });
 
+  // Botón Quitar Foto
+  removeLogoBtn?.addEventListener('click', async () => {
+    if (!confirm('¿Deseas quitar la foto de perfil y logo de tu negocio?')) return;
+    if (logoHiddenInput) logoHiddenInput.value = '';
+    updateLogoDisplay('');
+    try {
+      await api.business.updateProfile({ logo_url: null });
+      if (uploadStatus) {
+        uploadStatus.innerHTML = '<span style="color: var(--text-muted);">Foto eliminada</span>';
+        setTimeout(() => {
+          if (uploadStatus) uploadStatus.textContent = '';
+        }, 3000);
+      }
+      const updated = await api.business.getMyProfile();
+      if (onProfileUpdated) onProfileUpdated(updated);
+    } catch (e: any) {
+      alert('Error al quitar foto: ' + e.message);
+    }
+  });
+
+  // COPIAR ENLACE DE GOOGLE SHEETS
+  const setupCopySheetBtn = () => {
+    const copyBtn = container.querySelector('#btn-copy-sheet-url') as HTMLButtonElement | null;
+    const sheetUrlDisplay = container.querySelector('#prof-sheet-url-display') as HTMLInputElement | null;
+    const copyTextSpan = container.querySelector('#copy-sheet-btn-text');
+
+    copyBtn?.addEventListener('click', async () => {
+      const url = sheetUrlDisplay?.value?.trim();
+      if (!url) return;
+
+      try {
+        await navigator.clipboard.writeText(url);
+        if (copyTextSpan) copyTextSpan.textContent = '¡Copiado!';
+        copyBtn.style.background = 'rgba(16,185,129,0.2)';
+        copyBtn.style.borderColor = '#10b981';
+        setTimeout(() => {
+          if (copyTextSpan) copyTextSpan.textContent = 'Copiar Enlace';
+          copyBtn.style.background = '';
+          copyBtn.style.borderColor = '';
+        }, 2500);
+      } catch (err) {
+        sheetUrlDisplay?.select();
+        document.execCommand('copy');
+        alert('📋 ¡Enlace copiado al portapapeles!');
+      }
+    });
+  };
+
+  setupCopySheetBtn();
+
   // Aprovisionamiento automático de Google Sheet
   const provisionBtn = container.querySelector('#btn-provision-sheet') as HTMLButtonElement | null;
   provisionBtn?.addEventListener('click', async () => {
@@ -457,14 +529,41 @@ export function setupBusinessProfileEvents(
 
     try {
       const res = await api.business.autoProvisionSheet();
-      alert(`✅ ¡Hoja de Google Sheets configurada con éxito!\n\nSe ha vinculado tu respaldo para ventas y facturación.\n\nEnlace: ${res.sheetUrl}`);
+      
+      // Actualizar dinámicamente el contenedor con el input y botón de copiar
+      const controlsContainer = container.querySelector('#sheet-url-controls-container');
+      if (controlsContainer) {
+        controlsContainer.innerHTML = `
+          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;">
+            <input type="text" readonly id="prof-sheet-url-display" class="form-control" value="${res.sheetUrl}" style="font-size: 12px; background: rgba(0,0,0,0.3); color: #60a5fa; font-family: monospace; height: 38px; min-width: 220px; flex-grow: 1;">
+            
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-sheet-url" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 8px;">
+              <span>📋</span> <span id="copy-sheet-btn-text">Copiar Enlace</span>
+            </button>
+
+            <a href="${res.sheetUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 0 14px; border-radius: 8px;">
+              <span>↗️</span> Abrir
+            </a>
+          </div>
+        `;
+        setupCopySheetBtn();
+      }
+
+      // Intentar copiar automáticamente al portapapeles
+      try {
+        await navigator.clipboard.writeText(res.sheetUrl);
+      } catch (_) {}
+
+      alert(`✅ ¡Hoja de Google Sheets configurada con éxito!\n\nSe ha vinculado tu respaldo para ventas y facturación.\n\nEnlace copiado al portapapeles: ${res.sheetUrl}`);
       const current = await api.business.getMyProfile();
       if (onProfileUpdated) onProfileUpdated(current);
     } catch (err: any) {
       alert(`⚠️ Error al aprovisionar Google Sheet: ${err.message || 'Error desconocido'}`);
     } finally {
-      provisionBtn.disabled = false;
-      provisionBtn.innerHTML = originalText;
+      if (provisionBtn) {
+        provisionBtn.disabled = false;
+        provisionBtn.innerHTML = originalText;
+      }
     }
   });
 
@@ -487,7 +586,7 @@ export function setupBusinessProfileEvents(
         email: emailInput?.value.trim(),
         address: addressInput?.value.trim(),
         ticket_message: msgInput?.value.trim(),
-        logo_url: logoInput?.value.trim() || null,
+        logo_url: logoHiddenInput?.value?.trim() || null,
         google_sheets_webhook_url: sheetWebhookInput?.value.trim() || null
       };
 
