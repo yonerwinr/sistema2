@@ -342,9 +342,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email }),
     }),
-    loginGoogle: (credential: string) => request<{ token: string; user: User }>('/auth/google', {
+    loginGoogle: (params: { credential?: string; accessToken?: string }) => request<{ token: string; user: User }>('/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ credential }),
+      body: JSON.stringify(params),
     }),
     getGoogleClientId: () => request<{ clientId: string }>('/auth/google-client-id'),
     me: () => request<User>('/auth/me'),

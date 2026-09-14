@@ -312,29 +312,41 @@ router.get('/google-client-id', (_req, res) => {
 
 // Autenticación con Google (Login / Registro integrado)
 router.post('/google', async (req, res) => {
-  const { credential } = req.body;
+  const { credential, accessToken } = req.body;
 
-  if (!credential) {
-    return res.status(400).json({ message: 'La credencial de Google es obligatoria' });
+  if (!credential && !accessToken) {
+    return res.status(400).json({ message: 'La credencial o token de acceso de Google es obligatorio' });
   }
 
   try {
-    const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
-    if (!googleRes.ok) {
-      return res.status(400).json({ message: 'Token de Google inválido o expirado' });
-    }
+    let email = '';
+    let name = '';
+    let email_verified: any = false;
 
-    const payload: any = await googleRes.json();
-    const { email, name, email_verified, aud } = payload;
+    if (credential) {
+      const googleRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+      if (!googleRes.ok) {
+        return res.status(400).json({ message: 'Token de Google inválido o expirado' });
+      }
+      const payload: any = await googleRes.json();
+      email = payload.email;
+      name = payload.name;
+      email_verified = payload.email_verified;
+    } else if (accessToken) {
+      const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (!googleRes.ok) {
+        return res.status(400).json({ message: 'Token de acceso de Google inválido o expirado' });
+      }
+      const payload: any = await googleRes.json();
+      email = payload.email;
+      name = payload.name;
+      email_verified = payload.email_verified;
+    }
 
     if (email_verified !== true && email_verified !== 'true') {
       return res.status(400).json({ message: 'El correo electrónico de Google no está verificado' });
-    }
-
-    // Validar GOOGLE_CLIENT_ID si está configurado en .env
-    const expectedClientId = process.env.GOOGLE_CLIENT_ID;
-    if (expectedClientId && aud !== expectedClientId) {
-      return res.status(400).json({ message: 'El cliente de Google no coincide con el configurado' });
     }
 
     // Buscar si el usuario ya existe por correo
