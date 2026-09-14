@@ -652,7 +652,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-    updateLicense: (id: number, body: { action?: string; add_days?: number; expires_at?: string; license_status?: string; license_plan?: string; is_active?: boolean; price_monthly?: number }) => request<any>(`/superadmin/businesses/${id}/license`, {
+    updateLicense: (id: number, body: { action?: string; add_days?: number; expires_at?: string; license_status?: string; license_plan?: string; is_active?: boolean; price_monthly?: number; google_sheet_url?: string | null }) => request<any>(`/superadmin/businesses/${id}/license`, {
       method: 'PUT',
       body: JSON.stringify(body),
     }),

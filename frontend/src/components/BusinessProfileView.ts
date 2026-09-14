@@ -4,7 +4,7 @@ import { api } from '../utils/api';
 /**
  * BusinessProfileView.ts
  * Formulario para que cada comercio configure sus datos fiscales, logotipo local,
- * visualice el estado y vencimiento de su licencia, copie el enlace de Google Sheets y configure facturas.
+ * visualice el estado y vencimiento de su licencia, vincule su hoja real de Google Sheets y configure facturas.
  */
 
 function formatPlanName(plan: string | undefined): string {
@@ -92,6 +92,7 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
 
   const formattedExpiration = formatExpirationDate(b.license_expires_at);
   const planDisplay = formatPlanName(b.license_plan);
+  const hasRealSheet = b.google_sheet_url && !b.google_sheet_url.includes('facilito_');
 
   return `
     <div class="business-profile-container animate-fade-in" style="max-width: 1020px; margin: 0 auto; padding: 20px 0;">
@@ -254,42 +255,47 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
               
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                 <span style="font-size: 13px; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 6px;">
-                  <span>📑</span> Hoja de Google Sheets del Comercio
+                  <span>📑</span> Enlace de tu Hoja de Google Sheets
                 </span>
-                ${b.google_sheet_url ? `
-                  <span style="font-size: 11px; background: rgba(16,185,129,0.18); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 3px 8px; border-radius: 6px; font-weight: 700;">
-                    🟢 Vinculada en Vivo
-                  </span>
-                ` : `
-                  <button type="button" class="btn btn-sm btn-primary" id="btn-provision-sheet">
-                    Generar Hoja Automáticamente 🚀
-                  </button>
-                `}
+                <span style="font-size: 11px; background: rgba(16,185,129,0.18); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 3px 8px; border-radius: 6px; font-weight: 700;">
+                  ${hasRealSheet ? '🟢 Hoja Vinculada' : '⚙️ Requiere Vincular Hoja'}
+                </span>
               </div>
 
-              <div id="sheet-url-controls-container">
-                ${b.google_sheet_url ? `
-                  <!-- Control con enlace, botón de copiar y botón de abrir -->
-                  <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;">
-                    <input type="text" readonly id="prof-sheet-url-display" class="form-control" value="${b.google_sheet_url}" style="font-size: 12px; background: rgba(0,0,0,0.3); color: #60a5fa; font-family: monospace; height: 38px; min-width: 220px; flex-grow: 1;" title="Enlace directo a Google Sheets">
-                    
-                    <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-sheet-url" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 8px;" title="Copiar enlace al portapapeles">
-                      <span>📋</span> <span id="copy-sheet-btn-text">Copiar Enlace</span>
-                    </button>
+              <!-- Explicación amigable paso a paso -->
+              <p style="font-size: 12px; color: var(--text-secondary); margin: 0 0 12px 0; line-height: 1.5;">
+                Pega aquí el enlace de tu hoja de Google Sheets para que quede guardada y conectada a tu negocio. Si aún no tienes una hoja creada, puedes abrir una en 1 clic:
+              </p>
 
-                    <a href="${b.google_sheet_url}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 0 14px; border-radius: 8px;" title="Abrir Google Sheets en pestaña nueva">
-                      <span>↗️</span> Abrir
-                    </a>
-                  </div>
-                ` : `
-                  <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 14px 0;">
-                    Aún no tienes una hoja de Google Sheets generada. Haz clic en "Generar Hoja Automáticamente" para crear y vincular tu respaldo de ventas.
-                  </p>
-                `}
+              <!-- Botones rápidos de ayuda para crear y preparar la hoja -->
+              <div style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;">
+                <a href="https://sheets.new" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; text-decoration: none; padding: 7px 14px; border-radius: 8px; font-size: 12px;">
+                  <span>✨</span> Crear Hoja Nueva (sheets.new) ↗️
+                </a>
+
+                <button type="button" class="btn btn-sm btn-secondary" id="btn-copy-sheet-headers" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 7px 14px; border-radius: 8px; font-size: 12px;" title="Copia los encabezados para pegarlos en la primera fila de tu hoja">
+                  <span>📋</span> <span id="copy-headers-btn-text">Copiar Encabezados para Fila 1</span>
+                </button>
+              </div>
+
+              <!-- Campo para ingresar / editar el enlace real de Google Sheets -->
+              <div class="form-group" style="margin-bottom: 12px;">
+                <label class="form-label" for="prof-sheet-url" style="font-size: 12px; font-weight: 600;">URL / Enlace de la Hoja de Google Sheets:</label>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <input type="url" class="form-control" id="prof-sheet-url" value="${hasRealSheet ? (b.google_sheet_url || '') : ''}" placeholder="https://docs.google.com/spreadsheets/d/TU_ID_DE_HOJA/edit" style="font-size: 12px; font-family: monospace; height: 38px; min-width: 240px; flex-grow: 1;">
+                  
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-sheet-url" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 8px;" title="Copiar enlace al portapapeles">
+                    <span>📋</span> <span id="copy-sheet-btn-text">Copiar Enlace</span>
+                  </button>
+
+                  <a id="btn-open-sheet-link" href="${hasRealSheet ? b.google_sheet_url : 'https://sheets.google.com'}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 0 14px; border-radius: 8px;" title="Abrir Google Sheets">
+                    <span>↗️</span> Abrir
+                  </a>
+                </div>
               </div>
 
               <div class="form-group" style="margin: 0;">
-                <label class="form-label" for="prof-sheet-webhook" style="font-size: 12px;">Webhook Personalizado (Opcional - Google Apps Script)</label>
+                <label class="form-label" for="prof-sheet-webhook" style="font-size: 12px;">Webhook de Sincronización Automática (Google Apps Script - Opcional)</label>
                 <input type="url" class="form-control" id="prof-sheet-webhook" value="${b.google_sheets_webhook_url || ''}" placeholder="https://script.google.com/macros/s/.../exec" style="font-size: 12px;">
               </div>
             </div>
@@ -365,7 +371,9 @@ export function setupBusinessProfileEvents(
   const emailInput = container.querySelector('#prof-email') as HTMLInputElement | null;
   const msgInput = container.querySelector('#prof-ticket-msg') as HTMLTextAreaElement | null;
   const logoHiddenInput = container.querySelector('#prof-logo') as HTMLInputElement | null;
+  const sheetUrlInput = container.querySelector('#prof-sheet-url') as HTMLInputElement | null;
   const sheetWebhookInput = container.querySelector('#prof-sheet-webhook') as HTMLInputElement | null;
+  const openSheetLink = container.querySelector('#btn-open-sheet-link') as HTMLAnchorElement | null;
 
   const fileInput = container.querySelector('#prof-logo-file-input') as HTMLInputElement | null;
   const browseBtn = container.querySelector('#btn-browse-logo') as HTMLButtonElement | null;
@@ -490,80 +498,62 @@ export function setupBusinessProfileEvents(
     }
   });
 
-  // COPIAR ENLACE DE GOOGLE SHEETS
-  const setupCopySheetBtn = () => {
-    const copyBtn = container.querySelector('#btn-copy-sheet-url') as HTMLButtonElement | null;
-    const sheetUrlDisplay = container.querySelector('#prof-sheet-url-display') as HTMLInputElement | null;
-    const copyTextSpan = container.querySelector('#copy-sheet-btn-text');
+  // Dinámicamente actualizar enlace "Abrir" cuando el usuario edite el input de URL de Google Sheets
+  sheetUrlInput?.addEventListener('input', () => {
+    const val = sheetUrlInput.value.trim();
+    if (openSheetLink) {
+      openSheetLink.href = val || 'https://sheets.google.com';
+    }
+  });
 
-    copyBtn?.addEventListener('click', async () => {
-      const url = sheetUrlDisplay?.value?.trim();
-      if (!url) return;
+  // BOTÓN COPIAR ENLACE DE GOOGLE SHEETS
+  const copySheetBtn = container.querySelector('#btn-copy-sheet-url') as HTMLButtonElement | null;
+  const copySheetBtnText = container.querySelector('#copy-sheet-btn-text');
 
-      try {
-        await navigator.clipboard.writeText(url);
-        if (copyTextSpan) copyTextSpan.textContent = '¡Copiado!';
-        copyBtn.style.background = 'rgba(16,185,129,0.2)';
-        copyBtn.style.borderColor = '#10b981';
-        setTimeout(() => {
-          if (copyTextSpan) copyTextSpan.textContent = 'Copiar Enlace';
-          copyBtn.style.background = '';
-          copyBtn.style.borderColor = '';
-        }, 2500);
-      } catch (err) {
-        sheetUrlDisplay?.select();
-        document.execCommand('copy');
-        alert('📋 ¡Enlace copiado al portapapeles!');
-      }
-    });
-  };
-
-  setupCopySheetBtn();
-
-  // Aprovisionamiento automático de Google Sheet
-  const provisionBtn = container.querySelector('#btn-provision-sheet') as HTMLButtonElement | null;
-  provisionBtn?.addEventListener('click', async () => {
-    const originalText = provisionBtn.innerHTML;
-    provisionBtn.disabled = true;
-    provisionBtn.innerHTML = 'Aprovisionando Google Sheets... ⏳';
+  copySheetBtn?.addEventListener('click', async () => {
+    const url = sheetUrlInput?.value?.trim();
+    if (!url) {
+      alert('⚠️ Primero ingresa o pega el enlace de tu hoja de Google Sheets.');
+      sheetUrlInput?.focus();
+      return;
+    }
 
     try {
-      const res = await api.business.autoProvisionSheet();
-      
-      // Actualizar dinámicamente el contenedor con el input y botón de copiar
-      const controlsContainer = container.querySelector('#sheet-url-controls-container');
-      if (controlsContainer) {
-        controlsContainer.innerHTML = `
-          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap;">
-            <input type="text" readonly id="prof-sheet-url-display" class="form-control" value="${res.sheetUrl}" style="font-size: 12px; background: rgba(0,0,0,0.3); color: #60a5fa; font-family: monospace; height: 38px; min-width: 220px; flex-grow: 1;">
-            
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-sheet-url" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 8px;">
-              <span>📋</span> <span id="copy-sheet-btn-text">Copiar Enlace</span>
-            </button>
+      await navigator.clipboard.writeText(url);
+      if (copySheetBtnText) copySheetBtnText.textContent = '¡Copiado!';
+      copySheetBtn.style.background = 'rgba(16,185,129,0.2)';
+      copySheetBtn.style.borderColor = '#10b981';
+      setTimeout(() => {
+        if (copySheetBtnText) copySheetBtnText.textContent = 'Copiar Enlace';
+        copySheetBtn.style.background = '';
+        copySheetBtn.style.borderColor = '';
+      }, 2500);
+    } catch (err) {
+      sheetUrlInput?.select();
+      document.execCommand('copy');
+      alert('📋 ¡Enlace copiado al portapapeles!');
+    }
+  });
 
-            <a href="${res.sheetUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 0 14px; border-radius: 8px;">
-              <span>↗️</span> Abrir
-            </a>
-          </div>
-        `;
-        setupCopySheetBtn();
-      }
+  // BOTÓN COPIAR ENCABEZADOS DE COLUMNA PARA LA HOJA
+  const copyHeadersBtn = container.querySelector('#btn-copy-sheet-headers') as HTMLButtonElement | null;
+  const copyHeadersText = container.querySelector('#copy-headers-btn-text');
 
-      // Intentar copiar automáticamente al portapapeles
-      try {
-        await navigator.clipboard.writeText(res.sheetUrl);
-      } catch (_) {}
-
-      alert(`✅ ¡Hoja de Google Sheets configurada con éxito!\n\nSe ha vinculado tu respaldo para ventas y facturación.\n\nEnlace copiado al portapapeles: ${res.sheetUrl}`);
-      const current = await api.business.getMyProfile();
-      if (onProfileUpdated) onProfileUpdated(current);
-    } catch (err: any) {
-      alert(`⚠️ Error al aprovisionar Google Sheet: ${err.message || 'Error desconocido'}`);
-    } finally {
-      if (provisionBtn) {
-        provisionBtn.disabled = false;
-        provisionBtn.innerHTML = originalText;
-      }
+  copyHeadersBtn?.addEventListener('click', async () => {
+    const headersText = "ID Venta\tFecha\tCliente\tCédula / RIF\tTeléfono\tMétodo de Pago\tSubtotal ($)\tDescuento ($)\tTotal ($)\tMonto Pagado ($)\tProductos\tVendedor";
+    try {
+      await navigator.clipboard.writeText(headersText);
+      if (copyHeadersText) copyHeadersText.textContent = '¡Encabezados Copiados!';
+      copyHeadersBtn.style.background = 'rgba(16,185,129,0.2)';
+      copyHeadersBtn.style.borderColor = '#10b981';
+      setTimeout(() => {
+        if (copyHeadersText) copyHeadersText.textContent = 'Copiar Encabezados para Fila 1';
+        copyHeadersBtn.style.background = '';
+        copyHeadersBtn.style.borderColor = '';
+      }, 3000);
+      alert('📋 ¡Encabezados copiados!\n\nAbre tu hoja de Google Sheets, selecciona la celda A1 y presiona Ctrl+V para pegar todas las columnas ordenadas.');
+    } catch (_) {
+      alert('Encabezados: ID Venta | Fecha | Cliente | Cédula | Teléfono | Método de Pago | Subtotal | Descuento | Total | Monto Pagado | Productos | Vendedor');
     }
   });
 
@@ -587,6 +577,7 @@ export function setupBusinessProfileEvents(
         address: addressInput?.value.trim(),
         ticket_message: msgInput?.value.trim(),
         logo_url: logoHiddenInput?.value?.trim() || null,
+        google_sheet_url: sheetUrlInput?.value.trim() || null,
         google_sheets_webhook_url: sheetWebhookInput?.value.trim() || null
       };
 

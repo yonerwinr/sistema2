@@ -51,7 +51,13 @@ async function getBusinessProfile(req, res) {
 async function updateBusinessProfile(req, res) {
     try {
         const businessId = req.businessId || (req.user && req.user.business_id) || 1;
-        const { name, rif, legal_name, logo_url, phone, email, address, ticket_message, google_sheets_webhook_url } = req.body;
+        const { name, rif, legal_name, logo_url, phone, email, address, ticket_message, google_sheet_url, google_sheets_webhook_url } = req.body;
+        let sheetId = null;
+        if (google_sheet_url) {
+            const match = google_sheet_url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+            if (match)
+                sheetId = match[1];
+        }
         await db_1.default.query(`
       UPDATE businesses 
       SET 
@@ -63,7 +69,9 @@ async function updateBusinessProfile(req, res) {
         email = COALESCE(?, email),
         address = COALESCE(?, address),
         ticket_message = COALESCE(?, ticket_message),
-        google_sheets_webhook_url = COALESCE(?, google_sheets_webhook_url)
+        google_sheet_url = ?,
+        google_sheet_id = COALESCE(?, google_sheet_id),
+        google_sheets_webhook_url = ?
       WHERE id = ?
     `, [
             name || null,
@@ -74,7 +82,9 @@ async function updateBusinessProfile(req, res) {
             email || null,
             address || null,
             ticket_message || null,
-            google_sheets_webhook_url || null,
+            google_sheet_url !== undefined ? (google_sheet_url || null) : null,
+            sheetId,
+            google_sheets_webhook_url !== undefined ? (google_sheets_webhook_url || null) : null,
             businessId
         ]);
         res.json({
@@ -95,13 +105,17 @@ async function autoProvisionSheet(req, res) {
         }
         const business = rows[0];
         const sheetInfo = await (0, googleSheetsAuto_1.provisionBusinessSheet)(business.name, business.email);
-        await db_1.default.query(`
-      UPDATE businesses 
-      SET google_sheet_id = ?, google_sheet_url = ? 
-      WHERE id = ?
-    `, [sheetInfo.sheetId, sheetInfo.sheetUrl, businessId]);
+        if (!sheetInfo.isSimulated && sheetInfo.sheetUrl) {
+            await db_1.default.query(`
+        UPDATE businesses 
+        SET google_sheet_id = ?, google_sheet_url = ? 
+        WHERE id = ?
+      `, [sheetInfo.sheetId, sheetInfo.sheetUrl, businessId]);
+        }
         res.json({
-            message: 'Hoja de Google Sheets creada y vinculada con éxito.',
+            message: sheetInfo.isSimulated
+                ? 'Crea tu hoja en Google Sheets con sheets.new y pega el enlace aquí.'
+                : 'Hoja de Google Sheets creada y vinculada con éxito.',
             sheetUrl: sheetInfo.sheetUrl,
             isSimulated: sheetInfo.isSimulated
         });

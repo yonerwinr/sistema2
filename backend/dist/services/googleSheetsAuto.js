@@ -38,13 +38,10 @@ async function provisionBusinessSheet(businessName, ownerEmail) {
     const auth = getGoogleAuthClient();
     if (!auth) {
         console.log(`[GOOGLE SHEETS AUTO] Credenciales de cuenta de servicio no detectadas en .env.`);
-        console.log(`[GOOGLE SHEETS AUTO] Generando enlace de plantilla automática para "${businessName}".`);
-        // Enlace de demostración funcional mientras se configuran las credenciales de Google Cloud
-        const demoId = 'facilito_' + Buffer.from(businessName + '_' + Date.now()).toString('hex').substring(0, 16);
-        const demoUrl = `https://docs.google.com/spreadsheets/d/${demoId}/edit#gid=0`;
+        console.log(`[GOOGLE SHEETS AUTO] Proveyendo acceso a Google Sheets (sheets.new) para "${businessName}".`);
         return {
-            sheetId: demoId,
-            sheetUrl: demoUrl,
+            sheetId: '',
+            sheetUrl: 'https://sheets.new',
             isSimulated: true
         };
     }

@@ -280,6 +280,7 @@ export function renderSuperAdminHtml(
                                 data-expires="${b.license_expires_at || ''}" 
                                 data-price="${b.price_monthly || 25}" 
                                 data-days="${daysRemaining ?? ''}"
+                                data-sheet-url="${b.google_sheet_url || ''}"
                                 title="Gestionar licencia (Planes Anuales, 2 Años, fechas o tarifas)" 
                                 style="padding: 6px 11px; font-size: 12px; font-weight: 700; border-radius: 8px;">
                           ⚙️ Licencia
@@ -524,13 +525,22 @@ export function renderSuperAdminHtml(
             </div>
 
             <!-- Estado de Licencia -->
-            <div class="form-group" style="margin-bottom: 20px;">
+            <div class="form-group" style="margin-bottom: 14px;">
               <label class="form-label" for="manage-status">Estado Operativo</label>
               <select class="form-control" id="manage-status">
                 <option value="active">🟢 Activo (Servicio operativo)</option>
                 <option value="trial">⏳ Período de Prueba (Trial)</option>
                 <option value="suspended">⛔ Suspendido / Pausado (Kill-switch)</option>
               </select>
+            </div>
+
+            <!-- Hoja de Google Sheets vinculada -->
+            <div class="form-group" style="margin-bottom: 20px;">
+              <label class="form-label" for="manage-sheet-url">URL de Google Sheets (Opcional)</label>
+              <input type="url" class="form-control" id="manage-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/TU_ID/edit" style="font-size: 12px; font-family: monospace;">
+              <small style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px;">
+                Pega la URL de una hoja real de Google Sheets para este comercio o déjala en blanco.
+              </small>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 12px;">
@@ -751,7 +761,10 @@ export function setupSuperAdminEvents(container: HTMLElement) {
         admin_password: adminPassword
       });
 
-      alert(`✅ ¡Comercio "${name}" creado exitosamente con su plan y vencimiento!\n\nSe ha generado su Google Sheet de respaldo:\n${res.business?.google_sheet_url || 'Asignado'}`);
+      const sheetMsg = res.business?.google_sheet_url 
+        ? `\n\n📊 Hoja de Google Sheets vinculada:\n${res.business.google_sheet_url}`
+        : '\n\n💡 Puedes vincular una hoja de Google Sheets en cualquier momento desde "⚙️ Licencia" o desde "Mi Negocio".';
+      alert(`✅ ¡Comercio "${name}" creado exitosamente con su plan y vigencia!${sheetMsg}`);
       closeCreateModal();
       await renderSuperAdminView(container);
     } catch (err: any) {
@@ -826,6 +839,10 @@ export function setupSuperAdminEvents(container: HTMLElement) {
       if (managePriceInput) managePriceInput.value = price;
       if (manageStatusSelect) manageStatusSelect.value = status === 'suspended' ? 'suspended' : (status === 'trial' ? 'trial' : 'active');
 
+      const sheetUrl = btn.getAttribute('data-sheet-url') || '';
+      const manageSheetUrlInput = container.querySelector('#manage-sheet-url') as HTMLInputElement | null;
+      if (manageSheetUrlInput) manageSheetUrlInput.value = sheetUrl;
+
       if (manageModalOverlay) (manageModalOverlay as HTMLElement).style.display = 'flex';
     });
   });
@@ -848,6 +865,7 @@ export function setupSuperAdminEvents(container: HTMLElement) {
       const selectedPlan = managePlanSelect?.value || 'pro';
       const priceVal = Number(managePriceInput?.value || 25);
       const statusVal = manageStatusSelect?.value || 'active';
+      const sheetUrlVal = (container.querySelector('#manage-sheet-url') as HTMLInputElement | null)?.value.trim() || null;
 
       let add_days: number | undefined = undefined;
       let expires_at: string | undefined = undefined;
@@ -871,7 +889,8 @@ export function setupSuperAdminEvents(container: HTMLElement) {
         license_plan: selectedPlan,
         price_monthly: priceVal,
         license_status: statusVal,
-        is_active: statusVal !== 'suspended'
+        is_active: statusVal !== 'suspended',
+        google_sheet_url: sheetUrlVal
       });
 
       alert('🎉 ¡Licencia y vigencia actualizadas con éxito!');

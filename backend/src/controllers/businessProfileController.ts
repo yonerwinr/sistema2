@@ -58,8 +58,15 @@ export async function updateBusinessProfile(req: Request, res: Response) {
       email,
       address,
       ticket_message,
+      google_sheet_url,
       google_sheets_webhook_url
     } = req.body;
+
+    let sheetId: string | null = null;
+    if (google_sheet_url) {
+      const match = google_sheet_url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (match) sheetId = match[1];
+    }
 
     await pool.query(`
       UPDATE businesses 
@@ -72,7 +79,9 @@ export async function updateBusinessProfile(req: Request, res: Response) {
         email = COALESCE(?, email),
         address = COALESCE(?, address),
         ticket_message = COALESCE(?, ticket_message),
-        google_sheets_webhook_url = COALESCE(?, google_sheets_webhook_url)
+        google_sheet_url = ?,
+        google_sheet_id = COALESCE(?, google_sheet_id),
+        google_sheets_webhook_url = ?
       WHERE id = ?
     `, [
       name || null,
@@ -83,7 +92,9 @@ export async function updateBusinessProfile(req: Request, res: Response) {
       email || null,
       address || null,
       ticket_message || null,
-      google_sheets_webhook_url || null,
+      google_sheet_url !== undefined ? (google_sheet_url || null) : null,
+      sheetId,
+      google_sheets_webhook_url !== undefined ? (google_sheets_webhook_url || null) : null,
       businessId
     ]);
 
@@ -108,14 +119,18 @@ export async function autoProvisionSheet(req: Request, res: Response) {
     const business = rows[0];
     const sheetInfo = await provisionBusinessSheet(business.name, business.email);
 
-    await pool.query(`
-      UPDATE businesses 
-      SET google_sheet_id = ?, google_sheet_url = ? 
-      WHERE id = ?
-    `, [sheetInfo.sheetId, sheetInfo.sheetUrl, businessId]);
+    if (!sheetInfo.isSimulated && sheetInfo.sheetUrl) {
+      await pool.query(`
+        UPDATE businesses 
+        SET google_sheet_id = ?, google_sheet_url = ? 
+        WHERE id = ?
+      `, [sheetInfo.sheetId, sheetInfo.sheetUrl, businessId]);
+    }
 
     res.json({
-      message: 'Hoja de Google Sheets creada y vinculada con éxito.',
+      message: sheetInfo.isSimulated 
+        ? 'Crea tu hoja en Google Sheets con sheets.new y pega el enlace aquí.'
+        : 'Hoja de Google Sheets creada y vinculada con éxito.',
       sheetUrl: sheetInfo.sheetUrl,
       isSimulated: sheetInfo.isSimulated
     });

@@ -145,9 +145,11 @@ async function createBusiness(req, res) {
         else {
             finalExpiresAt.setDate(finalExpiresAt.getDate() + Number(license_days || 30));
         }
-        // Aprovisionar automáticamente Google Sheets para el nuevo comercio
+        // Aprovisionar automáticamente Google Sheets para el nuevo comercio si hay credenciales
         const targetEmail = admin_email || email || '';
         const sheetInfo = await (0, googleSheetsAuto_1.provisionBusinessSheet)(name, targetEmail);
+        const realSheetId = sheetInfo.isSimulated ? null : sheetInfo.sheetId;
+        const realSheetUrl = sheetInfo.isSimulated ? null : sheetInfo.sheetUrl;
         await conn.beginTransaction();
         // 1. Insertar Comercio
         const [busRes] = await conn.query(`
@@ -168,8 +170,8 @@ async function createBusiness(req, res) {
             license_plan,
             finalExpiresAt,
             price_monthly,
-            sheetInfo.sheetId,
-            sheetInfo.sheetUrl
+            realSheetId,
+            realSheetUrl
         ]);
         const newBusinessId = busRes.insertId;
         // 2. Crear usuario Administrador del nuevo comercio si se proporcionó credenciales
@@ -189,12 +191,14 @@ async function createBusiness(req, res) {
         }
         await conn.commit();
         res.status(201).json({
-            message: `Comercio "${name}" creado exitosamente.`,
+            message: sheetInfo.isSimulated
+                ? `Comercio "${name}" creado exitosamente con su plan y vencimiento.`
+                : `Comercio "${name}" y Google Sheet aprovisionados exitosamente.`,
             business: {
                 id: newBusinessId,
                 name,
                 slug: cleanSlug,
-                google_sheet_url: sheetInfo.sheetUrl
+                google_sheet_url: realSheetUrl
             }
         });
     }
@@ -213,7 +217,7 @@ async function createBusiness(req, res) {
 async function updateBusinessLicense(req, res) {
     try {
         const businessId = Number(req.params.id);
-        const { action, add_days, expires_at, license_status, license_plan, is_active, price_monthly } = req.body;
+        const { action, add_days, expires_at, license_status, license_plan, is_active, price_monthly, google_sheet_url } = req.body;
         const [rows] = await db_1.default.query('SELECT * FROM businesses WHERE id = ? LIMIT 1', [businessId]);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Comercio no encontrado.' });
@@ -251,6 +255,18 @@ async function updateBusinessLicense(req, res) {
                 newExpiresAt.setDate(newExpiresAt.getDate() + 30);
             }
         }
+        let sheetId = business.google_sheet_id;
+        let cleanSheetUrl = business.google_sheet_url;
+        if (google_sheet_url !== undefined) {
+            cleanSheetUrl = google_sheet_url ? google_sheet_url.trim() : null;
+            if (cleanSheetUrl) {
+                const match = cleanSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+                sheetId = match ? match[1] : null;
+            }
+            else {
+                sheetId = null;
+            }
+        }
         await db_1.default.query(`
       UPDATE businesses 
       SET 
@@ -258,7 +274,9 @@ async function updateBusinessLicense(req, res) {
         license_plan = COALESCE(?, license_plan),
         license_expires_at = ?,
         is_active = ?,
-        price_monthly = COALESCE(?, price_monthly)
+        price_monthly = COALESCE(?, price_monthly),
+        google_sheet_url = ?,
+        google_sheet_id = ?
       WHERE id = ?
     `, [
             newStatus,
@@ -266,14 +284,17 @@ async function updateBusinessLicense(req, res) {
             newExpiresAt,
             newIsActive,
             price_monthly || null,
+            cleanSheetUrl,
+            sheetId,
             businessId
         ]);
         res.json({
-            message: `Licencia de "${business.name}" actualizada con éxito.`,
+            message: `Licencia y datos de "${business.name}" actualizados con éxito.`,
             license: {
                 status: newStatus,
                 isActive: newIsActive === 1,
-                expiresAt: newExpiresAt
+                expiresAt: newExpiresAt,
+                google_sheet_url: cleanSheetUrl
             }
         });
     }

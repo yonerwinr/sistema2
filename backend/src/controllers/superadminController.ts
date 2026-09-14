@@ -164,9 +164,11 @@ export async function createBusiness(req: Request, res: Response) {
       finalExpiresAt.setDate(finalExpiresAt.getDate() + Number(license_days || 30));
     }
 
-    // Aprovisionar automáticamente Google Sheets para el nuevo comercio
+    // Aprovisionar automáticamente Google Sheets para el nuevo comercio si hay credenciales
     const targetEmail = admin_email || email || '';
     const sheetInfo = await provisionBusinessSheet(name, targetEmail);
+    const realSheetId = sheetInfo.isSimulated ? null : sheetInfo.sheetId;
+    const realSheetUrl = sheetInfo.isSimulated ? null : sheetInfo.sheetUrl;
 
     await conn.beginTransaction();
 
@@ -189,8 +191,8 @@ export async function createBusiness(req: Request, res: Response) {
       license_plan,
       finalExpiresAt,
       price_monthly,
-      sheetInfo.sheetId,
-      sheetInfo.sheetUrl
+      realSheetId,
+      realSheetUrl
     ]);
 
     const newBusinessId = busRes.insertId;
@@ -215,12 +217,14 @@ export async function createBusiness(req: Request, res: Response) {
     await conn.commit();
 
     res.status(201).json({
-      message: `Comercio "${name}" creado exitosamente.`,
+      message: sheetInfo.isSimulated
+        ? `Comercio "${name}" creado exitosamente con su plan y vencimiento.`
+        : `Comercio "${name}" y Google Sheet aprovisionados exitosamente.`,
       business: {
         id: newBusinessId,
         name,
         slug: cleanSlug,
-        google_sheet_url: sheetInfo.sheetUrl
+        google_sheet_url: realSheetUrl
       }
     });
   } catch (error: any) {
@@ -238,7 +242,7 @@ export async function createBusiness(req: Request, res: Response) {
 export async function updateBusinessLicense(req: Request, res: Response) {
   try {
     const businessId = Number(req.params.id);
-    const { action, add_days, expires_at, license_status, license_plan, is_active, price_monthly } = req.body;
+    const { action, add_days, expires_at, license_status, license_plan, is_active, price_monthly, google_sheet_url } = req.body;
 
     const [rows]: any = await pool.query('SELECT * FROM businesses WHERE id = ? LIMIT 1', [businessId]);
     if (rows.length === 0) {
@@ -281,6 +285,18 @@ export async function updateBusinessLicense(req: Request, res: Response) {
       }
     }
 
+    let sheetId = business.google_sheet_id;
+    let cleanSheetUrl = business.google_sheet_url;
+    if (google_sheet_url !== undefined) {
+      cleanSheetUrl = google_sheet_url ? google_sheet_url.trim() : null;
+      if (cleanSheetUrl) {
+        const match = cleanSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        sheetId = match ? match[1] : null;
+      } else {
+        sheetId = null;
+      }
+    }
+
     await pool.query(`
       UPDATE businesses 
       SET 
@@ -288,7 +304,9 @@ export async function updateBusinessLicense(req: Request, res: Response) {
         license_plan = COALESCE(?, license_plan),
         license_expires_at = ?,
         is_active = ?,
-        price_monthly = COALESCE(?, price_monthly)
+        price_monthly = COALESCE(?, price_monthly),
+        google_sheet_url = ?,
+        google_sheet_id = ?
       WHERE id = ?
     `, [
       newStatus,
@@ -296,15 +314,18 @@ export async function updateBusinessLicense(req: Request, res: Response) {
       newExpiresAt,
       newIsActive,
       price_monthly || null,
+      cleanSheetUrl,
+      sheetId,
       businessId
     ]);
 
     res.json({
-      message: `Licencia de "${business.name}" actualizada con éxito.`,
+      message: `Licencia y datos de "${business.name}" actualizados con éxito.`,
       license: {
         status: newStatus,
         isActive: newIsActive === 1,
-        expiresAt: newExpiresAt
+        expiresAt: newExpiresAt,
+        google_sheet_url: cleanSheetUrl
       }
     });
   } catch (error: any) {
