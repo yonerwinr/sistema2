@@ -294,9 +294,71 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
                 </div>
               </div>
 
-              <div class="form-group" style="margin: 0;">
-                <label class="form-label" for="prof-sheet-webhook" style="font-size: 12px;">Webhook de Sincronización Automática (Google Apps Script - Opcional)</label>
-                <input type="url" class="form-control" id="prof-sheet-webhook" value="${b.google_sheets_webhook_url || ''}" placeholder="https://script.google.com/macros/s/.../exec" style="font-size: 12px;">
+              <!-- Separador y Explicación del Webhook en Vivo -->
+              <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed rgba(16,185,129,0.25);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                  <label class="form-label" for="prof-sheet-webhook" style="font-size: 12px; font-weight: 700; margin: 0; color: #10b981; display: flex; align-items: center; gap: 6px;">
+                    <span>⚡</span> Sincronización en Tiempo Real (Google Apps Script):
+                  </label>
+                  <button type="button" id="btn-toggle-script-guide" class="btn btn-sm btn-secondary" style="font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px;">
+                    📖 ¿Cómo conectar en 3 pasos? (Ver Código)
+                  </button>
+                </div>
+
+                <p style="font-size: 11.5px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.4;">
+                  Google exige este conector seguro para que tus ventas se registren automáticamente en tu hoja de Google Sheets. Solo toma 1 minuto:
+                </p>
+
+                <!-- Panel colapsable con las instrucciones y el código listo -->
+                <div id="script-guide-box" style="display: none; background: rgba(0,0,0,0.35); border: 1px solid rgba(16,185,129,0.3); border-radius: 10px; padding: 14px; margin-bottom: 14px;">
+                  <div style="font-size: 12px; font-weight: 700; color: white; margin-bottom: 8px;">
+                    🚀 Pasos para activar el registro automático de ventas:
+                  </div>
+                  <ol style="font-size: 11.5px; color: var(--text-secondary); margin: 0 0 12px 18px; padding: 0; line-height: 1.6;">
+                    <li>Abre tu hoja de Google Sheets y ve al menú: <b>Extensiones ➔ Apps Script</b>.</li>
+                    <li>Borra el código que esté en pantalla y pega el script de abajo (pulsa <i>Copiar Código</i>).</li>
+                    <li>Haz clic en el botón azul superior: <b>Implementar ➔ Nueva implementación</b>.</li>
+                    <li>En el engranaje ⚙️ selecciona <b>Aplicación web</b>. En <i>"Quién tiene acceso"</i> pon <b>Cualquier usuario (Anyone)</b> y haz clic en <b>Implementar</b>.</li>
+                    <li>Copia la <b>URL de la aplicación web</b> que te da Google (termina en <code>/exec</code>), pégala en la casilla de abajo y pulsa <b>⚡ Probar Conexión</b>.</li>
+                  </ol>
+
+                  <div>
+                    <textarea id="apps-script-code" readonly style="width: 100%; height: 110px; font-family: monospace; font-size: 11px; background: #0f172a; color: #a7f3d0; border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; padding: 10px; resize: none;">function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var data = JSON.parse(e.postData.contents);
+    sheet.appendRow([
+      data.saleId || '',
+      data.date || '',
+      data.customerName || 'Cliente General',
+      data.customerCi || '',
+      data.customerPhone || '',
+      data.paymentMethod || '',
+      data.subtotal || '0.00',
+      data.discount || '0.00',
+      data.total || '0.00',
+      data.amountPaid || '0.00',
+      data.items || '',
+      data.sellerName || 'POS'
+    ]);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}</textarea>
+                    <button type="button" id="btn-copy-apps-script" class="btn btn-sm btn-primary" style="margin-top: 8px; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 6px;">
+                      📋 Copiar Código del Script
+                    </button>
+                  </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <input type="url" class="form-control" id="prof-sheet-webhook" value="${b.google_sheets_webhook_url || ''}" placeholder="https://script.google.com/macros/s/.../exec" style="font-size: 12px; font-family: monospace; height: 38px; min-width: 240px; flex-grow: 1;">
+                  
+                  <button type="button" class="btn btn-success btn-sm" id="btn-test-sheet-webhook" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 8px;" title="Enviar fila de prueba a tu hoja de Google Sheets">
+                    <span>⚡</span> Probar Conexión
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -554,6 +616,62 @@ export function setupBusinessProfileEvents(
       alert('📋 ¡Encabezados copiados!\n\nAbre tu hoja de Google Sheets, selecciona la celda A1 y presiona Ctrl+V para pegar todas las columnas ordenadas.');
     } catch (_) {
       alert('Encabezados: ID Venta | Fecha | Cliente | Cédula | Teléfono | Método de Pago | Subtotal | Descuento | Total | Monto Pagado | Productos | Vendedor');
+    }
+  });
+
+  // MOSTRAR / OCULTAR GUÍA DE GOOGLE APPS SCRIPT
+  const toggleGuideBtn = container.querySelector('#btn-toggle-script-guide') as HTMLButtonElement | null;
+  const guideBox = container.querySelector('#script-guide-box') as HTMLElement | null;
+  toggleGuideBtn?.addEventListener('click', () => {
+    if (guideBox) {
+      const isHidden = guideBox.style.display === 'none';
+      guideBox.style.display = isHidden ? 'block' : 'none';
+      toggleGuideBtn.textContent = isHidden ? '🔼 Ocultar Guía' : '📖 ¿Cómo conectar en 3 pasos? (Ver Código)';
+    }
+  });
+
+  // COPIAR CÓDIGO DE GOOGLE APPS SCRIPT
+  const copyScriptBtn = container.querySelector('#btn-copy-apps-script') as HTMLButtonElement | null;
+  const scriptTextarea = container.querySelector('#apps-script-code') as HTMLTextAreaElement | null;
+  copyScriptBtn?.addEventListener('click', async () => {
+    if (!scriptTextarea) return;
+    try {
+      await navigator.clipboard.writeText(scriptTextarea.value);
+      copyScriptBtn.textContent = '✅ ¡Código Copiado!';
+      copyScriptBtn.style.background = '#10b981';
+      setTimeout(() => {
+        copyScriptBtn.textContent = '📋 Copiar Código del Script';
+        copyScriptBtn.style.background = '';
+      }, 2500);
+      alert('📋 ¡Código copiado!\n\nPégalo en Extensiones ➔ Apps Script dentro de tu hoja de cálculo.');
+    } catch (_) {
+      scriptTextarea.select();
+      document.execCommand('copy');
+      alert('📋 ¡Código copiado!');
+    }
+  });
+
+  // PROBAR CONEXIÓN DEL WEBHOOK DE GOOGLE SHEETS
+  const testWebhookBtn = container.querySelector('#btn-test-sheet-webhook') as HTMLButtonElement | null;
+  testWebhookBtn?.addEventListener('click', async () => {
+    const webhookUrl = sheetWebhookInput?.value.trim();
+    if (!webhookUrl) {
+      alert('⚠️ Primero debes pegar la URL de la aplicación web (Webhook) en la casilla para poder probarla.');
+      sheetWebhookInput?.focus();
+      return;
+    }
+
+    testWebhookBtn.disabled = true;
+    testWebhookBtn.textContent = 'Enviando prueba... ⏳';
+
+    try {
+      const res = await api.business.testWebhook(webhookUrl);
+      alert(`🎉 ${res.message || '¡Prueba exitosa! Revisa tu Google Sheet, la fila de prueba fue agregada correctamente.'}`);
+    } catch (err: any) {
+      alert(`❌ Error al conectar con tu Webhook:\n\n${err.message || 'Error desconocido'}\n\nAsegúrate de que en Apps Script pusiste "Quién tiene acceso: Cualquier usuario (Anyone)" al implementar.`);
+    } finally {
+      testWebhookBtn.disabled = false;
+      testWebhookBtn.innerHTML = '<span>⚡</span> Probar Conexión';
     }
   });
 

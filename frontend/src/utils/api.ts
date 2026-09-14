@@ -685,6 +685,10 @@ export const api = {
     autoProvisionSheet: () => request<{ message: string; sheetUrl: string; isSimulated: boolean }>('/business/google-sheet', {
       method: 'POST',
     }),
+    testWebhook: (webhook_url: string) => request<{ message: string }>('/business/test-webhook', {
+      method: 'POST',
+      body: JSON.stringify({ webhook_url }),
+    }),
     getPublicProfile: (slug: string) => request<{ business: BusinessProfile }>(`/business/public/${slug}`),
     getBySlug: async (slug: string): Promise<BusinessProfile> => {
       const res = await api.business.getPublicProfile(slug);

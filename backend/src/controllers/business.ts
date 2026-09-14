@@ -6,7 +6,8 @@ import {
   getBusinessProfile,
   updateBusinessProfile,
   autoProvisionSheet,
-  uploadBusinessLogo
+  uploadBusinessLogo,
+  testSheetsWebhook
 } from './businessProfileController';
 import pool from '../config/db';
 
@@ -72,6 +73,9 @@ router.post('/upload-logo', authenticate as any, isAdmin as any, uploadLogo.sing
 
 // Aprovisionar automáticamente Google Sheets para el comercio
 router.post('/google-sheet', authenticate as any, isAdmin as any, autoProvisionSheet);
+
+// Probar conexión con el Webhook de Google Sheets
+router.post('/test-webhook', authenticate as any, isAdmin as any, testSheetsWebhook);
 
 export default router;
 

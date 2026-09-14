@@ -7,6 +7,7 @@ exports.getBusinessProfile = getBusinessProfile;
 exports.updateBusinessProfile = updateBusinessProfile;
 exports.autoProvisionSheet = autoProvisionSheet;
 exports.uploadBusinessLogo = uploadBusinessLogo;
+exports.testSheetsWebhook = testSheetsWebhook;
 const db_1 = __importDefault(require("../config/db"));
 const googleSheetsAuto_1 = require("../services/googleSheetsAuto");
 /**
@@ -145,5 +146,46 @@ async function uploadBusinessLogo(req, res) {
     catch (error) {
         console.error('[BUSINESS PROFILE] Error subiendo logotipo:', error);
         res.status(500).json({ error: error.message || 'Error al procesar la imagen.' });
+    }
+}
+/**
+ * Envía una fila de prueba al Webhook de Google Apps Script para verificar la conexión
+ */
+async function testSheetsWebhook(req, res) {
+    try {
+        const { webhook_url } = req.body;
+        if (!webhook_url || !webhook_url.startsWith('http')) {
+            return res.status(400).json({ error: 'Debes proporcionar una URL válida de Webhook de Google Apps Script (ej. https://script.google.com/macros/s/.../exec).' });
+        }
+        const testPayload = {
+            saleId: 'PRUEBA-001',
+            date: new Date().toLocaleString('es-ES'),
+            customerName: 'Cliente Demo (Prueba Facilito)',
+            customerCi: 'V-00000000',
+            customerPhone: '+58 412 0000000',
+            paymentMethod: 'Prueba de Conexión',
+            subtotal: '10.00',
+            discount: '0.00',
+            total: '10.00',
+            amountPaid: '10.00',
+            items: 'Producto de Prueba x1',
+            sellerName: 'FacilitoApp'
+        };
+        const response = await fetch(webhook_url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(testPayload)
+        });
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            return res.status(400).json({ error: `Google Apps Script respondió con error (${response.status}): ${errText}` });
+        }
+        res.json({
+            message: '¡Prueba enviada con éxito! Revisa tu hoja de Google Sheets, deberías ver la fila agregada.'
+        });
+    }
+    catch (error) {
+        console.error('[BUSINESS PROFILE] Error probando webhook de Sheets:', error);
+        res.status(500).json({ error: `No se pudo conectar con el Webhook: ${error.message}` });
     }
 }

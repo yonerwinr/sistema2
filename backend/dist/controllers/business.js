@@ -63,4 +63,6 @@ router.put('/profile', auth_1.authenticate, auth_1.isAdmin, businessProfileContr
 router.post('/upload-logo', auth_1.authenticate, auth_1.isAdmin, uploadLogo.single('logo'), businessProfileController_1.uploadBusinessLogo);
 // Aprovisionar automáticamente Google Sheets para el comercio
 router.post('/google-sheet', auth_1.authenticate, auth_1.isAdmin, businessProfileController_1.autoProvisionSheet);
+// Probar conexión con el Webhook de Google Sheets
+router.post('/test-webhook', auth_1.authenticate, auth_1.isAdmin, businessProfileController_1.testSheetsWebhook);
 exports.default = router;
