@@ -13,7 +13,7 @@ const audit_1 = require("../services/audit");
 const validation_1 = require("../utils/validation");
 const router = (0, express_1.Router)();
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secreta_pos_online_token_key_987654321';
-// Registro de Usuario (Clientes)
+// Registro de Usuario (Clientes) con Validación por Correo y WhatsApp
 router.post('/register', async (req, res) => {
     const { name, email, password, phone, ci } = req.body;
     if (!name || !email || !password || !ci) {
@@ -25,9 +25,32 @@ router.post('/register', async (req, res) => {
     }
     try {
         // Verificar si el usuario ya existe por correo
-        const [existing] = await db_1.default.query('SELECT id FROM users WHERE email = ?', [email]);
+        const [existing] = await db_1.default.query('SELECT id, email_verified FROM users WHERE email = ?', [email]);
         if (existing.length > 0) {
-            return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
+            // Si el usuario existe pero no se ha verificado nunca, permitimos regenerar código y continuar
+            if (existing[0].email_verified === 0) {
+                const code = Math.floor(100000 + Math.random() * 900000).toString();
+                const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+                await db_1.default.query('UPDATE users SET verification_code = ?, verification_expires_at = ? WHERE id = ?', [code, expiresAt, existing[0].id]);
+                let previewUrl = '';
+                try {
+                    previewUrl = await (0, email_1.sendRegistrationVerificationEmail)(email, name, code);
+                }
+                catch (emailErr) {
+                    console.warn('No se pudo enviar correo de verificación:', emailErr);
+                }
+                const [bRows] = await db_1.default.query('SELECT phone FROM businesses WHERE id = 1 LIMIT 1');
+                const supportPhone = bRows.length > 0 && bRows[0].phone ? bRows[0].phone.replace(/[^0-9]/g, '') : '';
+                return res.status(200).json({
+                    requiresVerification: true,
+                    email,
+                    phone: phone || null,
+                    supportPhone,
+                    message: 'Tu cuenta ya estaba en proceso de registro. Hemos enviado un nuevo código de activación a tu correo.',
+                    previewUrl: previewUrl !== 'Email enviado' ? previewUrl : undefined
+                });
+            }
+            return res.status(400).json({ message: 'El correo electrónico ya está registrado y activo. Por favor inicia sesión.' });
         }
         // Verificar si la cédula ya existe
         const [existingCI] = await db_1.default.query('SELECT id FROM users WHERE ci = ?', [ci]);
@@ -37,19 +60,117 @@ router.post('/register', async (req, res) => {
         // Encriptar contraseña
         const salt = await bcryptjs_1.default.genSalt(10);
         const hashedPassword = await bcryptjs_1.default.hash(password, salt);
-        // Insertar usuario
-        const [result] = await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, ?, ?, ?, ?)', [name, email, hashedPassword, 'customer', phone || null, ci]);
-        const userId = result.insertId;
-        // Generar token JWT
-        const token = jsonwebtoken_1.default.sign({ id: userId, email, role: 'customer', name }, JWT_SECRET, { expiresIn: '8h' });
+        // Generar código de verificación de 6 dígitos
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+        // Insertar usuario con estado pendiente de verificación
+        await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci, email_verified, phone_verified, verification_code, verification_expires_at) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)', [name, email, hashedPassword, 'customer', phone || null, ci, verificationCode, expiresAt]);
+        // Enviar correo de validación
+        let previewUrl = '';
+        try {
+            previewUrl = await (0, email_1.sendRegistrationVerificationEmail)(email, name, verificationCode);
+        }
+        catch (emailErr) {
+            console.warn('Error enviando correo de verificación de registro:', emailErr);
+        }
+        // Obtener teléfono de soporte para WhatsApp gratis
+        const [bRows] = await db_1.default.query('SELECT phone FROM businesses WHERE id = 1 LIMIT 1');
+        const supportPhone = bRows.length > 0 && bRows[0].phone ? bRows[0].phone.replace(/[^0-9]/g, '') : '';
         res.status(201).json({
-            token,
-            user: { id: userId, name, email, role: 'customer', phone, ci }
+            requiresVerification: true,
+            email,
+            phone: phone || null,
+            supportPhone,
+            message: '¡Registro casi listo! Te hemos enviado un código de 6 dígitos a tu correo electrónico para verificar tu cuenta.',
+            previewUrl: previewUrl !== 'Email enviado' ? previewUrl : undefined
         });
     }
     catch (error) {
         console.error('Error en registro:', error);
         res.status(500).json({ message: 'Error interno del servidor en el registro' });
+    }
+});
+// Verificar código de activación (Correo o WhatsApp)
+router.post('/verify-code', async (req, res) => {
+    const { email, code } = req.body;
+    if (!email || !code) {
+        return res.status(400).json({ message: 'El correo y el código de verificación son obligatorios' });
+    }
+    try {
+        const [users] = await db_1.default.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        const user = users[0];
+        // Si ya está verificado
+        if (user.email_verified === 1) {
+            const token = jsonwebtoken_1.default.sign({ id: user.id, email: user.email, role: user.role, name: user.name, business_id: user.business_id || 1 }, JWT_SECRET, { expiresIn: '8h' });
+            return res.json({
+                message: 'Tu cuenta ya se encuentra verificada.',
+                token,
+                user: { id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone, ci: user.ci }
+            });
+        }
+        // Verificar código
+        if (!user.verification_code || user.verification_code.trim() !== code.toString().trim()) {
+            return res.status(400).json({ message: 'El código de verificación es incorrecto' });
+        }
+        // Verificar expiración
+        if (!user.verification_expires_at || new Date(user.verification_expires_at) < new Date()) {
+            return res.status(400).json({ message: 'El código de verificación ha expirado. Por favor solicita uno nuevo.' });
+        }
+        // Marcar como verificado y limpiar código
+        await db_1.default.query('UPDATE users SET email_verified = 1, phone_verified = 1, verification_code = NULL, verification_expires_at = NULL WHERE id = ?', [user.id]);
+        // Generar token JWT
+        const token = jsonwebtoken_1.default.sign({ id: user.id, email: user.email, role: user.role, name: user.name, business_id: user.business_id || 1 }, JWT_SECRET, { expiresIn: '8h' });
+        res.json({
+            message: '¡Cuenta verificada exitosamente! Bienvenido a FacilitoApp.',
+            token,
+            user: { id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone, ci: user.ci }
+        });
+    }
+    catch (error) {
+        console.error('Error en /verify-code:', error);
+        res.status(500).json({ message: 'Error interno al verificar el código' });
+    }
+});
+// Reenviar código de verificación
+router.post('/resend-verification', async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ message: 'El correo electrónico es obligatorio' });
+    }
+    try {
+        const [users] = await db_1.default.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'No existe una cuenta registrada con este correo' });
+        }
+        const user = users[0];
+        if (user.email_verified === 1) {
+            return res.status(400).json({ message: 'Tu cuenta ya está verificada. Puedes iniciar sesión directamente.' });
+        }
+        // Generar nuevo código
+        const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+        await db_1.default.query('UPDATE users SET verification_code = ?, verification_expires_at = ? WHERE id = ?', [newCode, expiresAt, user.id]);
+        let previewUrl = '';
+        try {
+            previewUrl = await (0, email_1.sendRegistrationVerificationEmail)(user.email, user.name, newCode);
+        }
+        catch (err) {
+            console.warn('Error reenviando código:', err);
+        }
+        const [bRows] = await db_1.default.query('SELECT phone FROM businesses WHERE id = 1 LIMIT 1');
+        const supportPhone = bRows.length > 0 && bRows[0].phone ? bRows[0].phone.replace(/[^0-9]/g, '') : '';
+        res.json({
+            message: 'Hemos enviado un nuevo código de 6 dígitos a tu correo electrónico.',
+            supportPhone,
+            previewUrl: previewUrl !== 'Email enviado' ? previewUrl : undefined
+        });
+    }
+    catch (error) {
+        console.error('Error en /resend-verification:', error);
+        res.status(500).json({ message: 'Error interno al reenviar el código' });
     }
 });
 // Inicio de Sesion (General y Administradores)
@@ -69,6 +190,25 @@ router.post('/login', async (req, res) => {
         const isMatch = await bcryptjs_1.default.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ message: 'Credenciales invalidas' });
+        }
+        // Si es un cliente y aún no ha verificado su cuenta, requerir validación
+        if (user.role === 'customer' && user.email_verified === 0) {
+            // Regenerar código si es necesario
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+            const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+            await db_1.default.query('UPDATE users SET verification_code = ?, verification_expires_at = ? WHERE id = ?', [code, expiresAt, user.id]);
+            try {
+                await (0, email_1.sendRegistrationVerificationEmail)(user.email, user.name, code);
+            }
+            catch (e) {
+                console.warn('Error reenviando código en login:', e);
+            }
+            return res.status(403).json({
+                requiresVerification: true,
+                email: user.email,
+                phone: user.phone,
+                message: 'Tu cuenta requiere verificación. Hemos enviado un código de 6 dígitos a tu correo electrónico.'
+            });
         }
         // Obtener información del negocio asociado
         let businessInfo = null;
@@ -139,11 +279,15 @@ router.post('/google', async (req, res) => {
         let user;
         if (users.length > 0) {
             user = users[0];
+            if (user.email_verified === 0) {
+                await db_1.default.query('UPDATE users SET email_verified = 1 WHERE id = ?', [user.id]);
+                user.email_verified = 1;
+            }
         }
         else {
-            // Registrar un nuevo cliente desde Google
+            // Registrar un nuevo cliente desde Google (correo verificado automáticamente por Google)
             const userName = name || email.split('@')[0];
-            const [result] = await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci) VALUES (?, ?, NULL, ?, NULL, NULL)', [userName, email, 'customer']);
+            const [result] = await db_1.default.query('INSERT INTO users (name, email, password, role, phone, ci, email_verified) VALUES (?, ?, NULL, ?, NULL, NULL, 1)', [userName, email, 'customer']);
             const userId = result.insertId;
             const [newUsers] = await db_1.default.query('SELECT * FROM users WHERE id = ?', [userId]);
             user = newUsers[0];

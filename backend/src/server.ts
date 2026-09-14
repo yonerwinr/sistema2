@@ -163,6 +163,16 @@ async function runMigrations() {
           console.error('Error al agregar columna "permissions":', err.message);
         }
       }
+      if (!userColNames.includes('email_verified')) {
+        try {
+          await conn.query('ALTER TABLE users ADD COLUMN email_verified TINYINT(1) DEFAULT 0, ADD COLUMN phone_verified TINYINT(1) DEFAULT 0, ADD COLUMN verification_code VARCHAR(10) NULL, ADD COLUMN verification_expires_at DATETIME NULL');
+          // Actualizar usuarios existentes para que no queden bloqueados
+          await conn.query('UPDATE users SET email_verified = 1 WHERE email_verified IS NULL OR email_verified = 0');
+          console.log('Columnas "email_verified", "phone_verified", "verification_code" agregadas y usuarios existentes verificados.');
+        } catch (err: any) {
+          console.error('Error al agregar columnas de verificación a users:', err.message);
+        }
+      }
     } catch (err: any) {
       console.error('Error al inspeccionar columnas de la tabla users:', err.message);
     }

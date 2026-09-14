@@ -330,9 +330,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-    register: (body: any) => request<{ token: string; user: User }>('/auth/register', {
+    register: (body: any) => request<{ requiresVerification?: boolean; token?: string; user?: User; email?: string; phone?: string; supportPhone?: string; message?: string; previewUrl?: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+    verifyCode: (email: string, code: string) => request<{ message: string; token: string; user: User }>('/auth/verify-code', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    }),
+    resendVerification: (email: string) => request<{ message: string; supportPhone?: string; previewUrl?: string }>('/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
     }),
     loginGoogle: (credential: string) => request<{ token: string; user: User }>('/auth/google', {
       method: 'POST',

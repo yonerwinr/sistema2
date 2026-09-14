@@ -2910,11 +2910,22 @@ function bindSuccessEvents() {
 // ==========================================================================
 // VISTA: LOGIN / REGISTRO
 // ==========================================================================
-let activeAuthTab: 'login' | 'register' | 'forgot' = 'login';
+let activeAuthTab: 'login' | 'register' | 'forgot' | 'verify' = 'login';
 let forgotStep: 'email' | 'code' = 'email';
 let resetTargetEmail = '';
 let resetPreviewUrl = '';
+let verifyTargetEmail = '';
+let verifyTargetPhone = '';
+let verifySupportPhone = '';
+let verifyPreviewUrl = '';
 let cachedGoogleClientId: string | null = null;
+
+function getWhatsAppVerifyLink(): string {
+  const phone = (verifySupportPhone || verifyTargetPhone || '').replace(/[^0-9]/g, '');
+  const target = phone.length >= 10 ? phone : '584120000000';
+  const text = `¡Hola! Acabo de registrarme en FacilitoApp con el correo ${verifyTargetEmail}. Solicito confirmar la activación de mi cuenta.`;
+  return `https://wa.me/${target}?text=${encodeURIComponent(text)}`;
+}
 
 function renderAuthView(): string {
   const authNotice = sessionStorage.getItem('auth_notice');
@@ -2938,10 +2949,12 @@ function renderAuthView(): string {
             ⚠️ ${authNotice}
           </div>
         ` : ''}
-        <div class="auth-tabs">
-          <button class="auth-tab-btn ${activeAuthTab === 'login' ? 'active' : ''}" id="tab-login-btn">Iniciar Sesion</button>
-          <button class="auth-tab-btn ${activeAuthTab === 'register' ? 'active' : ''}" id="tab-register-btn">Registrarse</button>
-        </div>
+        ${(activeAuthTab === 'login' || activeAuthTab === 'register') ? `
+          <div class="auth-tabs">
+            <button class="auth-tab-btn ${activeAuthTab === 'login' ? 'active' : ''}" id="tab-login-btn">Iniciar Sesion</button>
+            <button class="auth-tab-btn ${activeAuthTab === 'register' ? 'active' : ''}" id="tab-register-btn">Registrarse</button>
+          </div>
+        ` : ''}
 
         ${activeAuthTab === 'login' ? `
           <form id="login-form">
@@ -2993,13 +3006,52 @@ function renderAuthView(): string {
                   <span id="icon-toggle-reg-pass">👁️</span>
                 </button>
               </div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 5px; display: flex; align-items: center; gap: 4px;">
+                <span>🔒</span><span>No olvides tu contraseña para ingresar con tu correo luego.</span>
+              </div>
             </div>
             <div class="form-group">
-              <label class="form-label" for="reg-phone">WhatsApp / Telefono</label>
-              <input type="tel" class="form-control" id="reg-phone" placeholder="Ej. +584125374589">
+              <label class="form-label" for="reg-phone">WhatsApp / Teléfono</label>
+              <input type="tel" class="form-control" id="reg-phone" placeholder="Ej. 04125374589">
             </div>
             <button type="submit" class="btn btn-primary w-100 mt-4" id="reg-submit-btn">Crear Cuenta</button>
           </form>
+        ` : activeAuthTab === 'verify' ? `
+          <div style="margin-top: 10px;">
+            <h3 style="font-size: 17px; font-weight: 700; margin-bottom: 6px; text-align: center;">¡Valida tu Cuenta! 📬</h3>
+            <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.4; text-align: center;">
+              Te enviamos un código de activación de 6 dígitos a:<br>
+              <strong style="color: var(--primary); font-size: 13px;">${verifyTargetEmail}</strong>
+            </p>
+
+            <form id="verify-code-form">
+              <div class="form-group mb-3">
+                <label class="form-label" for="verify-code-input" style="text-align: center; display: block;">Código de 6 dígitos</label>
+                <input type="text" class="form-control" id="verify-code-input" required placeholder="123456" maxlength="6" pattern="\\d{6}" title="Ingrese el código de 6 dígitos" style="font-size: 22px; font-weight: 800; letter-spacing: 8px; text-align: center; color: var(--primary);">
+              </div>
+              <button type="submit" class="btn btn-primary w-100 mb-2" id="btn-submit-verify">Confirmar y Entrar</button>
+            </form>
+
+            <div style="margin-top: 14px; text-align: center;">
+              <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">¿Deseas validar vía WhatsApp? (100% Gratis)</div>
+              <a href="${getWhatsAppVerifyLink()}" target="_blank" class="btn btn-whatsapp w-100" id="btn-whatsapp-verify">
+                <span>📲</span> Validar por WhatsApp
+              </a>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 12px;">
+              <a href="#" id="link-resend-verify" style="color: var(--primary); font-weight: 600; text-decoration: none;">🔄 Reenviar código</a>
+              <a href="#" id="link-back-login-from-verify" style="color: var(--text-muted); text-decoration: none;">⬅ Volver al Login</a>
+            </div>
+
+            ${verifyPreviewUrl ? `
+              <div style="margin-top: 12px; text-align: center;">
+                <a href="${verifyPreviewUrl}" target="_blank" class="btn btn-secondary w-100" style="font-size: 11px; display: inline-block;">
+                  🔍 Ver correo en Ethereal Mail
+                </a>
+              </div>
+            ` : ''}
+          </div>
         ` : `
           <div style="margin-top: 10px;">
             <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 8px;">Recuperar Contraseña 🔐</h3>
@@ -3046,15 +3098,17 @@ function renderAuthView(): string {
           </div>
         `}
 
-        <div style="margin: 20px 0; text-align: center; color: var(--text-muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-          <span style="flex-grow: 1; height: 1px; background: var(--border-glass);"></span>
-          <span>O continuar con</span>
-          <span style="flex-grow: 1; height: 1px; background: var(--border-glass);"></span>
-        </div>
+        ${(activeAuthTab === 'login' || activeAuthTab === 'register') ? `
+          <div style="margin: 20px 0; text-align: center; color: var(--text-muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span style="flex-grow: 1; height: 1px; background: var(--border-glass);"></span>
+            <span>${activeAuthTab === 'login' ? 'O continuar con' : 'O regístrate con'}</span>
+            <span style="flex-grow: 1; height: 1px; background: var(--border-glass);"></span>
+          </div>
 
-        <div style="display: flex; justify-content: center; margin-top: 10px;">
-          <div id="google-signin-btn"></div>
-        </div>
+          <div style="display: flex; justify-content: center; margin-top: 10px;">
+            <div id="google-signin-btn"></div>
+          </div>
+        ` : ''}
       </div>
     </div>
   `;
@@ -3139,6 +3193,12 @@ function bindAuthEvents() {
     renderApp();
   });
 
+  document.getElementById('link-back-login-from-verify')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    activeAuthTab = 'login';
+    renderApp();
+  });
+
   // Evento Solicitar Código de Recuperación
   document.getElementById('forgot-email-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -3188,7 +3248,7 @@ function bindAuthEvents() {
   // Evento Login
   document.getElementById('login-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = (document.getElementById('login-email') as HTMLInputElement).value;
+    const email = (document.getElementById('login-email') as HTMLInputElement).value.trim();
     const password = (document.getElementById('login-password') as HTMLInputElement).value;
 
     const btn = document.getElementById('login-submit-btn') as HTMLButtonElement;
@@ -3211,6 +3271,15 @@ function bindAuthEvents() {
       }
     } catch (error: any) {
       currentMonkeyController?.resetFace();
+      if (error.requiresVerification || (error.message && error.message.includes('verificación'))) {
+        verifyTargetEmail = email;
+        verifyTargetPhone = error.phone || '';
+        verifySupportPhone = error.supportPhone || '';
+        activeAuthTab = 'verify';
+        alert(error.message || 'Tu cuenta requiere validación. Hemos enviado un código a tu correo.');
+        renderApp();
+        return;
+      }
       alert(error.message || 'Error en el inicio de sesion');
       btn.disabled = false;
       btn.innerText = 'Ingresar';
@@ -3220,12 +3289,12 @@ function bindAuthEvents() {
   // Evento Registro
   document.getElementById('register-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = (document.getElementById('reg-name') as HTMLInputElement).value;
+    const name = (document.getElementById('reg-name') as HTMLInputElement).value.trim();
     const ciPrefix = (document.getElementById('reg-ci-prefix') as HTMLSelectElement).value;
     const ciNum = (document.getElementById('reg-ci-num') as HTMLInputElement).value.trim();
-    const email = (document.getElementById('reg-email') as HTMLInputElement).value;
+    const email = (document.getElementById('reg-email') as HTMLInputElement).value.trim();
     const password = (document.getElementById('reg-password') as HTMLInputElement).value;
-    const phone = (document.getElementById('reg-phone') as HTMLInputElement).value;
+    const phone = (document.getElementById('reg-phone') as HTMLInputElement).value.trim();
 
     const validation = validateFrontendCi(ciPrefix, ciNum);
     if (!validation.isValid) {
@@ -3241,8 +3310,20 @@ function bindAuthEvents() {
 
     try {
       const res = await api.auth.register({ name, email, password, phone, ci });
-      establishUserSession(res.token, res.user);
-      navigate('store');
+      if (res.requiresVerification) {
+        verifyTargetEmail = res.email || email;
+        verifyTargetPhone = res.phone || phone || '';
+        verifySupportPhone = res.supportPhone || '';
+        verifyPreviewUrl = res.previewUrl || '';
+        activeAuthTab = 'verify';
+        alert(res.message || '¡Registro casi listo! Ingresa el código de 6 dígitos que enviamos a tu correo.');
+        renderApp();
+        return;
+      }
+      if (res.token && res.user) {
+        establishUserSession(res.token, res.user);
+        navigate('store');
+      }
     } catch (error: any) {
       alert(error.message || 'Error en el registro');
       btn.disabled = false;
@@ -3250,8 +3331,53 @@ function bindAuthEvents() {
     }
   });
 
+  // Evento Confirmar Código de Verificación
+  document.getElementById('verify-code-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const code = (document.getElementById('verify-code-input') as HTMLInputElement).value.trim();
+    const btn = document.getElementById('btn-submit-verify') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.innerText = 'Verificando...';
+
+    try {
+      const res = await api.auth.verifyCode(verifyTargetEmail, code);
+      currentMonkeyController?.celebrate();
+      alert(res.message);
+      establishUserSession(res.token, res.user);
+      navigate('store');
+    } catch (error: any) {
+      alert(error.message || 'Código de verificación incorrecto o expirado');
+      btn.disabled = false;
+      btn.innerText = 'Confirmar y Entrar';
+    }
+  });
+
+  // Evento Reenviar Código de Verificación
+  document.getElementById('link-resend-verify')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const link = document.getElementById('link-resend-verify') as HTMLElement;
+    link.innerText = 'Reenviando...';
+    try {
+      const res = await api.auth.resendVerification(verifyTargetEmail);
+      verifyPreviewUrl = res.previewUrl || '';
+      alert(res.message);
+      link.innerText = '✅ Código reenviado';
+      setTimeout(() => {
+        if (link) link.innerText = '🔄 Reenviar código';
+      }, 5000);
+      if (res.previewUrl) {
+        renderApp();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error al reenviar código');
+      link.innerText = '🔄 Reenviar código';
+    }
+  });
+
   // Integración de Google Sign-In (Login y Registro)
   const initGoogleBtn = async () => {
+    if (activeAuthTab !== 'login' && activeAuthTab !== 'register') return;
+
     const google = (window as any).google;
     if (google) {
       if (!cachedGoogleClientId) {

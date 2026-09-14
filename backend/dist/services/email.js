@@ -7,6 +7,7 @@ exports.getTransporter = getTransporter;
 exports.sendInvoiceEmail = sendInvoiceEmail;
 exports.sendPlainEmail = sendPlainEmail;
 exports.sendPasswordResetEmail = sendPasswordResetEmail;
+exports.sendRegistrationVerificationEmail = sendRegistrationVerificationEmail;
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
@@ -626,6 +627,65 @@ async function sendPasswordResetEmail(toEmail, userName, code) {
     }
     catch (error) {
         console.error('Error enviando correo de recuperación:', error);
+        throw error;
+    }
+}
+async function sendRegistrationVerificationEmail(toEmail, userName, code) {
+    try {
+        const client = await getTransporter();
+        const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@facilitoapp.com';
+        const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 0; }
+          .container { max-width: 500px; margin: 40px auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #edf2f7; box-shadow: 0 10px 15px rgba(0,0,0,0.05); }
+          .header { background: linear-gradient(135deg, #ff7a00 0%, #8b5cf6 100%); padding: 28px; text-align: center; color: #ffffff; }
+          .content { padding: 32px; text-align: center; }
+          .code-box { display: inline-block; background: #f1f5f9; padding: 16px 32px; border-radius: 12px; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #ff7a00; border: 2px dashed #ff7a00; margin: 20px 0; }
+          .badge { display: inline-block; background: #e0f2fe; color: #0284c7; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+          .footer { background: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #a0aec0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1 style="margin:0; font-size:24px;">¡Bienvenido a FacilitoApp! 🐒</h1>
+            <p style="margin:6px 0 0 0; opacity:0.95; font-size:13px;">Confirma tu cuenta para comenzar a vender y comprar</p>
+          </div>
+          <div class="content">
+            <div class="badge">Validación de Registro</div>
+            <h3 style="color:#1e293b; margin-top:0;">Hola, ${userName} 👋</h3>
+            <p style="color:#475569; font-size:14px; line-height:1.5;">Gracias por unirte. Tu código de activación de 6 dígitos es:</p>
+            <div class="code-box">${code}</div>
+            <p style="color:#64748b; font-size:12px;">Ingresa este código en la pantalla de registro para verificar tu cuenta. Es válido por <strong>15 minutos</strong>.</p>
+            <p style="color:#94a3b8; font-size:11px; margin-top:20px;">Si no solicitaste este registro, puedes ignorar este mensaje con tranquilidad.</p>
+          </div>
+          <div class="footer">
+            <p>FacilitoApp 🐒 - La plataforma rápida y moderna para tus ventas y compras.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+        const info = await client.sendMail({
+            from: `"FacilitoApp 🐒" <${fromAddress}>`,
+            to: toEmail,
+            subject: `Código de activación: ${code} - FacilitoApp 🐒`,
+            text: `¡Hola ${userName}! Tu código para activar tu cuenta en FacilitoApp es: ${code}. Válido por 15 minutos.`,
+            html: htmlContent
+        });
+        const testUrl = nodemailer_1.default.getTestMessageUrl(info);
+        if (testUrl) {
+            console.log(`[VERIFY CODE SENT] Código ${code} enviado a ${toEmail} - Preview: ${testUrl}`);
+            return testUrl;
+        }
+        return 'Email enviado';
+    }
+    catch (error) {
+        console.error('Error enviando correo de verificación de registro:', error);
         throw error;
     }
 }
