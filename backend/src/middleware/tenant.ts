@@ -39,7 +39,7 @@ export async function tenantMiddleware(req: Request, res: Response, next: NextFu
     const slugParam = req.params.businessSlug;
     const targetSlug = (slugHeader || slugQuery || slugParam || '').trim().toLowerCase();
 
-    let query = 'SELECT * FROM businesses WHERE is_active = 1 AND ';
+    let query = 'SELECT * FROM businesses WHERE ';
     let params: any[] = [];
 
     if (targetSlug && targetSlug !== 'undefined' && targetSlug !== 'null') {
@@ -60,7 +60,7 @@ export async function tenantMiddleware(req: Request, res: Response, next: NextFu
       if (targetSlug) {
         return res.status(404).json({
           error: 'Comercio no encontrado',
-          message: `El negocio con identificador "${targetSlug}" no existe o ha sido dado de baja.`
+          message: `El negocio con identificador "${targetSlug}" no existe.`
         });
       }
       // Fallback al primer negocio existente

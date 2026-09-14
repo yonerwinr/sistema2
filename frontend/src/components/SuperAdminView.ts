@@ -479,15 +479,15 @@ export function renderSuperAdminHtml(
             <div class="form-group" style="margin-bottom: 14px;">
               <label class="form-label" for="manage-add-option">Período a Extender o Asignar *</label>
               <select class="form-control" id="manage-add-option">
+                <option value="keep_date" selected>Mantener fecha actual (Solo cambiar estado/plan/tarifa)</option>
                 <option value="30">+30 Días (1 Mes)</option>
                 <option value="90">+90 Días (3 Meses)</option>
                 <option value="180">+180 Días (6 Meses)</option>
                 <option value="365">+1 Año (365 Días)</option>
-                <option value="730" selected>+2 Años (730 Días)</option>
+                <option value="730">+2 Años (730 Días)</option>
                 <option value="1095">+3 Años (1095 Días)</option>
                 <option value="custom_days">Cantidad de días específica</option>
                 <option value="exact_date">Fecha fija de vencimiento</option>
-                <option value="keep_date">Mantener fecha actual (Solo cambiar plan/tarifa/estado)</option>
               </select>
             </div>
 
@@ -838,12 +838,44 @@ export function setupSuperAdminEvents(container: HTMLElement) {
       if (managePlanSelect) managePlanSelect.value = plan;
       if (managePriceInput) managePriceInput.value = price;
       if (manageStatusSelect) manageStatusSelect.value = status === 'suspended' ? 'suspended' : (status === 'trial' ? 'trial' : 'active');
+      if (manageAddOptionSelect) {
+        manageAddOptionSelect.value = 'keep_date';
+        manageAddOptionSelect.dispatchEvent(new Event('change'));
+      }
 
       const sheetUrl = btn.getAttribute('data-sheet-url') || '';
       const manageSheetUrlInput = container.querySelector('#manage-sheet-url') as HTMLInputElement | null;
       if (manageSheetUrlInput) manageSheetUrlInput.value = sheetUrl;
 
       if (manageModalOverlay) (manageModalOverlay as HTMLElement).style.display = 'flex';
+    });
+  });
+
+  // Botones de acción rápida: Pausar/Suspender (Kill-switch) o Reactivar directamente en la tabla
+  container.querySelectorAll('.btn-toggle-status').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = Number(btn.getAttribute('data-id'));
+      const action = btn.getAttribute('data-action') as 'suspend' | 'activate';
+      if (!id || !action) return;
+
+      const isSuspending = action === 'suspend';
+      const confirmMsg = isSuspending
+        ? '¿Estás seguro de que deseas pausar/suspender la licencia de este comercio? No podrá operar en el sistema hasta que sea reactivada.'
+        : '¿Deseas reactivar el servicio operativo de este comercio?';
+
+      if (!confirm(confirmMsg)) return;
+
+      try {
+        await api.superadmin.updateLicense(id, {
+          action,
+          license_status: isSuspending ? 'suspended' : 'active',
+          is_active: !isSuspending
+        });
+        alert(isSuspending ? '⛔ Comercio pausado/suspendido con éxito.' : '🟢 Comercio reactivado con éxito.');
+        await renderSuperAdminView(container);
+      } catch (err: any) {
+        alert(`❌ Error al cambiar estado: ${err.message || 'Error desconocido'}`);
+      }
     });
   });
 
@@ -861,39 +893,42 @@ export function setupSuperAdminEvents(container: HTMLElement) {
     }
 
     try {
-      const opt = manageAddOptionSelect?.value || '730';
+      const opt = manageAddOptionSelect?.value || 'keep_date';
       const selectedPlan = managePlanSelect?.value || 'pro';
       const priceVal = Number(managePriceInput?.value || 25);
       const statusVal = manageStatusSelect?.value || 'active';
       const sheetUrlVal = (container.querySelector('#manage-sheet-url') as HTMLInputElement | null)?.value.trim() || null;
+      const isSuspending = statusVal === 'suspended';
 
       let add_days: number | undefined = undefined;
       let expires_at: string | undefined = undefined;
 
-      if (opt === 'exact_date') {
-        const dateInput = (container.querySelector('#manage-exact-date') as HTMLInputElement).value;
-        if (!dateInput) throw new Error('Por favor selecciona una fecha de vencimiento.');
-        expires_at = dateInput;
-      } else if (opt === 'custom_days') {
-        const daysInput = Number((container.querySelector('#manage-custom-days') as HTMLInputElement).value);
-        if (!daysInput || daysInput <= 0) throw new Error('Por favor ingresa una cantidad válida de días.');
-        add_days = daysInput;
-      } else if (opt !== 'keep_date') {
-        add_days = Number(opt);
+      if (!isSuspending) {
+        if (opt === 'exact_date') {
+          const dateInput = (container.querySelector('#manage-exact-date') as HTMLInputElement).value;
+          if (!dateInput) throw new Error('Por favor selecciona una fecha de vencimiento.');
+          expires_at = dateInput;
+        } else if (opt === 'custom_days') {
+          const daysInput = Number((container.querySelector('#manage-custom-days') as HTMLInputElement).value);
+          if (!daysInput || daysInput <= 0) throw new Error('Por favor ingresa una cantidad válida de días.');
+          add_days = daysInput;
+        } else if (opt !== 'keep_date') {
+          add_days = Number(opt);
+        }
       }
 
       await api.superadmin.updateLicense(id, {
-        action: add_days ? 'renew' : undefined,
+        action: isSuspending ? 'suspend' : (add_days ? 'renew' : undefined),
         add_days,
         expires_at,
         license_plan: selectedPlan,
         price_monthly: priceVal,
         license_status: statusVal,
-        is_active: statusVal !== 'suspended',
+        is_active: !isSuspending,
         google_sheet_url: sheetUrlVal
       });
 
-      alert('🎉 ¡Licencia y vigencia actualizadas con éxito!');
+      alert(isSuspending ? '⛔ ¡Licencia del comercio pausada/suspendida con éxito!' : '🎉 ¡Licencia y vigencia actualizadas con éxito!');
       closeManageModal();
       await renderSuperAdminView(container);
     } catch (err: any) {

@@ -251,37 +251,49 @@ export async function updateBusinessLicense(req: Request, res: Response) {
     const business = rows[0];
 
     let newExpiresAt = business.license_expires_at ? new Date(business.license_expires_at) : new Date();
-    let newStatus = license_status || business.license_status;
-    let newIsActive = typeof is_active === 'boolean' ? (is_active ? 1 : 0) : (is_active !== undefined ? is_active : business.is_active);
+    let newStatus = business.license_status;
+    let newIsActive = business.is_active;
 
-    // Si se especificó una fecha exacta de expiración (ej. seleccionada en calendario)
-    if (expires_at) {
-      newExpiresAt = new Date(expires_at);
-      newStatus = 'active';
-      newIsActive = 1;
-    } else if (action === 'extend' || action === 'renew' || add_days) {
-      // Si la acción es extender días (ej. +30 días, +365 días, +730 días)
-      const daysToAdd = Number(add_days || 30);
-      // Si ya estaba vencido, extender a partir de hoy
-      if (newExpiresAt < new Date()) {
-        newExpiresAt = new Date();
-      }
-      newExpiresAt.setDate(newExpiresAt.getDate() + daysToAdd);
-      newStatus = 'active';
-      newIsActive = 1;
-    }
+    // 1. Manejar acción explícita o estado de suspensión/reactivación
+    const isSuspending = action === 'suspend' || license_status === 'suspended' || is_active === false || is_active === 0;
 
-    if (action === 'suspend') {
+    if (isSuspending) {
       newStatus = 'suspended';
       newIsActive = 0;
-    }
-
-    if (action === 'activate') {
+    } else if (action === 'activate') {
       newStatus = 'active';
       newIsActive = 1;
       if (newExpiresAt < new Date()) {
         newExpiresAt = new Date();
         newExpiresAt.setDate(newExpiresAt.getDate() + 30);
+      }
+    } else {
+      if (license_status) {
+        newStatus = license_status;
+        if (newStatus === 'suspended') newIsActive = 0;
+        else if (newStatus === 'active' || newStatus === 'trial') newIsActive = 1;
+      }
+      if (typeof is_active === 'boolean') {
+        newIsActive = is_active ? 1 : 0;
+      } else if (is_active !== undefined) {
+        newIsActive = Number(is_active);
+      }
+    }
+
+    // 2. Manejar vigencia / expiración (solo si no se está suspendiendo)
+    if (!isSuspending) {
+      if (expires_at) {
+        newExpiresAt = new Date(expires_at);
+        newStatus = 'active';
+        newIsActive = 1;
+      } else if (add_days && Number(add_days) > 0) {
+        const daysToAdd = Number(add_days);
+        if (newExpiresAt < new Date()) {
+          newExpiresAt = new Date();
+        }
+        newExpiresAt.setDate(newExpiresAt.getDate() + daysToAdd);
+        newStatus = 'active';
+        newIsActive = 1;
       }
     }
 

@@ -15,7 +15,7 @@ async function tenantMiddleware(req, res, next) {
         const slugQuery = req.query.business;
         const slugParam = req.params.businessSlug;
         const targetSlug = (slugHeader || slugQuery || slugParam || '').trim().toLowerCase();
-        let query = 'SELECT * FROM businesses WHERE is_active = 1 AND ';
+        let query = 'SELECT * FROM businesses WHERE ';
         let params = [];
         if (targetSlug && targetSlug !== 'undefined' && targetSlug !== 'null') {
             query += 'slug = ? LIMIT 1';
@@ -35,7 +35,7 @@ async function tenantMiddleware(req, res, next) {
             if (targetSlug) {
                 return res.status(404).json({
                     error: 'Comercio no encontrado',
-                    message: `El negocio con identificador "${targetSlug}" no existe o ha sido dado de baja.`
+                    message: `El negocio con identificador "${targetSlug}" no existe.`
                 });
             }
             // Fallback al primer negocio existente

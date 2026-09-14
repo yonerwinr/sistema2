@@ -389,6 +389,9 @@ function hydrateStateFromCache() {
       const cachedUser = localStorage.getItem('user');
       if (cachedUser) {
         currentUser = JSON.parse(cachedUser);
+        if ((currentUser as any)?.business) {
+          currentBusinessProfile = (currentUser as any).business;
+        }
         if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'seller' || currentUser.role === 'billing')) {
           const lastAdminView = localStorage.getItem('facilito_last_admin_view') as AdminSubView;
           if (currentUser.role === 'billing') {
@@ -704,7 +707,12 @@ function renderApp() {
   if (!appDiv) return;
 
   // Si la cuenta está suspendida y el usuario no es superadmin
-  const isSuspended = currentUser && currentUser.role !== 'superadmin' && currentBusinessProfile && (currentBusinessProfile.license_status === 'suspended' || currentBusinessProfile.license_status === 'expired');
+  const isSuspended = currentUser && currentUser.role !== 'superadmin' && currentBusinessProfile && (
+    currentBusinessProfile.license_status === 'suspended' || 
+    currentBusinessProfile.license_status === 'expired' || 
+    currentBusinessProfile.is_active === 0 ||
+    Boolean(currentBusinessProfile.isExpired)
+  );
 
   if (isSuspended && currentView === 'admin') {
     appDiv.innerHTML = `
