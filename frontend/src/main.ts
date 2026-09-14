@@ -813,9 +813,9 @@ function renderNavbar(): string {
     </div>
     <nav class="navbar">
       <div class="container navbar-container">
-        <a class="logo" href="#" id="nav-logo" style="display:flex; align-items:center; gap:10px; text-decoration:none;">
-          <img src="/logo.png" style="height:38px; width:38px; object-fit:contain; border-radius:50%; background:rgba(255,255,255,0.06); padding:2px; box-shadow: 0 4px 12px rgba(0, 119, 246, 0.25);" class="animate-float" alt="FacilitoApp Logo">
-          <span style="font-weight:900; font-size:20px; letter-spacing:-0.5px;">
+        <a class="logo" href="#" id="nav-logo" style="display:flex; align-items:center; gap:12px; text-decoration:none;">
+          <img src="${currentBusinessProfile?.logo_url || '/logo.png'}" style="height:56px; width:56px; object-fit:contain; border-radius:12px; background:rgba(255,255,255,0.06); padding:4px; box-shadow: 0 4px 16px rgba(0, 119, 246, 0.25);" alt="Logo">
+          <span style="font-weight:900; font-size:24px; letter-spacing:-0.5px; display:inline-flex; align-items:baseline;">
             <span style="color:#0084ff;">Facilito</span><span style="color:#ff7300;">App</span>
           </span>
         </a>

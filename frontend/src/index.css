@@ -248,7 +248,7 @@ tr.cascade-item {
   -webkit-backdrop-filter: blur(16px);
   background: rgba(11, 15, 25, 0.7);
   border-bottom: 1px solid var(--border-glass);
-  padding: 16px 0;
+  padding: 12px 0;
   transition: all 0.3s ease;
 }
 
