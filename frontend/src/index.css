@@ -3424,5 +3424,207 @@ select option:hover {
   border: 1px solid rgba(56, 189, 248, 0.25);
 }
 
+/* Showcase Splits con Imágenes del Sistema */
+.info-showcase-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
+  margin: 60px 0;
+  background: rgba(15, 21, 35, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 28px;
+  padding: 36px;
+  backdrop-filter: blur(16px);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+}
+
+@media (max-width: 900px) {
+  .info-showcase-split {
+    grid-template-columns: 1fr;
+    padding: 24px;
+    gap: 24px;
+  }
+}
+
+.info-showcase-img-wrap {
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  position: relative;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+}
+
+.info-showcase-img-wrap:hover {
+  transform: scale(1.02);
+  box-shadow: 0 24px 50px rgba(0, 119, 246, 0.25);
+}
+
+.info-showcase-img-wrap img {
+  width: 100%;
+  height: 100%;
+  max-height: 380px;
+  object-fit: cover;
+  display: block;
+}
+
+.info-showcase-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-showcase-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  width: fit-content;
+  text-transform: uppercase;
+}
+
+.info-showcase-title {
+  font-size: clamp(22px, 2.6vw, 30px);
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.info-showcase-text {
+  font-size: 14px;
+  color: #94a3b8;
+  line-height: 1.65;
+}
+
+.info-showcase-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.info-showcase-bullet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  color: #e2e8f0;
+  line-height: 1.45;
+}
+
+.info-showcase-bullet-icon {
+  color: #38bdf8;
+  font-size: 15px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Grilla de Arquitectura Tecnológica */
+.info-tech-stack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.info-tech-item {
+  background: rgba(18, 24, 39, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 18px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.25s ease;
+}
+
+.info-tech-item:hover {
+  transform: translateY(-3px);
+  border-color: rgba(0, 119, 246, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 119, 246, 0.1);
+}
+
+.info-tech-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.info-tech-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.info-tech-desc {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+/* Tabla de Resumen de Valor Comercial */
+.info-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 21, 35, 0.6);
+  backdrop-filter: blur(14px);
+  margin-top: 28px;
+}
+
+.info-commercial-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13.5px;
+}
+
+.info-commercial-table th {
+  background: rgba(0, 119, 246, 0.1);
+  color: #93c5fd;
+  font-weight: 800;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  letter-spacing: 0.5px;
+}
+
+.info-commercial-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  vertical-align: top;
+}
+
+.info-commercial-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.info-commercial-table td strong {
+  color: #ffffff;
+}
+
+.info-author-card {
+  background: linear-gradient(135deg, rgba(0, 119, 246, 0.12), rgba(255, 115, 0, 0.12));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 36px;
+}
+
+
 
 

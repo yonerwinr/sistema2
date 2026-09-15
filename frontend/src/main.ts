@@ -827,7 +827,7 @@ function renderNavbar(): string {
   const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return `
-    ${currentView !== 'auth' ? `
+    ${currentView !== 'auth' && currentView !== 'info' ? `
       <div class="exchange-rate-banner" style="background: rgba(16,185,129,0.06); border-bottom: 1px solid var(--border-glass); padding: 6px 0; font-size: 11px; font-weight: 600; text-align: center; color: var(--success); display: flex; justify-content: center; gap: 16px; align-items:center; flex-wrap: wrap;">
         <span>💵 BCV: <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
         <span style="color:var(--text-muted);">|</span>
@@ -1354,13 +1354,13 @@ function renderInfoView(): string {
       <section class="info-hero animate-on-scroll animate-fade-up">
         <div class="info-hero-badge">
           <span class="pulsing-dot"></span>
-          <span>SISTEMA POS & GESTIÓN EN LA NUBE • FACILITOAPP</span>
+          <span>SISTEMA INTEGRAL DEFINITIVO • POS & E-COMMERCE</span>
         </div>
         <h1 class="info-hero-title">
-          El Software de Punto de Venta y Facturación que revoluciona tu negocio.
+          FacilitoApp 🐒: El Ecosistema Definitivo de Punto de Venta (POS) y E-Commerce
         </h1>
         <p class="info-hero-subtitle">
-          Administra tus ventas, inventario en tiempo real, tasas de cambio oficiales (BCV y Binance), cierres de caja X y Z, recibos térmicos y tienda virtual sincronizada. Todo en una sola plataforma en la nube, rápida y sin instalaciones engorrosas.
+          Software moderno, rápido y robusto que integra Punto de Venta Físico y Tienda Online en un solo panel. Con sincronización de inventario único en tiempo real, blindaje contra la devaluación (Ventana de 6 Horas), respaldo automático en Google Sheets y cobranza automatizada de deudores.
         </p>
         <div class="info-hero-ctas">
           <button class="btn-hero-primary" id="info-cta-demo" style="font-size:15px; padding:14px 28px;">
@@ -1375,130 +1375,305 @@ function renderInfoView(): string {
         </div>
       </section>
 
-      <!-- 2. MÉTRICAS CLAVE DEL SISTEMA -->
-      <section class="info-metrics-grid animate-on-scroll animate-fade-up" style="margin-top:40px;">
-        <div class="info-metric-card">
-          <div class="info-metric-number">100%</div>
-          <div class="info-metric-label">Tasas Sincronizadas</div>
-          <div class="info-metric-sub">Tasas oficiales BCV, Euro y Binance P2P actualizadas al instante</div>
+      <!-- 2. PROPUESTA DE VALOR COMERCIAL (BENTO CARDS) -->
+      <section class="animate-on-scroll animate-fade-up" style="margin-top:50px;">
+        <div class="info-section-header">
+          <div class="info-section-tag">¿POR QUÉ ES LA SOLUCIÓN IDEAL PARA SU NEGOCIO?</div>
+          <h2 class="info-section-title">Propuesta de Valor Comercial & Blindaje</h2>
+          <p class="info-section-desc">Cinco pilares diseñados para proteger el margen de ganancia y optimizar el flujo de caja en entornos económicos exigentes.</p>
         </div>
-        <div class="info-metric-card">
-          <div class="info-metric-number">99.9%</div>
-          <div class="info-metric-label">Disponibilidad Cloud</div>
-          <div class="info-metric-sub">Acceso ininterrumpido 24/7 desde cualquier computadora, tablet o teléfono</div>
-        </div>
-        <div class="info-metric-card">
-          <div class="info-metric-number">&lt; 0.2s</div>
-          <div class="info-metric-label">Velocidad de Facturación</div>
-          <div class="info-metric-sub">Cobro ágil en caja y emisión de tickets térmicos 58mm/80mm y QR digital</div>
-        </div>
-        <div class="info-metric-card">
-          <div class="info-metric-number">Multi-Rol</div>
-          <div class="info-metric-label">Seguridad Antifraude</div>
-          <div class="info-metric-sub">Permisos estrictos para Administradores, Cajeros, Facturación e Inventario</div>
+
+        <div class="info-metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+          <div class="info-metric-card animate-on-scroll animate-fade-up">
+            <div class="info-metric-number" style="font-size:32px;">🔄 Omnicanal</div>
+            <div class="info-metric-label">Sincronización Total</div>
+            <div class="info-metric-sub">Administre tienda física y virtual compartiendo un inventario único en tiempo real.</div>
+          </div>
+          <div class="info-metric-card animate-on-scroll animate-fade-up">
+            <div class="info-metric-number" style="font-size:32px; color:#f59e0b;">🛡️ 6 Horas</div>
+            <div class="info-metric-label">Blindaje Económico</div>
+            <div class="info-metric-sub">Protección contra devaluación: mantiene la tasa más alta registrada en la ventana del día.</div>
+          </div>
+          <div class="info-metric-card animate-on-scroll animate-fade-up">
+            <div class="info-metric-number" style="font-size:32px; color:#10b981;">☁️ Sheets</div>
+            <div class="info-metric-label">Integración Cloud</div>
+            <div class="info-metric-sub">Respaldo automático de cada transacción en Google Sheets para auditoría externa garantizada.</div>
+          </div>
+          <div class="info-metric-card animate-on-scroll animate-fade-up">
+            <div class="info-metric-number" style="font-size:32px; color:#06b6d4;">💳 Cada 6h</div>
+            <div class="info-metric-label">Recuperación de Cartera</div>
+            <div class="info-metric-sub">Automatización de recordatorios de pago para deudores por correo, optimizando el flujo de caja.</div>
+          </div>
+          <div class="info-metric-card animate-on-scroll animate-fade-up">
+            <div class="info-metric-number" style="font-size:32px; color:#a855f7;">🔐 Supervisor</div>
+            <div class="info-metric-label">Seguridad Jerárquica</div>
+            <div class="info-metric-sub">Acciones críticas (anulaciones, sangrías de caja) resguardadas por aprobación de supervisor.</div>
+          </div>
         </div>
       </section>
 
-      <!-- 3. CAPACIDADES DEL SISTEMA (BENTO GRID - MAS INFORMACIÓN) -->
-      <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
+      <!-- 3. MÓDULOS CON IMÁGENES DEL SISTEMA (SPLIT SHOWCASES) -->
+      
+      <!-- SHOWCASE 1: MÓDULO 1 - POS FÍSICO CON IMAGEN -->
+      <section class="info-showcase-split animate-on-scroll animate-slide-left">
+        <div class="info-showcase-img-wrap">
+          <img src="/images/facilito_pos_terminal.jpg" alt="Punto de Venta POS FacilitoApp" loading="lazy">
+        </div>
+        <div class="info-showcase-content">
+          <span class="info-showcase-tag" style="background:rgba(0,119,246,0.15); color:#60a5fa; border:1px solid rgba(0,119,246,0.3);">
+            🛒 MÓDULO 1: PUNTO DE VENTA FÍSICO (POS)
+          </span>
+          <h3 class="info-showcase-title">Facturación de Alta Velocidad en Mostrador</h3>
+          <p class="info-showcase-text">
+            Diseñado para eliminar filas en caja y garantizar que cada transacción quede debidamente registrada y respaldada al instante.
+          </p>
+          <ul class="info-showcase-bullets">
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon">✓</span>
+              <span><strong>Validación de Stock en Tiempo Real:</strong> Descuenta existencias automáticamente al procesar cada venta.</span>
+            </li>
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon">✓</span>
+              <span><strong>Soporte Periférico:</strong> Lector de código de barras integrado con alertas sonoras y teclado numérico rápido.</span>
+            </li>
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon">✓</span>
+              <span><strong>Flexibilidad Multimoneda:</strong> Conversión instantánea a Bolívares (Bs.) basada en tasas BCV o Binance P2P.</span>
+            </li>
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon">✓</span>
+              <span><strong>Pagos Mixtos y Combinados:</strong> Procesa una sola factura combinando Efectivo en divisas, Pago Móvil, Tarjetas o Zelle.</span>
+            </li>
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon">✓</span>
+              <span><strong>Documentación Digital:</strong> Emisión para impresoras térmicas (58mm/80mm) y envío por WhatsApp con código QR.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- SHOWCASE 2: MÓDULO 2 - TIENDA VIRTUAL CON IMAGEN -->
+      <section class="info-showcase-split animate-on-scroll animate-slide-right">
+        <div class="info-showcase-content">
+          <span class="info-showcase-tag" style="background:rgba(255,115,0,0.15); color:#fb923c; border:1px solid rgba(255,115,0,0.3);">
+            🌐 MÓDULO 2: TIENDA VIRTUAL (E-COMMERCE)
+          </span>
+          <h3 class="info-showcase-title">Canal de Ventas 24/7 Enfocado en la Conversión</h3>
+          <p class="info-showcase-text">
+            Tu tienda en internet conectada al mismo almacén del punto de venta físico, sin duplicar inventarios ni discrepancias.
+          </p>
+          <ul class="info-showcase-bullets">
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon" style="color:#fb923c;">✓</span>
+              <span><strong>Catálogo Interactivo:</strong> Filtros avanzados por categorías, marcas, precios y disponibilidad en stock.</span>
+            </li>
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon" style="color:#fb923c;">✓</span>
+              <span><strong>Checkout Adaptativo:</strong> Opciones para "Retiro en Tienda" o "Delivery" con integración de geolocalización vía Google Maps.</span>
+            </li>
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon" style="color:#fb923c;">✓</span>
+              <span><strong>Gestión de Pagos por el Cliente:</strong> Carga de capturas de pantalla de comprobantes bancarios directamente al sistema para aprobación del facturador.</span>
+            </li>
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon" style="color:#fb923c;">✓</span>
+              <span><strong>Total Bimoneda en Línea:</strong> Cálculo transparente de montos en dólares y bolívares a la tasa oficial del día sin sobreprecios.</span>
+            </li>
+          </ul>
+        </div>
+        <div class="info-showcase-img-wrap">
+          <img src="/images/facilito_ecommerce_mobile.jpg" alt="Tienda Virtual E-commerce FacilitoApp" loading="lazy">
+        </div>
+      </section>
+
+      <!-- SHOWCASE 3: MÓDULO 4 - DASHBOARD & GOOGLE SHEETS -->
+      <section class="info-showcase-split animate-on-scroll animate-slide-left">
+        <div class="info-showcase-img-wrap">
+          <img src="/images/facilito_dashboard_analytics.jpg" alt="Dashboard y Estadísticas FacilitoApp" loading="lazy">
+        </div>
+        <div class="info-showcase-content">
+          <span class="info-showcase-tag" style="background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3);">
+            📈 MÓDULO 4: DASHBOARD, ANALÍTICA & RESPALDO CLOUD
+          </span>
+          <h3 class="info-showcase-title">Toma de Decisiones Financieras Basada en Datos</h3>
+          <p class="info-showcase-text">
+            Visualiza el rendimiento de tu negocio en tiempo real con reportes interactivos y auditoría externa garantizada.
+          </p>
+          <ul class="info-showcase-bullets">
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon" style="color:#34d399;">✓</span>
+              <span><strong>Métricas Clave (KPIs):</strong> Visualización instantánea de ganancia neta, margen porcentual, ticket promedio y alertas de stock crítico.</span>
+            </li>
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon" style="color:#34d399;">✓</span>
+              <span><strong>Gráficos de Tendencia (Chart.js):</strong> Análisis histórico de ventas de los últimos 7 días y distribución por métodos de pago.</span>
+            </li>
+            <li class="info-showcase-bullet-item">
+              <span class="info-showcase-bullet-icon" style="color:#34d399;">✓</span>
+              <span><strong>Respaldo Paralelo en Google Sheets:</strong> Cada venta emite un Webhook a Google Apps Script sincronizando todos los campos para una contabilidad externa inmutable.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 4. MÓDULOS OPERATIVOS ADICIONALES (BENTO GRID) -->
+      <section class="animate-on-scroll animate-fade-up" style="margin-top:50px;">
         <div class="info-section-header">
-          <div class="info-section-tag">CARACTERÍSTICAS DE ÉLITE</div>
-          <h2 class="info-section-title">Todo lo que tu comercio necesita para crecer</h2>
-          <p class="info-section-desc">Diseñado para resolver los desafíos reales del comercio venezolano: bimoneda, fluctuación de precios y velocidad en caja.</p>
+          <div class="info-section-tag">CONTROL DE OPERACIONES</div>
+          <h2 class="info-section-title">Flujo de Efectivo, Cobranza y Catálogo</h2>
+          <p class="info-section-desc">Módulos avanzados diseñados para blindar las finanzas de tu comercio contra pérdidas y morosidad.</p>
         </div>
 
         <div class="system-features-bento">
-          <!-- Card 1: POS -->
+          <!-- Módulo 3: Flujo de Efectivo -->
           <div class="system-feature-card animate-on-scroll animate-fade-up">
-            <div class="system-feature-icon">🖥️</div>
-            <span class="system-feature-badge">Agilidad en Caja</span>
-            <h3 class="system-feature-title">Punto de Venta (POS) Táctil</h3>
+            <div class="system-feature-icon" style="color:#a855f7; background:rgba(168,85,247,0.1); border-color:rgba(168,85,247,0.25);">💰</div>
+            <span class="system-feature-badge" style="color:#c084fc; background:rgba(192,132,252,0.12); border-color:rgba(192,132,252,0.25);">Módulo 3</span>
+            <h3 class="system-feature-title">Flujo de Efectivo y Arqueo (X / Z)</h3>
             <p class="system-feature-desc">
-              Interfaz optimizada para pantallas táctiles y teclado. Búsqueda instantánea de productos por nombre, código de barras o categoría. Cobros combinados en efectivo, Pago Móvil, tarjeta o Zelle en segundos.
+              Apertura y cierre blindado con registro obligatorio de balance inicial. Cálculo automático de diferencias (sobrante/faltante) al cierre. Límite de seguridad en caja y control de sangrías con validación digital de supervisor en el dispositivo.
             </p>
           </div>
 
-          <!-- Card 2: Multimoneda -->
+          <!-- Módulo 5: Gestión de Cuentas por Cobrar -->
           <div class="system-feature-card animate-on-scroll animate-fade-up">
-            <div class="system-feature-icon" style="color:var(--brand-orange); background:rgba(255,115,0,0.1); border-color:rgba(255,115,0,0.25);">🔄</div>
-            <span class="system-feature-badge" style="color:#fb923c; background:rgba(251,146,60,0.12); border-color:rgba(251,146,60,0.25);">Bimoneda Inteligente</span>
-            <h3 class="system-feature-title">Tasas BCV & Binance al Instante</h3>
+            <div class="system-feature-icon" style="color:#06b6d4; background:rgba(6,182,212,0.1); border-color:rgba(6,182,212,0.25);">💳</div>
+            <span class="system-feature-badge" style="color:#22d3ee; background:rgba(34,211,238,0.12); border-color:rgba(34,211,238,0.25);">Módulo 5</span>
+            <h3 class="system-feature-title">Gestión de Cuentas por Cobrar (Deudores)</h3>
             <p class="system-feature-desc">
-              Olvídate de calcular a mano. El sistema sincroniza automáticamente las tasas oficiales del BCV y Binance P2P. Tus clientes ven el total exacto en Bs. y $, y el arqueo de caja cuadra a la perfección.
+              Servicio en segundo plano (Cron Job) que despacha recordatorios automáticos por correo electrónico cada 6 horas según configuración. Registro de abonos parciales con actualización de saldo pendiente en tiempo real.
             </p>
           </div>
 
-          <!-- Card 3: Inventario -->
+          <!-- Módulo 6: Catálogo e Inventario -->
           <div class="system-feature-card animate-on-scroll animate-fade-up">
-            <div class="system-feature-icon" style="color:#10b981; background:rgba(16,185,129,0.1); border-color:rgba(16,185,129,0.25);">📦</div>
-            <span class="system-feature-badge" style="color:#34d399; background:rgba(52,211,153,0.12); border-color:rgba(52,211,153,0.25);">Stock en Tiempo Real</span>
-            <h3 class="system-feature-title">Control de Inventario & Alertas</h3>
+            <div class="system-feature-icon" style="color:#f59e0b; background:rgba(245,158,11,0.1); border-color:rgba(245,158,11,0.25);">📦</div>
+            <span class="system-feature-badge" style="color:#fbbf24; background:rgba(251,191,36,0.12); border-color:rgba(251,191,36,0.25);">Módulo 6</span>
+            <h3 class="system-feature-title">Catálogo e Inventario Centralizado</h3>
             <p class="system-feature-desc">
-              Monitoreo permanente de stock. Recibe avisos automáticos cuando un producto esté por agotarse. Historial de movimientos de entrada y salida, cálculo de márgenes y soporte para fotos de productos.
-            </p>
-          </div>
-
-          <!-- Card 4: Cierres X y Z -->
-          <div class="system-feature-card animate-on-scroll animate-fade-up">
-            <div class="system-feature-icon" style="color:#a855f7; background:rgba(168,85,247,0.1); border-color:rgba(168,85,247,0.25);">📊</div>
-            <span class="system-feature-badge" style="color:#c084fc; background:rgba(192,132,252,0.12); border-color:rgba(192,132,252,0.25);">Auditoría Financiera</span>
-            <h3 class="system-feature-title">Cierres de Caja Blindados (X / Z)</h3>
-            <p class="system-feature-desc">
-              Arqueo de caja por turno y cajero. Desglose automático por moneda y método de pago (Efectivo $, Bs Pago Móvil, Punto de Venta). Cierres de turno con impresión de reporte de auditoría.
-            </p>
-          </div>
-
-          <!-- Card 5: Tickets Térmicos & Recibos QR -->
-          <div class="system-feature-card animate-on-scroll animate-fade-up">
-            <div class="system-feature-icon" style="color:#06b6d4; background:rgba(6,182,212,0.1); border-color:rgba(6,182,212,0.25);">🧾</div>
-            <span class="system-feature-badge" style="color:#22d3ee; background:rgba(34,211,238,0.12); border-color:rgba(34,211,238,0.25);">Impresión y Digital</span>
-            <h3 class="system-feature-title">Tickets Térmicos & QR Digital</h3>
-            <p class="system-feature-desc">
-              Compatible con impresoras térmicas USB, Bluetooth y de red (58mm y 80mm). Además, genera comprobantes digitales con código QR escaneable para enviar directo a los clientes por WhatsApp.
-            </p>
-          </div>
-
-          <!-- Card 6: Deudores y Cotizaciones -->
-          <div class="system-feature-card animate-on-scroll animate-fade-up">
-            <div class="system-feature-icon" style="color:#f59e0b; background:rgba(245,158,11,0.1); border-color:rgba(245,158,11,0.25);">📑</div>
-            <span class="system-feature-badge" style="color:#fbbf24; background:rgba(251,191,36,0.12); border-color:rgba(251,191,36,0.25);">Créditos y Presupuestos</span>
-            <h3 class="system-feature-title">Deudores & Cotizaciones</h3>
-            <p class="system-feature-desc">
-              Gestiona ventas a crédito o pagos parciales con historial de abonos por cliente. Genera presupuestos profesionales en formato PDF o imagen PNG listos para compartir con tus prospectos.
+              Generador inteligente de SKU en formato metodológico <code>CC-SSS-NNNN</code>. Buscador global de alta velocidad por nombre, código SKU, marca o descripción con filtros de disponibilidad y carga de fotos de productos.
             </p>
           </div>
         </div>
       </section>
 
-      <!-- 4. PASO A PASO: CÓMO EMPEZAR -->
+      <!-- 5. ESPECIFICACIÓN TÉCNICA Y ARQUITECTURA -->
       <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
         <div class="info-section-header">
-          <div class="info-section-tag">FÁCIL Y RÁPIDO</div>
-          <h2 class="info-section-title">Comienza a operar en 3 sencillos pasos</h2>
-          <p class="info-section-desc">Sin contratos forzosos, sin instalaciones complejas y con soporte técnico dedicado.</p>
+          <div class="info-section-tag">INGENIERÍA MODERNA</div>
+          <h2 class="info-section-title">Especificación Técnica y Arquitectura</h2>
+          <p class="info-section-desc">Diseñado bajo estándares rigurosos de ingeniería de software para máxima velocidad, seguridad y escalabilidad.</p>
         </div>
 
-        <div class="info-steps-grid">
-          <div class="info-step-card">
-            <span class="info-step-number">PASO 01</span>
-            <h3 class="info-step-title">Activa tu Demo Gratuita</h3>
-            <p class="info-step-desc">Crea tu cuenta de comercio en menos de 1 minuto y accede a todas las funciones premium gratis durante 3 días.</p>
+        <div class="info-tech-stack-grid">
+          <div class="info-tech-item animate-on-scroll animate-fade-up">
+            <div class="info-tech-icon">⚡</div>
+            <div>
+              <div class="info-tech-name">Backend Node.js & TS</div>
+              <div class="info-tech-desc">Express con TypeScript tipado y seguro</div>
+            </div>
           </div>
-          <div class="info-step-card">
-            <span class="info-step-number" style="color:var(--brand-orange); background:rgba(255,115,0,0.12); border-color:rgba(255,115,0,0.3);">PASO 02</span>
-            <h3 class="info-step-title">Carga tu Inventario</h3>
-            <p class="info-step-desc">Registra tus productos con precios en dólares o bolívares, fotos y categorías. Puedes importar tu catálogo en lote.</p>
+          <div class="info-tech-item animate-on-scroll animate-fade-up">
+            <div class="info-tech-icon">🗄️</div>
+            <div>
+              <div class="info-tech-name">MySQL & TiDB Cloud</div>
+              <div class="info-tech-desc">Alta disponibilidad y tolerancia a fallos</div>
+            </div>
           </div>
-          <div class="info-step-card">
-            <span class="info-step-number" style="color:#10b981; background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.3);">PASO 03</span>
-            <h3 class="info-step-title">Vende y Crece</h3>
-            <p class="info-step-desc">Comienza a facturar en tu punto de venta, abre tu catálogo web para pedidos online y supervisa tus ganancias en tiempo real.</p>
+          <div class="info-tech-item animate-on-scroll animate-fade-up">
+            <div class="info-tech-icon">🚀</div>
+            <div>
+              <div class="info-tech-name">Frontend SPA & Vite</div>
+              <div class="info-tech-desc">Vanilla TypeScript ultraliviano y veloz</div>
+            </div>
+          </div>
+          <div class="info-tech-item animate-on-scroll animate-fade-up">
+            <div class="info-tech-icon">🔒</div>
+            <div>
+              <div class="info-tech-name">Seguridad Grado Bancario</div>
+              <div class="info-tech-desc">JWT + bcryptjs + Google OAuth 2.0</div>
+            </div>
+          </div>
+          <div class="info-tech-item animate-on-scroll animate-fade-up">
+            <div class="info-tech-icon">📊</div>
+            <div>
+              <div class="info-tech-name">Visualización Chart.js</div>
+              <div class="info-tech-desc">Gráficos dinámicos e interactivos</div>
+            </div>
+          </div>
+          <div class="info-tech-item animate-on-scroll animate-fade-up">
+            <div class="info-tech-icon">👥</div>
+            <div>
+              <div class="info-tech-name">Roles y Permisos Granulares</div>
+              <div class="info-tech-desc">Admin, Vendedor, Facturador y Cliente</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. TABLA COMPARATIVA: RESUMEN DE VALOR COMERCIAL -->
+      <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
+        <div class="info-section-header">
+          <div class="info-section-tag">IMPACTO EN SU NEGOCIO</div>
+          <h2 class="info-section-title">Resumen de Valor Comercial</h2>
+          <p class="info-section-desc">Cómo cada característica del sistema se traduce en ahorro de tiempo y protección de capital.</p>
+        </div>
+
+        <div class="info-table-container">
+          <table class="info-commercial-table">
+            <thead>
+              <tr>
+                <th>Característica</th>
+                <th>Beneficio Operativo</th>
+                <th>Impacto Económico</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Omnicanalidad Unificada</strong></td>
+                <td>Un solo inventario para tienda física (POS) y web (E-commerce).</td>
+                <td>Ahorro en tiempos administrativos y fin de quiebres de stock.</td>
+              </tr>
+              <tr>
+                <td><strong>Protección Cambiaria</strong></td>
+                <td>Algoritmo de ventana de 6 horas con la tasa más alta registrada.</td>
+                <td>Blindaje contra la inflación y protección del margen de utilidad.</td>
+              </tr>
+              <tr>
+                <td><strong>Cobranza Automatizada</strong></td>
+                <td>Recordatorios recurrentes por correo cada 6 horas y registro de abonos.</td>
+                <td>Aumento del flujo de caja y reducción de cuentas incobrables.</td>
+              </tr>
+              <tr>
+                <td><strong>Respaldo en la Nube</strong></td>
+                <td>Copia financiera simultánea en Google Sheets vía Webhook.</td>
+                <td>Seguridad total de datos y facilidad para auditorías externas.</td>
+              </tr>
+              <tr>
+                <td><strong>Control de Supervisor</strong></td>
+                <td>Validación digital en tiempo real de acciones críticas (anulaciones).</td>
+                <td>Reducción drástica del fraude interno y errores de caja.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tarjeta del Responsable del Proyecto -->
+        <div class="info-author-card animate-on-scroll animate-fade-up">
+          <div>
+            <div style="font-size:12px; font-weight:800; text-transform:uppercase; color:#60a5fa; letter-spacing:0.5px; margin-bottom:4px;">RESPONSABLE DEL PROYECTO</div>
+            <div style="font-size:17px; font-weight:800; color:#ffffff;">Yonerwin Rodriguez</div>
+            <div style="font-size:13px; color:#94a3b8;">Contacto directo: <a href="mailto:yonerwinrodriguez19@gmail.com" style="color:#38bdf8; text-decoration:none;">yonerwinrodriguez19@gmail.com</a></div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:12px; color:#94a3b8;">Fecha de Emisión Oficial</div>
+            <div style="font-size:14px; font-weight:700; color:#ffffff;">7/27/2026</div>
           </div>
         </div>
       </section>
 
       <!-- ==================================================================== -->
-      <!-- 5. SECCIÓN DE LA FOTO: PLANES Y PRECIOS (ESTILO VE-COMMERCE)        -->
+      <!-- 7. SECCIÓN DE LA FOTO: PLANES Y PRECIOS (ESTILO VE-COMMERCE)        -->
       <!-- ==================================================================== -->
       <div id="planes" style="position:relative; top:-40px;"></div>
       <section class="pricing-section-container animate-on-scroll animate-fade-up" style="margin-top:60px;">
@@ -1669,7 +1844,7 @@ function renderInfoView(): string {
         </div>
       </section>
 
-      <!-- 6. PREGUNTAS FRECUENTES (FAQ ACORDEÓN) -->
+      <!-- 8. PREGUNTAS FRECUENTES (FAQ ACORDEÓN) -->
       <div id="info-faq-anchor" style="position:relative; top:-40px;"></div>
       <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
         <div class="info-section-header">
@@ -1685,7 +1860,7 @@ function renderInfoView(): string {
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              El sistema se conecta de forma automática a los servidores oficiales del Banco Central de Venezuela (BCV) y a Binance P2P. Tus productos fijados en dólares o bolívares se calculan en tiempo real sin que tengas que ajustar precios manualmente cada día.
+              El sistema se conecta de forma automática a los servidores oficiales del Banco Central de Venezuela (BCV) y a Binance P2P. Además, implementa el algoritmo de <strong>Protección de Ventana de 6 Horas</strong>, conservando la tasa más alta registrada en ese lapso para proteger tu margen de utilidad contra devaluaciones repentinas.
             </div>
           </div>
 
@@ -1701,11 +1876,21 @@ function renderInfoView(): string {
 
           <div class="info-faq-item">
             <button class="info-faq-question">
-              <span>¿Necesito comprar equipos especiales o instalar programas?</span>
+              <span>¿Cómo se respaldan mis transacciones en Google Sheets?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              No. FacilitoApp es 100% basado en la nube. Puedes utilizarlo desde cualquier computadora de escritorio, laptop, tablet o teléfono con conexión a internet. Es compatible con tus lectores de códigos de barras e impresoras térmicas USB o de red existentes.
+              Cada venta confirmada dispara una petición fetch en tiempo real hacia un Webhook seguro de Google Apps Script. Todos los datos de la transacción se escriben en tu propia hoja de cálculo de Google Drive, garantizando persistencia financiera externa incluso si tu servidor local o conexión llegaran a fallar.
+            </div>
+          </div>
+
+          <div class="info-faq-item">
+            <button class="info-faq-question">
+              <span>¿Cómo opera la cobranza automatizada de deudores?</span>
+              <span class="info-faq-chevron">▼</span>
+            </button>
+            <div class="info-faq-answer">
+              El sistema ejecuta un servicio Cron en segundo plano que inspecciona las cuentas por cobrar y despacha recordatorios de pago automáticos cada 6 horas por correo electrónico. Cuando el cliente realiza un abono parcial, el saldo pendiente se descuenta de inmediato.
             </div>
           </div>
 
@@ -1721,46 +1906,17 @@ function renderInfoView(): string {
 
           <div class="info-faq-item">
             <button class="info-faq-question">
-              <span>¿Puedo tener varios cajeros o empleados con cuentas separadas?</span>
+              <span>¿Puedo tener varios empleados con roles y niveles de acceso separados?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              Sí. Puedes crear usuarios con roles definidos: Administrador (acceso total), Cajero (solo punto de venta y cierre de turno), Facturación e Inventario. Esto previene accesos indebidos a tus reportes financieros y costos de compra.
-            </div>
-          </div>
-
-          <div class="info-faq-item">
-            <button class="info-faq-question">
-              <span>¿Cómo se respaldan mis ventas e inventario?</span>
-              <span class="info-faq-chevron">▼</span>
-            </button>
-            <div class="info-faq-answer">
-              Además de copias de seguridad automáticas en nuestros servidores en la nube, el sistema incluye un módulo de sincronización directa con Google Sheets, permitiéndote exportar y respaldar tu información de ventas y stock en tus propias hojas de cálculo externas.
+              Sí. El sistema cuenta con roles jerárquicos: Administrador (control total), Vendedor (solo POS y clientes), Facturador (ventas online y conciliación) y Cliente. Además, cualquier acción crítica como anulación de factura o retiro de efectivo en caja requiere autorización de supervisor en tiempo real.
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 7. HORARIOS & ATENCIÓN DIRECTA -->
-      <section class="info-contact-card animate-on-scroll animate-fade-up" style="margin-top:60px;">
-        <div>
-          <div class="info-contact-col-title">🚀 Puesta en Marcha</div>
-          <div class="info-contact-col-main">Activación Inmediata</div>
-          <div class="info-contact-col-sub">Crea tu cuenta demo y comienza a registrar productos y vender en menos de 5 minutos.</div>
-        </div>
-        <div>
-          <div class="info-contact-col-title">💬 Soporte Técnico Especializado</div>
-          <div class="info-contact-col-main">Atención Directa</div>
-          <div class="info-contact-col-sub">Te asistimos en la configuración de impresoras térmicas, importación de inventario y dudas operativas.</div>
-        </div>
-        <div>
-          <div class="info-contact-col-title">🛡️ Respaldo & Garantía</div>
-          <div class="info-contact-col-main">Seguridad de Datos</div>
-          <div class="info-contact-col-sub">Tus datos comerciales están protegidos con cifrado y copias de seguridad periódicas.</div>
-        </div>
-      </section>
-
-      <!-- 8. LLAMADO A LA ACCIÓN FINAL -->
+      <!-- 9. LLAMADO A LA ACCIÓN FINAL -->
       <section class="info-cta-box animate-on-scroll animate-zoom-in" style="margin-top:60px;">
         <h2 style="font-size:clamp(26px, 3.5vw, 38px); font-weight:900; color:#ffffff; margin-bottom:12px; letter-spacing:-0.5px;">
           ¿Listo para transformar la gestión de tu comercio?
