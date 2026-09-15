@@ -1344,223 +1344,458 @@ function bindStoreEvents() {
 }
 
 // ==========================================================================
-// VISTA: INFORMACIÓN (/info) - MINIMALISTA & MODERNA CON SCROLL ANIMATION
+// VISTA: INFORMACIÓN (/info) - SAAS POS & GESTIÓN EN LA NUBE CON SCROLL ANIMATION
 // ==========================================================================
 function renderInfoView(): string {
   return `
-    <div class="info-page-wrapper">
-      <!-- 1. HERO MINIMALISTA -->
+    <div class="info-page-wrapper" style="max-width:1200px; margin:0 auto; padding:20px 20px 80px; overflow-x:hidden;">
+      
+      <!-- 1. HERO SAAS CON SCROLL ANIMATION -->
       <section class="info-hero animate-on-scroll animate-fade-up">
         <div class="info-hero-badge">
           <span class="pulsing-dot"></span>
-          <span>INFORMACIÓN OFICIAL • FACILITOAPP</span>
+          <span>SISTEMA POS & GESTIÓN EN LA NUBE • FACILITOAPP</span>
         </div>
         <h1 class="info-hero-title">
-          Tecnología simple, rápida y transparente para todos.
+          El Software de Punto de Venta y Facturación que revoluciona tu negocio.
         </h1>
         <p class="info-hero-subtitle">
-          FacilitoApp nace con el propósito de conectar a las personas con la mejor tecnología del mercado, ofreciendo precios reales con tasa oficial del día, atención personalizada y envíos seguros a nivel nacional.
+          Administra tus ventas, inventario en tiempo real, tasas de cambio oficiales (BCV y Binance), cierres de caja X y Z, recibos térmicos y tienda virtual sincronizada. Todo en una sola plataforma en la nube, rápida y sin instalaciones engorrosas.
         </p>
         <div class="info-hero-ctas">
-          <button class="btn-hero-primary" id="info-cta-store">
-            🛍️ Ver Catálogo de Productos
+          <button class="btn-hero-primary" id="info-cta-demo" style="font-size:15px; padding:14px 28px;">
+            🚀 Comenzar Demo Gratis (3 Días)
           </button>
-          <a href="#info-faq-anchor" class="btn-hero-secondary" id="info-cta-faq">
-            ❓ Preguntas Frecuentes
+          <a href="#planes" class="btn-hero-secondary" id="info-cta-pricing" style="font-size:15px; padding:14px 28px; text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
+            💎 Ver Planes y Precios
           </a>
+          <button class="btn-hero-secondary" id="info-cta-store" style="font-size:15px; padding:14px 24px;">
+            🛍️ Ver Tienda Demo
+          </button>
         </div>
       </section>
 
-      <!-- 2. MÉTRICAS CLAVE (BENTO COUNTER CARDS) -->
-      <section class="info-metrics-grid animate-on-scroll animate-fade-up">
+      <!-- 2. MÉTRICAS CLAVE DEL SISTEMA -->
+      <section class="info-metrics-grid animate-on-scroll animate-fade-up" style="margin-top:40px;">
         <div class="info-metric-card">
           <div class="info-metric-number">100%</div>
-          <div class="info-metric-label">Tasa Oficial Sincronizada</div>
-          <div class="info-metric-sub">Precios transparentes en $ y Bs. al cambio BCV del día</div>
+          <div class="info-metric-label">Tasas Sincronizadas</div>
+          <div class="info-metric-sub">Tasas oficiales BCV, Euro y Binance P2P actualizadas al instante</div>
         </div>
         <div class="info-metric-card">
-          <div class="info-metric-number">24h</div>
-          <div class="info-metric-label">Despachos & Entregas</div>
-          <div class="info-metric-sub">Entregas el mismo día y envíos asegurados a todo el país</div>
+          <div class="info-metric-number">99.9%</div>
+          <div class="info-metric-label">Disponibilidad Cloud</div>
+          <div class="info-metric-sub">Acceso ininterrumpido 24/7 desde cualquier computadora, tablet o teléfono</div>
         </div>
         <div class="info-metric-card">
-          <div class="info-metric-number">4.9 ★</div>
-          <div class="info-metric-label">Satisfacción de Clientes</div>
-          <div class="info-metric-sub">Cientos de compradores confían en nuestra atención y garantía</div>
+          <div class="info-metric-number">&lt; 0.2s</div>
+          <div class="info-metric-label">Velocidad de Facturación</div>
+          <div class="info-metric-sub">Cobro ágil en caja y emisión de tickets térmicos 58mm/80mm y QR digital</div>
         </div>
         <div class="info-metric-card">
-          <div class="info-metric-number">&lt;50ms</div>
-          <div class="info-metric-label">Plataforma Ultrarrápida</div>
-          <div class="info-metric-sub">Navegación instantánea en cualquier dispositivo o conexión</div>
+          <div class="info-metric-number">Multi-Rol</div>
+          <div class="info-metric-label">Seguridad Antifraude</div>
+          <div class="info-metric-sub">Permisos estrictos para Administradores, Cajeros, Facturación e Inventario</div>
         </div>
       </section>
 
-      <!-- 3. PILARES / NUESTRA PROPUESTA -->
-      <section class="animate-on-scroll animate-fade-up">
+      <!-- 3. CAPACIDADES DEL SISTEMA (BENTO GRID - MAS INFORMACIÓN) -->
+      <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
         <div class="info-section-header">
-          <div class="info-section-tag">NUESTRA PROPUESTA</div>
-          <h2 class="info-section-title">Comprar tecnología nunca fue tan fácil</h2>
-          <p class="info-section-desc">Diseñamos cada detalle para que tu experiencia sea cómoda, segura y libre de complicaciones.</p>
+          <div class="info-section-tag">CARACTERÍSTICAS DE ÉLITE</div>
+          <h2 class="info-section-title">Todo lo que tu comercio necesita para crecer</h2>
+          <p class="info-section-desc">Diseñado para resolver los desafíos reales del comercio venezolano: bimoneda, fluctuación de precios y velocidad en caja.</p>
         </div>
 
-        <div class="info-pillars-grid">
-          <div class="info-pillar-card">
-            <div class="info-pillar-icon" style="color:var(--brand-blue);">📱</div>
-            <div class="info-pillar-title">Catálogo Completo & Actualizado</div>
-            <div class="info-pillar-text">
-              Smartphones de última generación, computadoras portátiles, accesorios de audio y gadgets inteligentes con disponibilidad de inventario verificada en tiempo real.
-            </div>
+        <div class="system-features-bento">
+          <!-- Card 1: POS -->
+          <div class="system-feature-card animate-on-scroll animate-fade-up">
+            <div class="system-feature-icon">🖥️</div>
+            <span class="system-feature-badge">Agilidad en Caja</span>
+            <h3 class="system-feature-title">Punto de Venta (POS) Táctil</h3>
+            <p class="system-feature-desc">
+              Interfaz optimizada para pantallas táctiles y teclado. Búsqueda instantánea de productos por nombre, código de barras o categoría. Cobros combinados en efectivo, Pago Móvil, tarjeta o Zelle en segundos.
+            </p>
           </div>
-          <div class="info-pillar-card">
-            <div class="info-pillar-icon" style="color:var(--brand-orange);">💳</div>
-            <div class="info-pillar-title">Múltiples Métodos de Pago</div>
-            <div class="info-pillar-text">
-              Paga en tu moneda favorita sin cálculos engorrosos: Pago Móvil interbancario, Efectivo en dólares o euros, Binance Pay USDT y tarjetas de débito o crédito.
-            </div>
+
+          <!-- Card 2: Multimoneda -->
+          <div class="system-feature-card animate-on-scroll animate-fade-up">
+            <div class="system-feature-icon" style="color:var(--brand-orange); background:rgba(255,115,0,0.1); border-color:rgba(255,115,0,0.25);">🔄</div>
+            <span class="system-feature-badge" style="color:#fb923c; background:rgba(251,146,60,0.12); border-color:rgba(251,146,60,0.25);">Bimoneda Inteligente</span>
+            <h3 class="system-feature-title">Tasas BCV & Binance al Instante</h3>
+            <p class="system-feature-desc">
+              Olvídate de calcular a mano. El sistema sincroniza automáticamente las tasas oficiales del BCV y Binance P2P. Tus clientes ven el total exacto en Bs. y $, y el arqueo de caja cuadra a la perfección.
+            </p>
           </div>
-          <div class="info-pillar-card">
-            <div class="info-pillar-icon" style="color:#10b981;">🛡️</div>
-            <div class="info-pillar-title">Garantía & Comprobante Digital</div>
-            <div class="info-pillar-text">
-              Todos nuestros productos cuentan con garantía oficial de fábrica y comprobante digital inmediato con código QR para seguimiento y tranquilidad total.
-            </div>
+
+          <!-- Card 3: Inventario -->
+          <div class="system-feature-card animate-on-scroll animate-fade-up">
+            <div class="system-feature-icon" style="color:#10b981; background:rgba(16,185,129,0.1); border-color:rgba(16,185,129,0.25);">📦</div>
+            <span class="system-feature-badge" style="color:#34d399; background:rgba(52,211,153,0.12); border-color:rgba(52,211,153,0.25);">Stock en Tiempo Real</span>
+            <h3 class="system-feature-title">Control de Inventario & Alertas</h3>
+            <p class="system-feature-desc">
+              Monitoreo permanente de stock. Recibe avisos automáticos cuando un producto esté por agotarse. Historial de movimientos de entrada y salida, cálculo de márgenes y soporte para fotos de productos.
+            </p>
+          </div>
+
+          <!-- Card 4: Cierres X y Z -->
+          <div class="system-feature-card animate-on-scroll animate-fade-up">
+            <div class="system-feature-icon" style="color:#a855f7; background:rgba(168,85,247,0.1); border-color:rgba(168,85,247,0.25);">📊</div>
+            <span class="system-feature-badge" style="color:#c084fc; background:rgba(192,132,252,0.12); border-color:rgba(192,132,252,0.25);">Auditoría Financiera</span>
+            <h3 class="system-feature-title">Cierres de Caja Blindados (X / Z)</h3>
+            <p class="system-feature-desc">
+              Arqueo de caja por turno y cajero. Desglose automático por moneda y método de pago (Efectivo $, Bs Pago Móvil, Punto de Venta). Cierres de turno con impresión de reporte de auditoría.
+            </p>
+          </div>
+
+          <!-- Card 5: Tickets Térmicos & Recibos QR -->
+          <div class="system-feature-card animate-on-scroll animate-fade-up">
+            <div class="system-feature-icon" style="color:#06b6d4; background:rgba(6,182,212,0.1); border-color:rgba(6,182,212,0.25);">🧾</div>
+            <span class="system-feature-badge" style="color:#22d3ee; background:rgba(34,211,238,0.12); border-color:rgba(34,211,238,0.25);">Impresión y Digital</span>
+            <h3 class="system-feature-title">Tickets Térmicos & QR Digital</h3>
+            <p class="system-feature-desc">
+              Compatible con impresoras térmicas USB, Bluetooth y de red (58mm y 80mm). Además, genera comprobantes digitales con código QR escaneable para enviar directo a los clientes por WhatsApp.
+            </p>
+          </div>
+
+          <!-- Card 6: Deudores y Cotizaciones -->
+          <div class="system-feature-card animate-on-scroll animate-fade-up">
+            <div class="system-feature-icon" style="color:#f59e0b; background:rgba(245,158,11,0.1); border-color:rgba(245,158,11,0.25);">📑</div>
+            <span class="system-feature-badge" style="color:#fbbf24; background:rgba(251,191,36,0.12); border-color:rgba(251,191,36,0.25);">Créditos y Presupuestos</span>
+            <h3 class="system-feature-title">Deudores & Cotizaciones</h3>
+            <p class="system-feature-desc">
+              Gestiona ventas a crédito o pagos parciales con historial de abonos por cliente. Genera presupuestos profesionales en formato PDF o imagen PNG listos para compartir con tus prospectos.
+            </p>
           </div>
         </div>
       </section>
 
-      <!-- 4. CÓMO FUNCIONA (PASOS) -->
-      <section class="animate-on-scroll animate-fade-up">
+      <!-- 4. PASO A PASO: CÓMO EMPEZAR -->
+      <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
         <div class="info-section-header">
-          <div class="info-section-tag">PASO A PASO</div>
-          <h2 class="info-section-title">Tu compra lista en 3 simples pasos</h2>
-          <p class="info-section-desc">Sin registros complicados ni demoras innecesarias.</p>
+          <div class="info-section-tag">FÁCIL Y RÁPIDO</div>
+          <h2 class="info-section-title">Comienza a operar en 3 sencillos pasos</h2>
+          <p class="info-section-desc">Sin contratos forzosos, sin instalaciones complejas y con soporte técnico dedicado.</p>
         </div>
 
         <div class="info-steps-grid">
           <div class="info-step-card">
             <span class="info-step-number">PASO 01</span>
-            <h3 class="info-step-title">Elige tus Productos</h3>
-            <p class="info-step-desc">Explora las categorías, filtra por disponibilidad y agrega lo que necesites a tu carrito de compras.</p>
+            <h3 class="info-step-title">Activa tu Demo Gratuita</h3>
+            <p class="info-step-desc">Crea tu cuenta de comercio en menos de 1 minuto y accede a todas las funciones premium gratis durante 3 días.</p>
           </div>
           <div class="info-step-card">
             <span class="info-step-number" style="color:var(--brand-orange); background:rgba(255,115,0,0.12); border-color:rgba(255,115,0,0.3);">PASO 02</span>
-            <h3 class="info-step-title">Confirma tu Pago</h3>
-            <p class="info-step-desc">Selecciona Pago Móvil, Efectivo o Binance. Verás el total exacto en Bolívares y Dólares al cambio oficial sin recargos.</p>
+            <h3 class="info-step-title">Carga tu Inventario</h3>
+            <p class="info-step-desc">Registra tus productos con precios en dólares o bolívares, fotos y categorías. Puedes importar tu catálogo en lote.</p>
           </div>
           <div class="info-step-card">
             <span class="info-step-number" style="color:#10b981; background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.3);">PASO 03</span>
-            <h3 class="info-step-title">Recibe o Retira</h3>
-            <p class="info-step-desc">Te enviamos tu paquete asegurado a tu dirección o puedes pasar retirándolo por nuestra sede física sin esperas.</p>
+            <h3 class="info-step-title">Vende y Crece</h3>
+            <p class="info-step-desc">Comienza a facturar en tu punto de venta, abre tu catálogo web para pedidos online y supervisa tus ganancias en tiempo real.</p>
           </div>
         </div>
       </section>
 
-      <!-- 5. PREGUNTAS FRECUENTES (FAQ ACORDEÓN) -->
+      <!-- ==================================================================== -->
+      <!-- 5. SECCIÓN DE LA FOTO: PLANES Y PRECIOS (ESTILO VE-COMMERCE)        -->
+      <!-- ==================================================================== -->
+      <div id="planes" style="position:relative; top:-40px;"></div>
+      <section class="pricing-section-container animate-on-scroll animate-fade-up" style="margin-top:60px;">
+        <div class="info-section-header">
+          <div class="info-section-tag">PLANES Y SUSCRIPCIÓN</div>
+          <h2 class="info-section-title">
+            Planes que se adaptan a tu <span style="background: linear-gradient(135deg, #0084ff 0%, #ff7300 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">tipo de negocio</span>
+          </h2>
+          <p class="info-section-desc">Desde el pequeño comercio hasta la cadena multi-sucursal.</p>
+        </div>
+
+        <div class="pricing-cards-grid">
+          <!-- TARJETA 1: DEMO GRATUITA -->
+          <div class="pricing-card animate-on-scroll animate-fade-up">
+            <div>
+              <div class="pricing-card-header">
+                <span class="pricing-plan-tag">DEMO GRATUITA</span>
+              </div>
+              <div class="pricing-price-box">
+                <span class="pricing-amount">Gratis</span>
+                <span class="pricing-cycle">por 3 días</span>
+              </div>
+              <p class="pricing-desc">
+                Prueba el sistema completo y conoce todas las herramientas sin compromiso. Depuración automática tras 2 días hábiles de vencido.
+              </p>
+
+              <ul class="pricing-features-list">
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Punto de venta e inventario</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Soporte multimoneda completo</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Tasas BCV en tiempo real</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Múltiples métodos de pago</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Prueba de 3 días sin compromiso</span>
+                </li>
+              </ul>
+            </div>
+
+            <button class="btn-pricing-demo" id="btn-plan-demo">
+              Comenzar Demo
+            </button>
+          </div>
+
+          <!-- TARJETA 2: PRO (RECOMENDADO) -->
+          <div class="pricing-card featured animate-on-scroll animate-fade-up">
+            <div>
+              <div class="pricing-card-header">
+                <span class="pricing-plan-tag">PRO</span>
+                <span class="pricing-badge-recommended">⭐ RECOMENDADO</span>
+              </div>
+              <div class="pricing-price-box">
+                <span class="pricing-amount">$30</span>
+                <span class="pricing-cycle">/ mes</span>
+              </div>
+              <p class="pricing-desc">
+                Para negocios en crecimiento. Todo lo que necesitas sin límites.
+              </p>
+
+              <ul class="pricing-features-list">
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span><strong>Punto de venta ilimitado</strong></span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span><strong>Productos ilimitados</strong></span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Inventario en tiempo real</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Reportes avanzados + dashboard</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Múltiples usuarios y roles</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Soporte multimoneda completo</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>IGTF automático</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Soporte técnico prioritario</span>
+                </li>
+              </ul>
+            </div>
+
+            <button class="btn-pricing-pro" id="btn-plan-pro">
+              Comenzar Ahora
+            </button>
+          </div>
+
+          <!-- TARJETA 3: VERSIÓN FISCAL (SENIAT) - EN DESARROLLO -->
+          <div class="pricing-card animate-on-scroll animate-fade-up">
+            <div>
+              <div class="pricing-card-header">
+                <span class="pricing-plan-tag">VERSIÓN FISCAL</span>
+                <span class="pricing-badge-wip">⏳ MUY PRONTO</span>
+              </div>
+              <div class="pricing-price-box">
+                <span class="pricing-amount">Fiscal</span>
+                <span class="pricing-cycle">integración</span>
+              </div>
+              <p class="pricing-desc">
+                Emisión de facturas y cumplimiento tributario mediante integración con sistemas fiscales homologados.
+              </p>
+
+              <!-- AVISO EXPLÍCITO SENIAT (REQUERIDO) -->
+              <div class="pricing-wip-notice">
+                <span style="font-size:18px;">⚠️</span>
+                <div>
+                  <strong>Estamos trabajando en el plan del SENIAT / Integración Fiscal.</strong>
+                  <br>Aún no está disponible de forma comercial. ¡Muy pronto estará disponible para todos! Únete a la lista de espera para ser el primero en activarlo.
+                </div>
+              </div>
+
+              <ul class="pricing-features-list">
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Todo lo incluido en el plan Pro</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Integración con impresoras fiscales</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Soporte para sistemas homologados</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Configuración personalizada</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Cumplimiento normativo SENIAT</span>
+                </li>
+                <li class="pricing-feature-item">
+                  <span class="pricing-feature-check">✓</span>
+                  <span>Soporte técnico especializado</span>
+                </li>
+              </ul>
+            </div>
+
+            <a href="https://wa.me/584120000000?text=${encodeURIComponent('Hola, me interesa conocer más sobre la Versión Fiscal SENIAT de FacilitoApp y anotarme en la lista de espera.')}" target="_blank" class="btn-pricing-fiscal" id="btn-plan-fiscal">
+              💬 Contactar por WhatsApp
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. PREGUNTAS FRECUENTES (FAQ ACORDEÓN) -->
       <div id="info-faq-anchor" style="position:relative; top:-40px;"></div>
-      <section class="animate-on-scroll animate-fade-up">
+      <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
         <div class="info-section-header">
           <div class="info-section-tag">RESOLVEMOS TUS DUDAS</div>
           <h2 class="info-section-title">Preguntas Frecuentes</h2>
-          <p class="info-section-desc">Todo lo que necesitas saber antes de realizar tu compra.</p>
+          <p class="info-section-desc">Todo lo que necesitas saber sobre FacilitoApp, tus datos y la suscripción.</p>
         </div>
 
         <div class="info-faq-list">
           <div class="info-faq-item open">
             <button class="info-faq-question">
-              <span>¿Cómo se calculan los precios en Bolívares (Bs.)?</span>
+              <span>¿Cómo funciona la sincronización de tasas BCV y Binance?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              Todos nuestros precios en Bolívares se calculan con la tasa oficial publicada por el Banco Central de Venezuela (BCV), la cual se sincroniza de forma automática en nuestra plataforma para garantizar transparencia total.
+              El sistema se conecta de forma automática a los servidores oficiales del Banco Central de Venezuela (BCV) y a Binance P2P. Tus productos fijados en dólares o bolívares se calculan en tiempo real sin que tengas que ajustar precios manualmente cada día.
             </div>
           </div>
 
           <div class="info-faq-item">
             <button class="info-faq-question">
-              <span>¿Qué métodos de pago tienen disponibles?</span>
+              <span>¿Cuándo estará disponible el plan con integración SENIAT?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              Aceptamos Pago Móvil de cualquier entidad bancaria nacional, Efectivo en Dólares ($) y Euros (€), Binance Pay (USDT) y tarjetas de débito o crédito nacionales e internacionales.
+              Actualmente estamos trabajando activamente en el módulo fiscal para homologar impresoras fiscales y cumplir al 100% con las normativas y providencias del SENIAT. Aún no está disponible, ¡muy pronto anunciaremos su lanzamiento oficial! Puedes contactarnos por WhatsApp para anotarte en la lista de espera prioritaria.
             </div>
           </div>
 
           <div class="info-faq-item">
             <button class="info-faq-question">
-              <span>¿Realizan envíos a todo el país?</span>
+              <span>¿Necesito comprar equipos especiales o instalar programas?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              Sí, despachamos a nivel nacional mediante las principales empresas de encomienda (MRW, Zoom, Tealca) con número de guía y seguro de envío. En la zona metropolitana contamos con servicio express el mismo día.
+              No. FacilitoApp es 100% basado en la nube. Puedes utilizarlo desde cualquier computadora de escritorio, laptop, tablet o teléfono con conexión a internet. Es compatible con tus lectores de códigos de barras e impresoras térmicas USB o de red existentes.
             </div>
           </div>
 
           <div class="info-faq-item">
             <button class="info-faq-question">
-              <span>¿Puedo retirar personalmente mi pedido?</span>
+              <span>¿Qué ocurre cuando vencen los 3 días de la Demo Gratuita?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              ¡Por supuesto! Puedes seleccionar la opción de retiro en tienda durante tu checkout y pasar por nuestra sede física en el horario comercial sin ningún costo adicional.
+              Puedes probar todas las funciones sin costo. Si decides activar el Plan Pro ($30/mes), conservas todos tus productos, clientes y ventas intactos. Tienes 2 días hábiles de gracia para formalizar tu pago antes de la depuración automática del comercio demo.
             </div>
           </div>
 
           <div class="info-faq-item">
             <button class="info-faq-question">
-              <span>¿Los productos tienen garantía?</span>
+              <span>¿Puedo tener varios cajeros o empleados con cuentas separadas?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              Todos nuestros productos son 100% nuevos y originales, respaldados por garantía oficial contra defectos de fábrica. Además, recibes un comprobante digital con código QR para cualquier consulta o trámite.
+              Sí. Puedes crear usuarios con roles definidos: Administrador (acceso total), Cajero (solo punto de venta y cierre de turno), Facturación e Inventario. Esto previene accesos indebidos a tus reportes financieros y costos de compra.
+            </div>
+          </div>
+
+          <div class="info-faq-item">
+            <button class="info-faq-question">
+              <span>¿Cómo se respaldan mis ventas e inventario?</span>
+              <span class="info-faq-chevron">▼</span>
+            </button>
+            <div class="info-faq-answer">
+              Además de copias de seguridad automáticas en nuestros servidores en la nube, el sistema incluye un módulo de sincronización directa con Google Sheets, permitiéndote exportar y respaldar tu información de ventas y stock en tus propias hojas de cálculo externas.
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 6. HORARIOS & ATENCIÓN DIRECTA -->
-      <section class="info-contact-card animate-on-scroll animate-fade-up">
+      <!-- 7. HORARIOS & ATENCIÓN DIRECTA -->
+      <section class="info-contact-card animate-on-scroll animate-fade-up" style="margin-top:60px;">
         <div>
-          <div class="info-contact-col-title">📍 Ubicación & Retiro</div>
-          <div class="info-contact-col-main">Sede Comercial Central</div>
-          <div class="info-contact-col-sub">Zona Comercial Principal. Espacio accesible con estacionamiento para retiros inmediatos.</div>
+          <div class="info-contact-col-title">🚀 Puesta en Marcha</div>
+          <div class="info-contact-col-main">Activación Inmediata</div>
+          <div class="info-contact-col-sub">Crea tu cuenta demo y comienza a registrar productos y vender en menos de 5 minutos.</div>
         </div>
         <div>
-          <div class="info-contact-col-title">🕒 Horario de Atención</div>
-          <div class="info-contact-col-main">Lunes a Sábado</div>
-          <div class="info-contact-col-sub">8:30 AM a 6:30 PM (Horario corrido). Domingos cerrado para mantenimiento y logística.</div>
+          <div class="info-contact-col-title">💬 Soporte Técnico Especializado</div>
+          <div class="info-contact-col-main">Atención Directa</div>
+          <div class="info-contact-col-sub">Te asistimos en la configuración de impresoras térmicas, importación de inventario y dudas operativas.</div>
         </div>
         <div>
-          <div class="info-contact-col-title">💬 Atención Inmediata</div>
-          <div class="info-contact-col-main">Soporte & Asesoría</div>
-          <div class="info-contact-col-sub">¿Tienes preguntas sobre un producto o envío? Nuestro equipo de atención te atiende al instante.</div>
+          <div class="info-contact-col-title">🛡️ Respaldo & Garantía</div>
+          <div class="info-contact-col-main">Seguridad de Datos</div>
+          <div class="info-contact-col-sub">Tus datos comerciales están protegidos con cifrado y copias de seguridad periódicas.</div>
         </div>
       </section>
 
-      <!-- 7. LLAMADO A LA ACCIÓN FINAL -->
-      <section class="info-cta-box animate-on-scroll animate-zoom-in">
+      <!-- 8. LLAMADO A LA ACCIÓN FINAL -->
+      <section class="info-cta-box animate-on-scroll animate-zoom-in" style="margin-top:60px;">
         <h2 style="font-size:clamp(26px, 3.5vw, 38px); font-weight:900; color:#ffffff; margin-bottom:12px; letter-spacing:-0.5px;">
-          ¿Listo para estrenar la mejor tecnología?
+          ¿Listo para transformar la gestión de tu comercio?
         </h2>
-        <p style="font-size:15px; color:#94a3b8; max-width:540px; margin:0 auto 24px; line-height:1.6;">
-          Descubre cientos de artículos verificados con entrega inmediata, garantía oficial y precios transparentes.
+        <p style="font-size:15.5px; color:#94a3b8; max-width:600px; margin:0 auto 26px; line-height:1.6;">
+          Prueba FacilitoApp gratis por 3 días y descubre la velocidad de un Punto de Venta moderno, multi-moneda y en la nube.
         </p>
-        <button class="btn-hero-primary" id="info-cta-bottom" style="font-size:16px; padding:16px 36px;">
-          🛍️ Explorar Tienda FacilitoApp
-        </button>
+        <div style="display:flex; justify-content:center; gap:16px; flex-wrap:wrap;">
+          <button class="btn-hero-primary" id="info-cta-bottom" style="font-size:16px; padding:16px 36px;">
+            🚀 Comenzar Demo Gratis Ahora
+          </button>
+          <a href="https://wa.me/584120000000?text=${encodeURIComponent('Hola, deseo una demostración personalizada del sistema FacilitoApp POS.')}" target="_blank" class="btn-hero-secondary" style="font-size:16px; padding:16px 28px; text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
+            💬 Hablar con un Asesor
+          </a>
+        </div>
       </section>
+
     </div>
   `;
 }
 
 function bindInfoEvents() {
-  // Botones para ir a la tienda
+  // Navegación a Demo / Registro
+  document.getElementById('info-cta-demo')?.addEventListener('click', () => navigate('auth'));
+  document.getElementById('btn-plan-demo')?.addEventListener('click', () => navigate('auth'));
+  document.getElementById('btn-plan-pro')?.addEventListener('click', () => navigate('auth'));
+  document.getElementById('info-cta-bottom')?.addEventListener('click', () => navigate('auth'));
+
+  // Navegación a Catálogo / Tienda
   document.getElementById('info-cta-store')?.addEventListener('click', () => navigate('store'));
-  document.getElementById('info-cta-bottom')?.addEventListener('click', () => navigate('store'));
-  
-  // Desplazamiento suave al ancla de FAQ
-  document.getElementById('info-cta-faq')?.addEventListener('click', (e) => {
+
+  // Scroll suave hacia los planes
+  document.getElementById('info-cta-pricing')?.addEventListener('click', (e) => {
     e.preventDefault();
-    document.getElementById('info-faq-anchor')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('planes')?.scrollIntoView({ behavior: 'smooth' });
   });
 
   // Acordeón interactivo de Preguntas Frecuentes
