@@ -6,11 +6,37 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const path_1 = __importDefault(require("path"));
+const multer_1 = __importDefault(require("multer"));
 const db_1 = __importDefault(require("../config/db"));
 const auth_1 = require("../middleware/auth");
 const email_1 = require("../services/email");
 const audit_1 = require("../services/audit");
 const validation_1 = require("../utils/validation");
+// Configuración de almacenamiento para fotos de perfil locales
+const avatarStorage = multer_1.default.diskStorage({
+    destination: (_req, _file, cb) => {
+        cb(null, path_1.default.join(__dirname, '../../uploads'));
+    },
+    filename: (_req, file, cb) => {
+        const ext = path_1.default.extname(file.originalname).toLowerCase();
+        const uniqueSuffix = 'avatar-' + Date.now() + '-' + Math.round(Math.random() * 1e6) + ext;
+        cb(null, uniqueSuffix);
+    }
+});
+const uploadAvatar = (0, multer_1.default)({
+    storage: avatarStorage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|webp|svg\+xml|svg/;
+        const extname = allowedTypes.test(path_1.default.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (extname || mimetype) {
+            return cb(null, true);
+        }
+        cb(new Error('Solo se permiten imágenes (PNG, JPG, JPEG, WEBP, SVG)'));
+    }
+});
 const router = (0, express_1.Router)();
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secreta_pos_online_token_key_987654321';
 // Registro de Usuario (Clientes) con Validación por Correo y WhatsApp
@@ -238,8 +264,6 @@ router.post('/login', async (req, res) => {
                 email: user.email,
                 role: user.role,
                 phone: user.phone,
-                ci: user.ci,
-                avatar_url: user.avatar_url || null,
                 business_id: targetBusinessId,
                 business: businessInfo
             }
@@ -342,8 +366,7 @@ router.post('/google', async (req, res) => {
                 email: user.email,
                 role: user.role,
                 phone: user.phone,
-                ci: user.ci,
-                avatar_url: user.avatar_url || null
+                ci: user.ci
             }
         });
     }
@@ -352,12 +375,12 @@ router.post('/google', async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor al procesar la autenticación de Google' });
     }
 });
-// Obtener datos del usuario logueado
+// Obtener datos del usuario logueado (Todos los roles)
 router.get('/me', auth_1.authenticate, async (req, res) => {
     try {
         if (!req.user)
             return res.status(401).json({ message: 'No autenticado' });
-        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, ci, avatar_url, permissions, business_id, created_at FROM users WHERE id = ?', [req.user.id]);
+        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, ci, address, client_type, photo_url, permissions, business_id, created_at FROM users WHERE id = ?', [req.user.id]);
         if (users.length === 0) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
@@ -389,95 +412,83 @@ router.get('/me', auth_1.authenticate, async (req, res) => {
         res.status(500).json({ message: 'Error al obtener datos del usuario' });
     }
 });
-// GET /auth/profile: Obtener configuración de perfil del usuario logueado (todos los roles)
-router.get('/profile', auth_1.authenticate, async (req, res) => {
-    try {
-        if (!req.user)
-            return res.status(401).json({ message: 'No autenticado' });
-        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, ci, avatar_url, password IS NOT NULL as has_password, business_id, created_at FROM users WHERE id = ?', [req.user.id]);
-        if (users.length === 0)
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        res.json(users[0]);
-    }
-    catch (error) {
-        console.error('Error al obtener perfil:', error);
-        res.status(500).json({ message: 'Error interno al obtener el perfil' });
-    }
-});
-// PUT /auth/profile: Modificar información de la cuenta, foto de perfil y contraseña (todos los usuarios)
+// Actualizar perfil de cuenta del usuario autenticado (Todos los roles)
 router.put('/profile', auth_1.authenticate, async (req, res) => {
     try {
         if (!req.user)
             return res.status(401).json({ message: 'No autenticado' });
-        const userId = req.user.id;
-        const { name, phone, ci, avatar_url, current_password, new_password } = req.body;
+        const { name, phone, ci, email, address, photo_url, currentPassword, newPassword } = req.body;
         if (!name || !name.trim()) {
             return res.status(400).json({ message: 'El nombre completo es obligatorio' });
         }
-        if (ci && !(0, validation_1.validateCi)(ci)) {
-            return res.status(400).json({ message: 'Formato de Cédula o RIF inválido. Debe comenzar con V-, E-, J- o G- (ej. V-12345678)' });
-        }
-        const [existingUsers] = await db_1.default.query('SELECT * FROM users WHERE id = ?', [userId]);
-        if (existingUsers.length === 0) {
+        // Obtener usuario actual
+        const [users] = await db_1.default.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
+        if (users.length === 0) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
-        const currentUserDb = existingUsers[0];
-        // Manejo de cambio de contraseña si se solicita
-        let updatePasswordSql = '';
-        const queryParams = [
-            name.trim(),
-            phone ? phone.trim() : null,
-            ci ? ci.trim() : null,
-            avatar_url !== undefined ? avatar_url : currentUserDb.avatar_url
-        ];
-        if (new_password && new_password.trim()) {
-            if (new_password.trim().length < 6) {
+        const currentUser = users[0];
+        // Si intenta cambiar email, verificar unicidad
+        if (email && email.trim().toLowerCase() !== currentUser.email.toLowerCase()) {
+            const [emailExists] = await db_1.default.query('SELECT id FROM users WHERE email = ? AND id != ?', [email.trim().toLowerCase(), req.user.id]);
+            if (emailExists.length > 0) {
+                return res.status(400).json({ message: 'Este correo electrónico ya está registrado por otro usuario' });
+            }
+        }
+        // Si intenta cambiar clave
+        let updatedPasswordHash = currentUser.password;
+        if (newPassword && newPassword.trim().length > 0) {
+            if (newPassword.trim().length < 6) {
                 return res.status(400).json({ message: 'La nueva contraseña debe tener al menos 6 caracteres' });
             }
-            if (currentUserDb.password) {
-                if (!current_password) {
+            if (currentUser.password) {
+                if (!currentPassword) {
                     return res.status(400).json({ message: 'Debes ingresar tu contraseña actual para cambiarla' });
                 }
-                const isMatch = await bcryptjs_1.default.compare(current_password, currentUserDb.password);
+                const isMatch = await bcryptjs_1.default.compare(currentPassword, currentUser.password);
                 if (!isMatch) {
-                    return res.status(400).json({ message: 'La contraseña actual no es correcta' });
+                    return res.status(400).json({ message: 'La contraseña actual ingresada es incorrecta' });
                 }
             }
             const salt = await bcryptjs_1.default.genSalt(10);
-            const hashedPassword = await bcryptjs_1.default.hash(new_password.trim(), salt);
-            updatePasswordSql = ', password = ?';
-            queryParams.push(hashedPassword);
+            updatedPasswordHash = await bcryptjs_1.default.hash(newPassword.trim(), salt);
         }
-        queryParams.push(userId);
-        await db_1.default.query(`UPDATE users SET name = ?, phone = ?, ci = ?, avatar_url = ?${updatePasswordSql} WHERE id = ?`, queryParams);
-        // Registrar auditoría
-        try {
-            await (0, audit_1.logAuditEvent)({
-                userId,
-                userName: name.trim(),
-                userRole: currentUserDb.role,
-                actionType: 'user_edit',
-                title: 'Actualización de perfil de usuario',
-                details: {
-                    name: name.trim(),
-                    phone,
-                    ci,
-                    has_avatar: Boolean(avatar_url),
-                    password_changed: Boolean(new_password)
-                }
-            });
-        }
-        catch (_) { }
-        // Obtener usuario actualizado
-        const [updatedRows] = await db_1.default.query('SELECT id, name, email, role, phone, ci, avatar_url, business_id FROM users WHERE id = ?', [userId]);
+        const newEmail = email ? email.trim().toLowerCase() : currentUser.email;
+        const newPhone = phone !== undefined ? (phone ? phone.trim() : null) : currentUser.phone;
+        const newCi = ci !== undefined ? (ci ? ci.trim() : null) : currentUser.ci;
+        const newAddress = address !== undefined ? (address ? address.trim() : null) : currentUser.address;
+        const newPhoto = photo_url !== undefined ? photo_url : currentUser.photo_url;
+        await db_1.default.query(`UPDATE users 
+       SET name = ?, email = ?, phone = ?, ci = ?, address = ?, photo_url = ?, password = ? 
+       WHERE id = ?`, [name.trim(), newEmail, newPhone, newCi, newAddress, newPhoto, updatedPasswordHash, req.user.id]);
+        // Obtener datos actualizados
+        const [updatedRows] = await db_1.default.query('SELECT id, name, email, role, phone, ci, address, client_type, photo_url, permissions, business_id, created_at FROM users WHERE id = ?', [req.user.id]);
+        const updatedUser = updatedRows[0];
+        // Emitir nuevo token con nombre y email actualizados
+        const token = jsonwebtoken_1.default.sign({ id: updatedUser.id, email: updatedUser.email, role: updatedUser.role, name: updatedUser.name, business_id: updatedUser.business_id || 1 }, JWT_SECRET, { expiresIn: '8h' });
         res.json({
             message: '¡Tu perfil ha sido actualizado con éxito!',
-            user: updatedRows[0]
+            user: updatedUser,
+            token
         });
     }
     catch (error) {
-        console.error('Error al actualizar perfil:', error);
-        res.status(500).json({ message: 'Error interno al actualizar perfil' });
+        console.error('Error al actualizar perfil de usuario:', error);
+        res.status(500).json({ message: 'Error interno al actualizar el perfil' });
+    }
+});
+// Subir foto de perfil desde archivo local
+router.post('/profile/photo', auth_1.authenticate, uploadAvatar.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No se recibió ningún archivo de imagen' });
+        }
+        const photoUrl = `/uploads/${req.file.filename}`;
+        await db_1.default.query('UPDATE users SET photo_url = ? WHERE id = ?', [photoUrl, req.user?.id]);
+        res.json({ message: 'Foto de perfil actualizada exitosamente', photo_url: photoUrl });
+    }
+    catch (error) {
+        console.error('Error subiendo foto de perfil:', error);
+        res.status(500).json({ message: 'Error al subir la foto de perfil' });
     }
 });
 router.get('/customers', auth_1.authenticate, async (req, res) => {

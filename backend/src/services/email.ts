@@ -104,16 +104,18 @@ export async function getTransporter(): Promise<any> {
   if (host && user && pass) {
     const isGmail = host.toLowerCase().includes('gmail.com');
     transporter = nodemailer.createTransport({
-      ...(isGmail ? { service: 'gmail' } : { host, port, secure: port === 465 }),
+      host: isGmail ? 'smtp.gmail.com' : host,
+      port: isGmail ? 465 : port,
+      secure: isGmail ? true : port === 465,
       auth: { user, pass },
-      connectionTimeout: 8000,
-      greetingTimeout: 8000,
-      socketTimeout: 12000,
+      connectionTimeout: 7000,
+      greetingTimeout: 7000,
+      socketTimeout: 10000,
       tls: {
         rejectUnauthorized: false
       }
     });
-    console.log(`Transportador de correo SMTP directo configurado con éxito.${isGmail ? ' (Modo Gmail optimizado)' : ''}`);
+    console.log(`Transportador de correo SMTP directo configurado con éxito.${isGmail ? ' (Modo Gmail SSL 465 ultrarrápido)' : ''}`);
     return transporter;
   }
 

@@ -173,6 +173,22 @@ async function runMigrations() {
           console.error('Error al agregar columnas de verificación a users:', err.message);
         }
       }
+      if (!userColNames.includes('photo_url')) {
+        try {
+          await conn.query('ALTER TABLE users ADD COLUMN photo_url MEDIUMTEXT NULL');
+          console.log('Columna "photo_url" agregada a la tabla users.');
+        } catch (err: any) {
+          console.error('Error al agregar columna "photo_url":', err.message);
+        }
+      }
+      if (!userColNames.includes('address')) {
+        try {
+          await conn.query('ALTER TABLE users ADD COLUMN address TEXT NULL');
+          console.log('Columna "address" agregada a la tabla users.');
+        } catch (err: any) {
+          console.error('Error al agregar columna "address":', err.message);
+        }
+      }
     } catch (err: any) {
       console.error('Error al inspeccionar columnas de la tabla users:', err.message);
     }

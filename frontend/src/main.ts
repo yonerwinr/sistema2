@@ -789,6 +789,7 @@ function renderApp() {
     ${renderInvoiceSuccessModal()}
     ${renderSaleDetailModal()}
     ${renderSaleDetailPngModal()}
+    ${renderUserProfileModal()}
   `;
 
   // Enlazar eventos de la vista activa y modales comunes
@@ -797,6 +798,7 @@ function renderApp() {
   bindCheckoutEvents();
   bindSuccessEvents();
   bindSaleDetailEvents();
+  bindUserProfileModalEvents();
 
   if (currentView === 'superadmin') {
     const saContainer = document.getElementById('superadmin-container');
@@ -825,15 +827,17 @@ function renderNavbar(): string {
   const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return `
-    <div class="exchange-rate-banner" style="background: rgba(16,185,129,0.06); border-bottom: 1px solid var(--border-glass); padding: 6px 0; font-size: 11px; font-weight: 600; text-align: center; color: var(--success); display: flex; justify-content: center; gap: 16px; align-items:center; flex-wrap: wrap;">
-      <span>💵 BCV: <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
-      <span style="color:var(--text-muted);">|</span>
-      <span>Euro €: <strong>Bs. ${formatRate(rateEurToVes)}</strong></span>
-      <span style="color:var(--text-muted);">|</span>
-      <span style="color:#f59e0b;">🟡 Binance P2P: <strong>Bs. ${formatRate(rateBinanceToVes)}</strong></span>
-      <span style="color:var(--text-muted);">|</span>
-      <span style="color:var(--text-secondary);">⚡ Envíos Express & Retiro en Tienda</span>
-    </div>
+    ${currentView !== 'auth' ? `
+      <div class="exchange-rate-banner" style="background: rgba(16,185,129,0.06); border-bottom: 1px solid var(--border-glass); padding: 6px 0; font-size: 11px; font-weight: 600; text-align: center; color: var(--success); display: flex; justify-content: center; gap: 16px; align-items:center; flex-wrap: wrap;">
+        <span>💵 BCV: <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
+        <span style="color:var(--text-muted);">|</span>
+        <span>Euro €: <strong>Bs. ${formatRate(rateEurToVes)}</strong></span>
+        <span style="color:var(--text-muted);">|</span>
+        <span style="color:#f59e0b;">🟡 Binance P2P: <strong>Bs. ${formatRate(rateBinanceToVes)}</strong></span>
+        <span style="color:var(--text-muted);">|</span>
+        <span style="color:var(--text-secondary);">⚡ Envíos Express & Retiro en Tienda</span>
+      </div>
+    ` : ''}
 
     <!-- Banner de Alerta Preventiva de Vencimiento de Suscripción (si quedan 5 días o menos o ya venció) -->
     ${(() => {
@@ -943,9 +947,17 @@ function renderNavbar(): string {
               `;
             })()}
 
-            <span class="nav-link" style="color: var(--primary); font-weight: 600; cursor: default;">
-              Hola, ${currentUser.name.split(' ')[0]}
-            </span>
+            <button type="button" class="btn btn-secondary nav-user-profile-btn" id="nav-user-profile-btn" style="display:inline-flex; align-items:center; gap:8px; border-radius:24px; padding:3px 12px 3px 5px; font-size:12px; font-weight:600; border-color:var(--border-glass); background:rgba(255,255,255,0.06); color:var(--text-main); cursor:pointer;" title="Configurar mi cuenta y foto de perfil">
+              <div style="width:26px; height:26px; border-radius:50%; overflow:hidden; background:linear-gradient(135deg, var(--brand-orange, #ff7300), var(--brand-blue, #0077f6)); display:flex; align-items:center; justify-content:center; color:white; font-size:12px; font-weight:800; flex-shrink:0; border:1px solid rgba(255,255,255,0.2);">
+                ${currentUser.photo_url
+                  ? (currentUser.photo_url.startsWith('data:') || currentUser.photo_url.startsWith('http') || currentUser.photo_url.startsWith('/uploads')
+                      ? `<img src="${currentUser.photo_url}" style="width:100%; height:100%; object-fit:cover;" alt="Avatar">`
+                      : `<span style="font-size:13px;">${currentUser.photo_url}</span>`)
+                  : currentUser.name.charAt(0).toUpperCase()}
+              </div>
+              <span style="max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${currentUser.name.split(' ')[0]}</span>
+              <span style="font-size:11px; opacity:0.8;">⚙️</span>
+            </button>
             <a class="nav-link" id="link-logout" style="display:flex; align-items:center; gap:6px;">
               ${icons.logout} Salir
             </a>
@@ -1006,6 +1018,10 @@ function bindGeneralEvents() {
 
   document.getElementById('link-store')?.addEventListener('click', () => navigate('store'));
   document.getElementById('link-info')?.addEventListener('click', () => navigate('info'));
+  document.getElementById('nav-user-profile-btn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openUserProfileModal();
+  });
   document.getElementById('footer-link-store')?.addEventListener('click', () => navigate('store'));
   document.getElementById('footer-link-info')?.addEventListener('click', () => navigate('info'));
   document.getElementById('footer-link-faq')?.addEventListener('click', () => {
@@ -3018,12 +3034,391 @@ function bindSuccessEvents() {
 }
 
 // ==========================================================================
+// MODAL: CONFIGURACIÓN DE PERFIL DE USUARIO (PARA TODOS LOS ROLES)
+// ==========================================================================
+let isUserProfileModalOpen = false;
+let profileEditPhotoUrl = '';
+let profileShowPassFields = false;
+
+function openUserProfileModal() {
+  if (!currentUser) {
+    navigate('auth');
+    return;
+  }
+  profileEditPhotoUrl = currentUser.photo_url || '';
+  profileShowPassFields = false;
+  isUserProfileModalOpen = true;
+  renderApp();
+}
+
+function closeUserProfileModal() {
+  isUserProfileModalOpen = false;
+  renderApp();
+}
+
+function renderUserProfileModal(): string {
+  if (!isUserProfileModalOpen || !currentUser) return '';
+
+  const initials = (currentUser.name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+  const roleNameMap: Record<string, { label: string; icon: string }> = {
+    superadmin: { label: 'SuperAdministrador SaaS', icon: '👑' },
+    admin: { label: 'Administrador del Comercio', icon: '🛡️' },
+    seller: { label: 'Vendedor / POS', icon: '💼' },
+    billing: { label: 'Facturación y Caja', icon: '🧾' },
+    customer: { label: 'Cliente Registrado', icon: '🛍️' }
+  };
+  const roleInfo = roleNameMap[currentUser.role] || { label: currentUser.role, icon: '👤' };
+
+  const avatarPresets = [
+    { id: 'monkey', label: '🐒 Monito Facilito', icon: '🐒' },
+    { id: 'pro', label: '💼 Ejecutivo', icon: '💼' },
+    { id: 'dev', label: '👨‍💻 Desarrollador', icon: '👨‍💻' },
+    { id: 'pro_f', label: '👩‍💼 Profesional', icon: '👩‍💼' },
+    { id: 'star', label: '⭐ Estrella', icon: '⭐' },
+    { id: 'rocket', label: '🚀 Emprendedor', icon: '🚀' },
+    { id: 'cart', label: '🛒 Comprador', icon: '🛒' },
+    { id: 'cash', label: '💰 Finanzas', icon: '💰' },
+  ];
+
+  return `
+    <div class="modal-backdrop active" id="user-profile-modal-backdrop" style="z-index: 99999; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); padding: 16px;">
+      <div class="card modal-dialog-custom animate-zoom-in" style="max-width: 580px; width: 100%; max-height: 90vh; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); padding: 0;">
+        
+        <!-- Encabezado del Modal -->
+        <div style="background: linear-gradient(135deg, rgba(255,115,0,0.15) 0%, rgba(0,119,246,0.15) 100%); border-bottom: 1px solid var(--border-glass); padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; border-top-left-radius: 20px; border-top-right-radius: 20px;">
+          <div>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px; color: var(--text-main);">
+              <span>👤</span> Configuración de Mi Perfil
+            </h3>
+            <p style="margin: 3px 0 0 0; font-size: 12px; color: var(--text-secondary);">
+              Personaliza tu información de cuenta, foto de perfil y contraseña
+            </p>
+          </div>
+          <button type="button" id="btn-close-profile-modal" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border-glass); color: var(--text-secondary); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; transition: all 0.2s;" title="Cerrar ventana">
+            ✕
+          </button>
+        </div>
+
+        <div style="padding: 22px;">
+          <form id="user-profile-form">
+            
+            <!-- SECCIÓN 1: FOTO DE PERFIL / AVATAR -->
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 16px; padding: 18px; margin-bottom: 18px; text-align: center;">
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                
+                <!-- Contenedor Visual de la Foto / Avatar -->
+                <div style="position: relative; width: 96px; height: 96px; border-radius: 50%; padding: 4px; background: linear-gradient(135deg, var(--brand-orange, #ff7300), var(--brand-blue, #0077f6)); box-shadow: 0 8px 24px rgba(255,115,0,0.25);">
+                  <div id="profile-avatar-preview" style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: var(--bg-main, #111); display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 800;">
+                    ${profileEditPhotoUrl
+                      ? (profileEditPhotoUrl.startsWith('data:') || profileEditPhotoUrl.startsWith('http') || profileEditPhotoUrl.startsWith('/uploads')
+                          ? `<img src="${profileEditPhotoUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar">`
+                          : `<span style="font-size: 40px;">${profileEditPhotoUrl}</span>`)
+                      : `<span>${initials}</span>`
+                    }
+                  </div>
+                  <button type="button" id="btn-trigger-upload-profile-photo" style="position: absolute; bottom: 0; right: 0; background: var(--primary, #ff7300); color: white; border: 2px solid var(--bg-card, #1e293b); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);" title="Subir foto desde archivo local">
+                    📷
+                  </button>
+                </div>
+
+                <input type="file" id="profile-photo-file-input" accept="image/png, image/jpeg, image/webp, image/svg+xml" style="display: none;">
+
+                <!-- Botones de Acción de Foto -->
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                  <button type="button" class="btn btn-secondary" id="btn-select-profile-file" style="font-size: 12px; padding: 5px 14px; display: inline-flex; align-items: center; gap: 6px;">
+                    📁 Subir Archivo Local
+                  </button>
+                  ${profileEditPhotoUrl ? `
+                    <button type="button" class="btn btn-secondary" id="btn-remove-profile-photo" style="font-size: 12px; padding: 5px 12px; color: #ef4444; border-color: rgba(239,68,68,0.3);" title="Quitar foto y usar iniciales">
+                      🗑️ Quitar Foto
+                    </button>
+                  ` : ''}
+                </div>
+
+                <!-- Selección de Avatares Rápida -->
+                <div style="width: 100%; border-top: 1px solid var(--border-glass); padding-top: 10px; margin-top: 2px;">
+                  <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">O elige un icono de avatar rápido:</div>
+                  <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                    ${avatarPresets.map(av => `
+                      <button type="button" class="avatar-preset-btn" data-preset="${av.icon}" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 12px; width: 36px; height: 36px; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;" title="${av.label}">
+                        ${av.icon}
+                      </button>
+                    `).join('')}
+                  </div>
+                </div>
+
+                <!-- Input opcional URL de foto -->
+                <div style="width: 100%; text-align: left; margin-top: 4px;">
+                  <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 3px;">O enlace web de imagen (opcional):</div>
+                  <input type="text" class="form-control" id="profile-photo-url-input" placeholder="https://ejemplo.com/mifoto.png" value="${profileEditPhotoUrl && !profileEditPhotoUrl.startsWith('data:') && !avatarPresets.some(a => a.icon === profileEditPhotoUrl) ? profileEditPhotoUrl : ''}" style="font-size: 12px; padding: 6px 10px;">
+                </div>
+
+              </div>
+            </div>
+
+            <!-- SECCIÓN 2: INFORMACIÓN DE LA CUENTA -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                <span>📋</span> Datos de la Cuenta
+              </span>
+              <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 12px; background: rgba(0,119,246,0.12); color: var(--brand-blue, #0084ff); border: 1px solid rgba(0,119,246,0.25);">
+                <span>${roleInfo.icon}</span> ${roleInfo.label}
+              </span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+              <div class="form-group" style="grid-column: span 2;">
+                <label class="form-label" for="profile-name-input" style="font-size: 12px; font-weight: 600;">Nombre Completo *</label>
+                <input type="text" class="form-control" id="profile-name-input" required value="${currentUser.name || ''}" placeholder="Ej. Juan Pérez">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="profile-email-input" style="font-size: 12px; font-weight: 600;">Correo Electrónico *</label>
+                <input type="email" class="form-control" id="profile-email-input" required value="${currentUser.email || ''}" placeholder="usuario@correo.com">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="profile-phone-input" style="font-size: 12px; font-weight: 600;">Teléfono / WhatsApp</label>
+                <input type="text" class="form-control" id="profile-phone-input" value="${currentUser.phone || ''}" placeholder="Ej. 04121234567">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="profile-ci-input" style="font-size: 12px; font-weight: 600;">Cédula / RIF</label>
+                <input type="text" class="form-control" id="profile-ci-input" value="${currentUser.ci || ''}" placeholder="Ej. V-12345678">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="profile-address-input" style="font-size: 12px; font-weight: 600;">Dirección</label>
+                <input type="text" class="form-control" id="profile-address-input" value="${currentUser.address || ''}" placeholder="Ej. Caracas, Venezuela">
+              </div>
+            </div>
+
+            <!-- SECCIÓN 3: CAMBIO DE CONTRASEÑA -->
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 14px; padding: 14px; margin-bottom: 18px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" id="toggle-profile-password-section">
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                  <span>🔒</span> Seguridad & Contraseña
+                </div>
+                <button type="button" class="btn btn-secondary" id="btn-toggle-pass-fields" style="font-size: 11px; padding: 3px 10px;">
+                  ${profileShowPassFields ? '▲ Ocultar' : '▼ Modificar Contraseña'}
+                </button>
+              </div>
+
+              ${profileShowPassFields ? `
+                <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border-glass); padding-top: 12px;">
+                  <div class="form-group">
+                    <label class="form-label" for="profile-current-pass" style="font-size: 11.5px;">Contraseña Actual (si ya tenías una clave)</label>
+                    <input type="password" class="form-control" id="profile-current-pass" placeholder="••••••••" autocomplete="current-password">
+                  </div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                      <label class="form-label" for="profile-new-pass" style="font-size: 11.5px;">Nueva Contraseña (mín. 6 car.)</label>
+                      <input type="password" class="form-control" id="profile-new-pass" minlength="6" placeholder="Nueva clave" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="profile-confirm-pass" style="font-size: 11.5px;">Confirmar Contraseña</label>
+                      <input type="password" class="form-control" id="profile-confirm-pass" minlength="6" placeholder="Repetir nueva clave" autocomplete="new-password">
+                    </div>
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-muted);">
+                    💡 Deja estos campos vacíos si no deseas modificar tu contraseña.
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Botones Guardar / Cancelar -->
+            <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center; border-top: 1px solid var(--border-glass); padding-top: 16px;">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-profile" style="padding: 8px 16px;">
+                Cancelar
+              </button>
+              <button type="submit" class="btn btn-primary" id="btn-save-profile" style="padding: 8px 22px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                💾 Guardar Cambios
+              </button>
+            </div>
+
+          </form>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+function bindUserProfileModalEvents() {
+  if (!isUserProfileModalOpen) return;
+
+  // Cerrar modal
+  document.getElementById('user-profile-modal-backdrop')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('user-profile-modal-backdrop')) {
+      closeUserProfileModal();
+    }
+  });
+
+  document.getElementById('btn-close-profile-modal')?.addEventListener('click', () => {
+    closeUserProfileModal();
+  });
+
+  document.getElementById('btn-cancel-profile')?.addEventListener('click', () => {
+    closeUserProfileModal();
+  });
+
+  // Selector de presets de avatares
+  document.querySelectorAll('.avatar-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const preset = btn.getAttribute('data-preset');
+      if (preset) {
+        profileEditPhotoUrl = preset;
+        const preview = document.getElementById('profile-avatar-preview');
+        if (preview) {
+          preview.innerHTML = `<span style="font-size:40px;">${preset}</span>`;
+        }
+        const urlInput = document.getElementById('profile-photo-url-input') as HTMLInputElement;
+        if (urlInput) urlInput.value = '';
+      }
+    });
+  });
+
+  // Subir archivo local (trigger file input)
+  const fileInput = document.getElementById('profile-photo-file-input') as HTMLInputElement | null;
+  document.getElementById('btn-select-profile-file')?.addEventListener('click', () => {
+    fileInput?.click();
+  });
+  document.getElementById('btn-trigger-upload-profile-photo')?.addEventListener('click', () => {
+    fileInput?.click();
+  });
+
+  fileInput?.addEventListener('change', async () => {
+    if (fileInput.files && fileInput.files[0]) {
+      const file = fileInput.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        alert('La imagen seleccionada no debe superar los 5MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        profileEditPhotoUrl = result;
+        const preview = document.getElementById('profile-avatar-preview');
+        if (preview) {
+          preview.innerHTML = `<img src="${result}" style="width:100%; height:100%; object-fit:cover;" alt="Avatar">`;
+        }
+        const urlInput = document.getElementById('profile-photo-url-input') as HTMLInputElement;
+        if (urlInput) urlInput.value = '';
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  // Input de URL manual
+  document.getElementById('profile-photo-url-input')?.addEventListener('input', (e) => {
+    const val = (e.target as HTMLInputElement).value.trim();
+    if (val) {
+      profileEditPhotoUrl = val;
+      const preview = document.getElementById('profile-avatar-preview');
+      if (preview) {
+        preview.innerHTML = `<img src="${val}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='/logo.png'" alt="Avatar">`;
+      }
+    }
+  });
+
+  // Quitar foto
+  document.getElementById('btn-remove-profile-photo')?.addEventListener('click', () => {
+    profileEditPhotoUrl = '';
+    const preview = document.getElementById('profile-avatar-preview');
+    if (preview && currentUser) {
+      const initials = (currentUser.name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+      preview.innerHTML = `<span>${initials}</span>`;
+    }
+    const urlInput = document.getElementById('profile-photo-url-input') as HTMLInputElement;
+    if (urlInput) urlInput.value = '';
+  });
+
+  // Toggle sección de contraseña
+  document.getElementById('btn-toggle-pass-fields')?.addEventListener('click', () => {
+    profileShowPassFields = !profileShowPassFields;
+    renderApp();
+  });
+  document.getElementById('toggle-profile-password-section')?.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).id !== 'btn-toggle-pass-fields') {
+      profileShowPassFields = !profileShowPassFields;
+      renderApp();
+    }
+  });
+
+  // Enviar formulario de guardado
+  document.getElementById('user-profile-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    const name = (document.getElementById('profile-name-input') as HTMLInputElement).value.trim();
+    const email = (document.getElementById('profile-email-input') as HTMLInputElement).value.trim();
+    const phone = (document.getElementById('profile-phone-input') as HTMLInputElement)?.value.trim() || '';
+    const ci = (document.getElementById('profile-ci-input') as HTMLInputElement)?.value.trim() || '';
+    const address = (document.getElementById('profile-address-input') as HTMLInputElement)?.value.trim() || '';
+
+    let currentPassword = '';
+    let newPassword = '';
+    if (profileShowPassFields) {
+      currentPassword = (document.getElementById('profile-current-pass') as HTMLInputElement)?.value || '';
+      newPassword = (document.getElementById('profile-new-pass') as HTMLInputElement)?.value || '';
+      const confirmPass = (document.getElementById('profile-confirm-pass') as HTMLInputElement)?.value || '';
+
+      if (newPassword) {
+        if (newPassword.length < 6) {
+          alert('La nueva contraseña debe tener al menos 6 caracteres.');
+          return;
+        }
+        if (newPassword !== confirmPass) {
+          alert('Las contraseñas no coinciden. Por favor confirma la nueva clave.');
+          return;
+        }
+      }
+    }
+
+    const saveBtn = document.getElementById('btn-save-profile') as HTMLButtonElement;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '⏳ Guardando...';
+
+    try {
+      const res = await api.auth.updateProfile({
+        name,
+        email,
+        phone,
+        ci,
+        address,
+        photo_url: profileEditPhotoUrl,
+        currentPassword: currentPassword || undefined,
+        newPassword: newPassword || undefined
+      });
+
+      currentUser = {
+        ...currentUser,
+        ...res.user
+      };
+      localStorage.setItem('facilito_pos_user', JSON.stringify(currentUser));
+      if (res.token) {
+        localStorage.setItem('facilito_pos_token', res.token);
+      }
+
+      alert(res.message || '¡Perfil actualizado con éxito!');
+      closeUserProfileModal();
+    } catch (err: any) {
+      alert(err.message || 'Error al actualizar el perfil.');
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '💾 Guardar Cambios';
+    }
+  });
+}
+
+// ==========================================================================
 // VISTA: LOGIN / REGISTRO
 // ==========================================================================
 let activeAuthTab: 'login' | 'register' | 'forgot' | 'verify' = 'login';
 let forgotStep: 'email' | 'code' = 'email';
 let resetTargetEmail = '';
 let resetPreviewUrl = '';
+let resetSupportPhone = '';
 let verifyTargetEmail = '';
 let verifyTargetPhone = '';
 let verifySupportPhone = '';
@@ -3198,6 +3593,13 @@ function renderAuthView(): string {
                   </a>
                 </div>
               ` : ''}
+              ${resetSupportPhone ? `
+                <div style="margin-top: 10px; text-align: center;">
+                  <a href="https://wa.me/${resetSupportPhone}?text=${encodeURIComponent(`Hola, solicité el código de recuperación para mi cuenta ${resetTargetEmail} en FacilitoApp.`)}" target="_blank" class="btn btn-secondary w-100" style="font-size: 11.5px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: rgba(37, 211, 102, 0.1); color: #25D366; border-color: rgba(37, 211, 102, 0.3); text-decoration: none;">
+                    💬 ¿No te llegó el correo? Validar por WhatsApp
+                  </a>
+                </div>
+              ` : ''}
             `}
 
             <div style="text-align: center; margin-top: 16px;">
@@ -3333,6 +3735,7 @@ function bindAuthEvents() {
       const res = await api.auth.forgotPassword(email);
       resetTargetEmail = email;
       resetPreviewUrl = res.emailPreviewUrl || '';
+      resetSupportPhone = (res as any).supportPhone || '';
       forgotStep = 'code';
       alert(res.message);
       renderApp();
@@ -4025,6 +4428,10 @@ function renderAdminDashboard(): string {
               👑 Consola SuperAdmin SaaS
             </button>
           ` : ''}
+
+          <button class="sidebar-nav-btn" id="admin-tab-user-profile" style="display:flex; align-items:center; gap:8px; background:rgba(255,115,0,0.08); border-color:rgba(255,115,0,0.25); color:var(--brand-orange); font-weight:600; margin-top:6px;" title="Configuración de tu cuenta y foto de perfil">
+            👤 Mi Perfil de Usuario
+          </button>
         </div>
 
         ${currentUser.role === 'admin' ? `
@@ -4258,6 +4665,11 @@ async function bindAdminEvents() {
 
   tabSuperAdminLink?.addEventListener('click', () => {
     navigate('superadmin');
+  });
+
+  document.getElementById('admin-tab-user-profile')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openUserProfileModal();
   });
 
   // Renderizar la subvista por defecto al cargar

@@ -132,6 +132,7 @@ export interface User {
   representative_phone?: string | null;
   representative_position?: string | null;
   permissions?: string;
+  photo_url?: string | null;
   created_at?: string;
 }
 
@@ -400,6 +401,35 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+    getProfile: () => request<User>('/auth/me'),
+    updateProfile: (body: {
+      name: string;
+      phone?: string;
+      ci?: string;
+      email?: string;
+      address?: string;
+      photo_url?: string;
+      currentPassword?: string;
+      newPassword?: string;
+    }) => request<{ message: string; user: User; token?: string }>('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+    uploadProfilePhoto: async (formData: FormData) => {
+      const token = localStorage.getItem('facilito_pos_token');
+      const res = await fetch(`${API_BASE}/auth/profile/photo`, {
+        method: 'POST',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Error al subir foto' }));
+        throw new Error(err.message || 'Error al subir foto');
+      }
+      return res.json() as Promise<{ message: string; photo_url: string }>;
+    },
   },
 
   // Productos
