@@ -3855,8 +3855,8 @@ function renderAuthView(): string {
         ${activeAuthTab === 'login' ? `
           <form id="login-form">
             <div class="form-group">
-              <label class="form-label" for="login-email">Correo Electronico</label>
-              <input type="email" class="form-control" id="login-email" required placeholder="admin@sistema.com o cliente@correo.com" autocomplete="username">
+              <label class="form-label" for="login-email">Correo Electrónico o Usuario</label>
+              <input type="text" class="form-control" id="login-email" required placeholder="admin o admin@sistema.com" autocomplete="username">
             </div>
             <div class="form-group">
               <label class="form-label" for="login-password">Contraseña</label>
