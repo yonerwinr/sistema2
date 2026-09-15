@@ -719,16 +719,38 @@ router.post('/forgot-password', async (req, res) => {
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
         // Guardar en base de datos
         await db_1.default.query('UPDATE users SET reset_code = ?, reset_code_expires_at = ? WHERE id = ?', [code, expiresAt, user.id]);
-        // Enviar correo electrónico
-        const emailPreviewUrl = await (0, email_1.sendPasswordResetEmail)(user.email, user.name, code);
+        // Enviar correo electrónico de forma segura
+        let emailPreviewUrl;
+        let emailSent = false;
+        try {
+            emailPreviewUrl = await (0, email_1.sendPasswordResetEmail)(user.email, user.name, code);
+            emailSent = true;
+        }
+        catch (mailError) {
+            console.error('Aviso: No se pudo enviar el correo de recuperación SMTP:', mailError);
+        }
+        // Teléfono de soporte de la empresa
+        let supportPhone = '';
+        try {
+            const [bRows] = await db_1.default.query('SELECT phone FROM businesses WHERE id = 1 LIMIT 1');
+            if (bRows.length > 0 && bRows[0].phone) {
+                supportPhone = bRows[0].phone.replace(/[^0-9]/g, '');
+            }
+        }
+        catch (_) { }
         res.json({
-            message: 'Hemos enviado un código de 6 dígitos a tu correo electrónico',
+            success: true,
+            message: emailSent
+                ? 'Hemos enviado un código de 6 dígitos a tu correo electrónico'
+                : 'Código de recuperación generado. Si el correo tarda en llegar, puedes comunicarte con soporte por WhatsApp.',
+            emailSent,
+            supportPhone,
             emailPreviewUrl: emailPreviewUrl !== 'Email enviado' ? emailPreviewUrl : undefined
         });
     }
     catch (error) {
         console.error('Error en /forgot-password:', error);
-        res.status(500).json({ message: 'Error interno al enviar el código de recuperación' });
+        res.status(500).json({ message: 'Error interno al procesar la solicitud de recuperación' });
     }
 });
 // Restablecer contraseña utilizando el código de 6 dígitos

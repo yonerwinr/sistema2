@@ -106,54 +106,53 @@ let transporter = null;
 async function getTransporter() {
     if (transporter)
         return transporter;
+    // 1. Priorizar SMTP directo si las credenciales están configuradas (p. ej. Gmail)
+    const host = process.env.SMTP_HOST;
+    const port = parseInt(process.env.SMTP_PORT || '587');
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    if (host && user && pass) {
+        const isGmail = host.toLowerCase().includes('gmail.com');
+        transporter = nodemailer_1.default.createTransport({
+            ...(isGmail ? { service: 'gmail' } : { host, port, secure: port === 465 }),
+            auth: { user, pass },
+            connectionTimeout: 8000,
+            greetingTimeout: 8000,
+            socketTimeout: 12000,
+            tls: {
+                rejectUnauthorized: false
+            }
+        });
+        console.log(`Transportador de correo SMTP directo configurado con éxito.${isGmail ? ' (Modo Gmail optimizado)' : ''}`);
+        return transporter;
+    }
+    // 2. Si no hay SMTP directo, usar Vercel Proxy si está definido
     const proxyUrl = process.env.EMAIL_PROXY_URL;
     if (proxyUrl) {
         transporter = new VercelProxyTransporter(proxyUrl);
         console.log(`Transportador de correo configurado vía Vercel Proxy: ${proxyUrl}`);
         return transporter;
     }
-    const host = process.env.SMTP_HOST;
-    const port = parseInt(process.env.SMTP_PORT || '587');
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    if (host && user && pass) {
-        // Usar SMTP provisto por el usuario
-        const isGmail = host.toLowerCase().includes('gmail.com');
+    // 3. Fallback: Crear cuenta de prueba en Ethereal Mail
+    console.log('No se detectaron credenciales SMTP ni Proxy. Creando cuenta temporal en Ethereal Mail...');
+    try {
+        const testAccount = await nodemailer_1.default.createTestAccount();
         transporter = nodemailer_1.default.createTransport({
-            ...(isGmail ? { service: 'gmail' } : { host, port, secure: port === 465 }),
-            auth: { user, pass },
-            connectionTimeout: 5000,
-            greetingTimeout: 5000,
-            socketTimeout: 10000,
-            tls: {
-                rejectUnauthorized: false
+            host: 'smtp.ethereal.email',
+            port: 587,
+            secure: false,
+            auth: {
+                user: testAccount.user,
+                pass: testAccount.pass
             }
         });
-        console.log(`Transpotador de correo SMTP configurado con exito.${isGmail ? ' (Modo Gmail optimizado)' : ''}`);
+        console.log(`Cuenta temporal Ethereal creada: User=${testAccount.user}`);
     }
-    else {
-        // Fallback: Crear cuenta de prueba en Ethereal Mail
-        console.log('No se detectaron credenciales SMTP en .env. Creando cuenta temporal en Ethereal Mail...');
-        try {
-            const testAccount = await nodemailer_1.default.createTestAccount();
-            transporter = nodemailer_1.default.createTransport({
-                host: 'smtp.ethereal.email',
-                port: 587,
-                secure: false,
-                auth: {
-                    user: testAccount.user,
-                    pass: testAccount.pass
-                }
-            });
-            console.log(`Cuenta temporal Ethereal creada: User=${testAccount.user}`);
-        }
-        catch (error) {
-            console.error('Error al crear cuenta en Ethereal Mail, usando transportador dummy:', error);
-            // Fallback a un mock
-            transporter = nodemailer_1.default.createTransport({
-                jsonTransport: true
-            });
-        }
+    catch (error) {
+        console.error('Error al crear cuenta en Ethereal Mail, usando transportador dummy:', error);
+        transporter = nodemailer_1.default.createTransport({
+            jsonTransport: true
+        });
     }
     return transporter;
 }
