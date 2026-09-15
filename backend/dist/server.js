@@ -175,6 +175,15 @@ async function runMigrations() {
                     console.error('Error al agregar columnas de verificación a users:', err.message);
                 }
             }
+            if (!userColNames.includes('avatar_url')) {
+                try {
+                    await conn.query('ALTER TABLE users ADD COLUMN avatar_url LONGTEXT NULL');
+                    console.log('Columna "avatar_url" agregada a la tabla users.');
+                }
+                catch (err) {
+                    console.error('Error al agregar columna "avatar_url" a users:', err.message);
+                }
+            }
         }
         catch (err) {
             console.error('Error al inspeccionar columnas de la tabla users:', err.message);

@@ -238,6 +238,8 @@ router.post('/login', async (req, res) => {
                 email: user.email,
                 role: user.role,
                 phone: user.phone,
+                ci: user.ci,
+                avatar_url: user.avatar_url || null,
                 business_id: targetBusinessId,
                 business: businessInfo
             }
@@ -340,7 +342,8 @@ router.post('/google', async (req, res) => {
                 email: user.email,
                 role: user.role,
                 phone: user.phone,
-                ci: user.ci
+                ci: user.ci,
+                avatar_url: user.avatar_url || null
             }
         });
     }
@@ -354,7 +357,7 @@ router.get('/me', auth_1.authenticate, async (req, res) => {
     try {
         if (!req.user)
             return res.status(401).json({ message: 'No autenticado' });
-        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, ci, permissions, business_id, created_at FROM users WHERE id = ?', [req.user.id]);
+        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, ci, avatar_url, permissions, business_id, created_at FROM users WHERE id = ?', [req.user.id]);
         if (users.length === 0) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
@@ -384,6 +387,97 @@ router.get('/me', auth_1.authenticate, async (req, res) => {
     catch (error) {
         console.error('Error en /me:', error);
         res.status(500).json({ message: 'Error al obtener datos del usuario' });
+    }
+});
+// GET /auth/profile: Obtener configuración de perfil del usuario logueado (todos los roles)
+router.get('/profile', auth_1.authenticate, async (req, res) => {
+    try {
+        if (!req.user)
+            return res.status(401).json({ message: 'No autenticado' });
+        const [users] = await db_1.default.query('SELECT id, name, email, role, phone, ci, avatar_url, password IS NOT NULL as has_password, business_id, created_at FROM users WHERE id = ?', [req.user.id]);
+        if (users.length === 0)
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        res.json(users[0]);
+    }
+    catch (error) {
+        console.error('Error al obtener perfil:', error);
+        res.status(500).json({ message: 'Error interno al obtener el perfil' });
+    }
+});
+// PUT /auth/profile: Modificar información de la cuenta, foto de perfil y contraseña (todos los usuarios)
+router.put('/profile', auth_1.authenticate, async (req, res) => {
+    try {
+        if (!req.user)
+            return res.status(401).json({ message: 'No autenticado' });
+        const userId = req.user.id;
+        const { name, phone, ci, avatar_url, current_password, new_password } = req.body;
+        if (!name || !name.trim()) {
+            return res.status(400).json({ message: 'El nombre completo es obligatorio' });
+        }
+        if (ci && !(0, validation_1.validateCi)(ci)) {
+            return res.status(400).json({ message: 'Formato de Cédula o RIF inválido. Debe comenzar con V-, E-, J- o G- (ej. V-12345678)' });
+        }
+        const [existingUsers] = await db_1.default.query('SELECT * FROM users WHERE id = ?', [userId]);
+        if (existingUsers.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+        const currentUserDb = existingUsers[0];
+        // Manejo de cambio de contraseña si se solicita
+        let updatePasswordSql = '';
+        const queryParams = [
+            name.trim(),
+            phone ? phone.trim() : null,
+            ci ? ci.trim() : null,
+            avatar_url !== undefined ? avatar_url : currentUserDb.avatar_url
+        ];
+        if (new_password && new_password.trim()) {
+            if (new_password.trim().length < 6) {
+                return res.status(400).json({ message: 'La nueva contraseña debe tener al menos 6 caracteres' });
+            }
+            if (currentUserDb.password) {
+                if (!current_password) {
+                    return res.status(400).json({ message: 'Debes ingresar tu contraseña actual para cambiarla' });
+                }
+                const isMatch = await bcryptjs_1.default.compare(current_password, currentUserDb.password);
+                if (!isMatch) {
+                    return res.status(400).json({ message: 'La contraseña actual no es correcta' });
+                }
+            }
+            const salt = await bcryptjs_1.default.genSalt(10);
+            const hashedPassword = await bcryptjs_1.default.hash(new_password.trim(), salt);
+            updatePasswordSql = ', password = ?';
+            queryParams.push(hashedPassword);
+        }
+        queryParams.push(userId);
+        await db_1.default.query(`UPDATE users SET name = ?, phone = ?, ci = ?, avatar_url = ?${updatePasswordSql} WHERE id = ?`, queryParams);
+        // Registrar auditoría
+        try {
+            await (0, audit_1.logAuditEvent)({
+                userId,
+                userName: name.trim(),
+                userRole: currentUserDb.role,
+                actionType: 'user_edit',
+                title: 'Actualización de perfil de usuario',
+                details: {
+                    name: name.trim(),
+                    phone,
+                    ci,
+                    has_avatar: Boolean(avatar_url),
+                    password_changed: Boolean(new_password)
+                }
+            });
+        }
+        catch (_) { }
+        // Obtener usuario actualizado
+        const [updatedRows] = await db_1.default.query('SELECT id, name, email, role, phone, ci, avatar_url, business_id FROM users WHERE id = ?', [userId]);
+        res.json({
+            message: '¡Tu perfil ha sido actualizado con éxito!',
+            user: updatedRows[0]
+        });
+    }
+    catch (error) {
+        console.error('Error al actualizar perfil:', error);
+        res.status(500).json({ message: 'Error interno al actualizar perfil' });
     }
 });
 router.get('/customers', auth_1.authenticate, async (req, res) => {
