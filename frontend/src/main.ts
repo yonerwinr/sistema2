@@ -834,10 +834,36 @@ function renderNavbar(): string {
       <span style="color:var(--text-muted);">|</span>
       <span style="color:var(--text-secondary);">⚡ Envíos Express & Retiro en Tienda</span>
     </div>
+
+    <!-- Banner de Alerta Preventiva de Vencimiento de Suscripción (si quedan 5 días o menos o ya venció) -->
+    ${(() => {
+      const biz = currentBusinessProfile || (currentUser as any)?.business;
+      if (!biz || !currentUser || currentUser.role === 'customer' || currentUser.role === 'superadmin') return '';
+      let days = biz.daysRemaining;
+      if (days === undefined || days === null) {
+        if (biz.license_expires_at) {
+          const exp = new Date(biz.license_expires_at);
+          days = Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        }
+      }
+      const isExp = biz.isExpired || (days !== undefined && days !== null && days < 0);
+      if (isExp || (days !== undefined && days !== null && days <= 5)) {
+        return `
+          <div style="background: linear-gradient(90deg, #b91c1c, #ea580c); color: white; padding: 7px 16px; font-size: 12px; font-weight: 700; text-align: center; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+            <span>⚠️ ${isExp ? '¡Atención! La suscripción de tu comercio ha vencido.' : `¡Atención! A la suscripción de tu comercio le quedan solo ${days} ${days === 1 ? 'día' : 'días'} de servicio.`} Renueva a tiempo para no pausar tus ventas.</span>
+            <a href="https://wa.me/584120000000?text=${encodeURIComponent(`Hola, deseo renovar la suscripción de FacilitoApp para el comercio "${biz.name || ''}"`)}" target="_blank" style="background: white; color: #111; padding: 3px 10px; border-radius: 6px; text-decoration: none; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
+              💬 Renovar por WhatsApp
+            </a>
+          </div>
+        `;
+      }
+      return '';
+    })()}
+
     <nav class="navbar">
       <div class="container navbar-container">
         <a class="logo" href="#" id="nav-logo" style="display:flex; align-items:center; gap:12px; text-decoration:none;">
-          <img src="${currentBusinessProfile?.logo_url || '/logo.png'}" style="height:56px; width:56px; object-fit:contain; border-radius:12px; background:rgba(255,255,255,0.06); padding:4px; box-shadow: 0 4px 16px rgba(0, 119, 246, 0.25);" alt="Logo">
+          <img src="${currentBusinessProfile?.logo_url || (currentUser as any)?.business?.logo_url || '/logo.png'}" style="height:56px; width:56px; object-fit:contain; border-radius:12px; background:rgba(255,255,255,0.06); padding:4px; box-shadow: 0 4px 16px rgba(0, 119, 246, 0.25);" alt="Logo">
           <span style="font-weight:900; font-size:24px; letter-spacing:-0.5px; display:inline-flex; align-items:baseline;">
             <span style="color:#0084ff;">Facilito</span><span style="color:#ff7300;">App</span>
           </span>
@@ -863,6 +889,60 @@ function renderNavbar(): string {
                 <span style="display:inline-flex; align-items:center; gap:4px;">${icons.dashboard} ${(currentUser as any).role === 'superadmin' ? 'Panel POS/Admin' : (currentUser.role === 'admin' ? 'Panel Admin' : (currentUser.role === 'billing' ? 'Facturación' : 'Caja POS'))}</span>
               </a>
             ` : ''}
+
+            <!-- Chip / Badge de Suscripción en Barra Superior -->
+            ${(() => {
+              const biz = currentBusinessProfile || (currentUser as any)?.business;
+              if (!biz || currentUser.role === 'customer') return '';
+              let days = biz.daysRemaining;
+              if (days === undefined || days === null) {
+                if (biz.license_expires_at) {
+                  const exp = new Date(biz.license_expires_at);
+                  days = Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                }
+              }
+              const isExp = biz.isExpired || (days !== undefined && days !== null && days < 0);
+              const isSusp = biz.license_status === 'suspended' || biz.is_active === 0;
+
+              let pillBg = 'rgba(16,185,129,0.12)';
+              let pillBorder = 'rgba(16,185,129,0.35)';
+              let pillColor = '#10b981';
+              let pillIcon = '🟢';
+              let pillText = days !== undefined && days !== null ? `${days} días restantes` : 'Plan Activo';
+
+              if (isSusp) {
+                pillBg = 'rgba(239,68,68,0.12)';
+                pillBorder = 'rgba(239,68,68,0.35)';
+                pillColor = '#ef4444';
+                pillIcon = '⛔';
+                pillText = 'Suscripción Suspendida';
+              } else if (isExp) {
+                pillBg = 'rgba(239,68,68,0.12)';
+                pillBorder = 'rgba(239,68,68,0.35)';
+                pillColor = '#ef4444';
+                pillIcon = '⚠️';
+                pillText = 'Licencia Vencida';
+              } else if (days !== undefined && days !== null && days <= 5) {
+                pillBg = 'rgba(245,158,11,0.15)';
+                pillBorder = 'rgba(245,158,11,0.4)';
+                pillColor = '#f59e0b';
+                pillIcon = '🟡';
+                pillText = `¡Vence en ${days} días!`;
+              }
+
+              const expFormatted = biz.license_expires_at
+                ? new Date(biz.license_expires_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+                : 'Indefinido';
+
+              return `
+                <div id="nav-subscription-badge" style="display:inline-flex; align-items:center; gap:6px; background:${pillBg}; border:1px solid ${pillBorder}; color:${pillColor}; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:700; cursor:pointer;" title="Suscripción del comercio. Vence: ${expFormatted}. Haz clic para ver detalles y gestionar">
+                  <span>${pillIcon}</span>
+                  <span>${pillText}</span>
+                  <span style="font-size:10px; opacity:0.85;">(${expFormatted})</span>
+                </div>
+              `;
+            })()}
+
             <span class="nav-link" style="color: var(--primary); font-weight: 600; cursor: default;">
               Hola, ${currentUser.name.split(' ')[0]}
             </span>
@@ -940,6 +1020,13 @@ function bindGeneralEvents() {
   document.getElementById('link-admin')?.addEventListener('click', () => {
     activeAdminView = 'stats';
     navigate('admin');
+  });
+
+  document.getElementById('nav-subscription-badge')?.addEventListener('click', () => {
+    if (currentUser && (currentUser.role === 'admin' || (currentUser as any).role === 'superadmin')) {
+      activeAdminView = 'business_profile';
+      navigate('admin');
+    }
   });
 
   document.getElementById('link-login')?.addEventListener('click', () => navigate('auth'));
@@ -3784,16 +3871,17 @@ function renderAdminDashboard(): string {
 
         <!-- Tarjeta de Suscripción del Sistema para el Comercio -->
         ${(() => {
-          if (!currentBusinessProfile) return '';
-          let days = currentBusinessProfile.daysRemaining;
+          const biz = currentBusinessProfile || (currentUser as any)?.business;
+          if (!biz) return '';
+          let days = biz.daysRemaining;
           if (days === undefined || days === null) {
-            if (currentBusinessProfile.license_expires_at) {
-              const exp = new Date(currentBusinessProfile.license_expires_at);
+            if (biz.license_expires_at) {
+              const exp = new Date(biz.license_expires_at);
               days = Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
             }
           }
-          const isExp = currentBusinessProfile.isExpired || (days !== undefined && days !== null && days < 0);
-          const isSusp = currentBusinessProfile.license_status === 'suspended' || currentBusinessProfile.is_active === 0;
+          const isExp = biz.isExpired || (days !== undefined && days !== null && days < 0);
+          const isSusp = biz.license_status === 'suspended' || biz.is_active === 0;
 
           let badgeBg = 'rgba(16,185,129,0.08)';
           let badgeBorder = 'rgba(16,185,129,0.25)';
@@ -3813,7 +3901,7 @@ function renderAdminDashboard(): string {
             badgeColor = '#ef4444';
             statusText = '⚠️ Vencida';
             daysDesc = 'Requiere renovación';
-          } else if (days !== undefined && days !== null && days <= 15) {
+          } else if (days !== undefined && days !== null && days <= 5) {
             badgeBg = 'rgba(245,158,11,0.08)';
             badgeBorder = 'rgba(245,158,11,0.3)';
             badgeColor = '#f59e0b';
@@ -3821,16 +3909,23 @@ function renderAdminDashboard(): string {
             daysDesc = `¡Quedan ${days} días!`;
           }
 
-          const expDateFormatted = currentBusinessProfile.license_expires_at
-            ? new Date(currentBusinessProfile.license_expires_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+          const expDateFormatted = biz.license_expires_at
+            ? new Date(biz.license_expires_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
             : 'Indefinido';
 
-          let planName = (currentBusinessProfile.license_plan || 'PRO').toUpperCase();
-          if (planName.includes('2YEARS') || planName.includes('2_YEARS')) planName = '2 AÑOS';
-          else if (planName.includes('ANNUAL') || planName.includes('ANUAL')) planName = 'ANUAL';
+          let rawPlan = (biz.license_plan || 'PRO').toLowerCase();
+          let planName = 'PRO';
+          if (rawPlan.includes('trial_3') || rawPlan.includes('3days')) planName = 'PRUEBA 3 DÍAS';
+          else if (rawPlan.includes('trial_7') || rawPlan.includes('7days')) planName = 'PRUEBA 7 DÍAS';
+          else if (rawPlan.includes('trial')) planName = 'PRUEBA';
+          else if (rawPlan.includes('2years') || rawPlan.includes('2_years')) planName = '2 AÑOS';
+          else if (rawPlan.includes('annual') || rawPlan.includes('anual')) planName = 'ANUAL';
+          else if (rawPlan === 'basic') planName = 'BÁSICO';
+          else if (rawPlan === 'enterprise') planName = 'ENTERPRISE';
+          else if (rawPlan === 'custom') planName = 'PERSONALIZADO';
 
           return `
-            <div class="card subscription-widget-sidebar" style="margin-top: 8px; padding: 10px 12px; background: ${badgeBg}; border: 1px solid ${badgeBorder}; border-radius: 12px;">
+            <div class="card subscription-widget-sidebar" id="sidebar-subscription-widget" style="margin-top: 8px; padding: 10px 12px; background: ${badgeBg}; border: 1px solid ${badgeBorder}; border-radius: 12px; cursor: pointer;" title="Clic para ver o gestionar suscripción en Mi Negocio">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
                 <span style="font-size:10.5px; font-weight:800; text-transform:uppercase; color:${badgeColor}; display:flex; align-items:center; gap:4px;">
                   🛡️ Suscripción
@@ -4153,6 +4248,12 @@ async function bindAdminEvents() {
     switchAdminSubView('business_profile');
     destroyCharts();
     await renderAdminBusinessProfile();
+  });
+
+  document.getElementById('sidebar-subscription-widget')?.addEventListener('click', async () => {
+    if (tabBusinessProfile) {
+      tabBusinessProfile.click();
+    }
   });
 
   tabSuperAdminLink?.addEventListener('click', () => {

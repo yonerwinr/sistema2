@@ -10,12 +10,17 @@ import { api } from '../utils/api';
 function formatPlanBadge(plan: string | undefined): string {
   if (!plan) return 'PRO';
   const clean = plan.toLowerCase();
+  if (clean.includes('trial_3') || clean.includes('3days') || clean.includes('3_dias')) return 'Prueba 3 Días ⏳';
+  if (clean.includes('trial_7') || clean.includes('7days') || clean.includes('7_dias')) return 'Prueba 7 Días ⏳';
+  if (clean.includes('trial')) return 'Prueba Gratuita ⏳';
   if (clean === 'basic') return 'Básico';
+  if (clean === 'basic_annual') return 'Básico Anual';
   if (clean === 'pro') return 'Pro';
-  if (clean === 'enterprise') return 'Enterprise';
   if (clean.includes('annual') || clean.includes('anual')) return 'Plan Anual';
-  if (clean.includes('2years') || clean.includes('2_years') || clean.includes('2 anos') || clean.includes('2 años')) return 'Plan 2 Años';
+  if (clean.includes('2years') || clean.includes('2_years') || clean.includes('2 anos') || clean.includes('2 años')) return 'Plan 2 Años 🚀';
   if (clean.includes('3years') || clean.includes('3_years') || clean.includes('3 anos') || clean.includes('3 años')) return 'Plan 3 Años';
+  if (clean === 'enterprise') return 'Enterprise';
+  if (clean === 'custom') return 'Personalizado';
   return plan.toUpperCase();
 }
 
@@ -351,15 +356,17 @@ export function renderSuperAdminHtml(
               <div class="form-group">
                 <label class="form-label" for="bus-plan">Plan de Licencia</label>
                 <select class="form-control" id="bus-plan">
+                  <option value="trial_3days">⏳ Prueba Gratuita 3 Días ($0.00)</option>
+                  <option value="trial_7days">⏳ Prueba Gratuita 7 Días ($0.00)</option>
                   <option value="pro" selected>Plan Pro Mensual ($25/mes)</option>
                   <option value="pro_annual">Plan Pro Anual ($250/año)</option>
-                  <option value="pro_2years">Plan Pro 2 Años ($450/2 años)</option>
+                  <option value="pro_2years">Plan Pro 2 Años ($450/2 años) 🚀</option>
                   <option value="basic">Plan Básico Mensual ($15/mes)</option>
                   <option value="basic_annual">Plan Básico Anual ($150/año)</option>
                   <option value="enterprise">Plan Enterprise ($50/mes)</option>
                   <option value="enterprise_annual">Plan Enterprise Anual ($500/año)</option>
                   <option value="enterprise_2years">Plan Enterprise 2 Años ($900/2 años)</option>
-                  <option value="custom">Plan Personalizado</option>
+                  <option value="custom">Plan Personalizado (Tarifa y tiempo libre)</option>
                 </select>
               </div>
             </div>
@@ -374,14 +381,16 @@ export function renderSuperAdminHtml(
                 <div class="form-group">
                   <label class="form-label" for="bus-duration-preset">Período de Contratación *</label>
                   <select class="form-control" id="bus-duration-preset">
+                    <option value="3">⏳ Prueba 3 Días (3 días)</option>
+                    <option value="7">⏳ Prueba 7 Días (7 días)</option>
                     <option value="30">1 Mes (30 días)</option>
                     <option value="90">3 Meses (90 días)</option>
                     <option value="180">6 Meses (180 días)</option>
                     <option value="365">1 Año (365 días)</option>
-                    <option value="730" selected>2 Años (730 días)</option>
+                    <option value="730" selected>2 Años (730 días) 🚀</option>
                     <option value="1095">3 Años (1095 días)</option>
-                    <option value="custom_days">Días personalizados</option>
-                    <option value="exact_date">Fecha exacta de vencimiento</option>
+                    <option value="custom_days">Días personalizados (Cualquier número)</option>
+                    <option value="exact_date">Fecha exacta de vencimiento (Calendario)</option>
                   </select>
                 </div>
 
@@ -480,20 +489,23 @@ export function renderSuperAdminHtml(
               <label class="form-label" for="manage-add-option">Período a Extender o Asignar *</label>
               <select class="form-control" id="manage-add-option">
                 <option value="keep_date" selected>Mantener fecha actual (Solo cambiar estado/plan/tarifa)</option>
+                <option value="3">⏳ +3 Días (Prueba / Extensión corta de 3 Días)</option>
+                <option value="7">⏳ +7 Días (1 Semana de Prueba)</option>
+                <option value="15">+15 Días (Quincena)</option>
                 <option value="30">+30 Días (1 Mes)</option>
                 <option value="90">+90 Días (3 Meses)</option>
                 <option value="180">+180 Días (6 Meses)</option>
                 <option value="365">+1 Año (365 Días)</option>
-                <option value="730">+2 Años (730 Días)</option>
+                <option value="730">+2 Años (730 Días) 🚀</option>
                 <option value="1095">+3 Años (1095 Días)</option>
-                <option value="custom_days">Cantidad de días específica</option>
-                <option value="exact_date">Fecha fija de vencimiento</option>
+                <option value="custom_days">Días específicos a sumar (Personalizable)</option>
+                <option value="exact_date">Fecha fija de vencimiento (Calendario)</option>
               </select>
             </div>
 
             <div id="manage-custom-days-group" style="display: none; margin-bottom: 14px;">
               <label class="form-label" for="manage-custom-days">Días a sumar:</label>
-              <input type="number" class="form-control" id="manage-custom-days" min="1" placeholder="Ej. 730">
+              <input type="number" class="form-control" id="manage-custom-days" min="1" placeholder="Ej. 3, 7, 730...">
             </div>
 
             <div id="manage-exact-date-group" style="display: none; margin-bottom: 14px;">
@@ -506,15 +518,17 @@ export function renderSuperAdminHtml(
               <div class="form-group">
                 <label class="form-label" for="manage-plan">Plan de Licencia</label>
                 <select class="form-control" id="manage-plan">
+                  <option value="trial_3days">⏳ Prueba 3 Días</option>
+                  <option value="trial_7days">⏳ Prueba 7 Días</option>
                   <option value="pro">Plan Pro Mensual</option>
                   <option value="pro_annual">Plan Pro Anual (1 Año)</option>
-                  <option value="pro_2years">Plan Pro 2 Años</option>
+                  <option value="pro_2years">Plan Pro 2 Años 🚀</option>
                   <option value="basic">Plan Básico</option>
                   <option value="basic_annual">Plan Básico Anual</option>
                   <option value="enterprise">Plan Enterprise</option>
                   <option value="enterprise_annual">Plan Enterprise Anual</option>
                   <option value="enterprise_2years">Plan Enterprise 2 Años</option>
-                  <option value="custom">Personalizado</option>
+                  <option value="custom">Personalizado (Tarifa y tiempo libre)</option>
                 </select>
               </div>
 
@@ -666,7 +680,13 @@ export function setupSuperAdminEvents(container: HTMLElement) {
   planSelect?.addEventListener('change', () => {
     if (!priceInput) return;
     const p = planSelect.value;
-    if (p === 'pro_2years') {
+    if (p === 'trial_3days') {
+      priceInput.value = '0';
+      if (durationPresetSelect) durationPresetSelect.value = '3';
+    } else if (p === 'trial_7days') {
+      priceInput.value = '0';
+      if (durationPresetSelect) durationPresetSelect.value = '7';
+    } else if (p === 'pro_2years') {
       priceInput.value = '450';
       if (durationPresetSelect) durationPresetSelect.value = '730';
     } else if (p === 'pro_annual') {
@@ -690,7 +710,11 @@ export function setupSuperAdminEvents(container: HTMLElement) {
     } else if (p === 'enterprise_2years') {
       priceInput.value = '900';
       if (durationPresetSelect) durationPresetSelect.value = '730';
+    } else if (p === 'custom') {
+      priceInput.value = '0';
+      if (durationPresetSelect) durationPresetSelect.value = 'custom_days';
     }
+    if (durationPresetSelect) durationPresetSelect.dispatchEvent(new Event('change'));
   });
 
   durationPresetSelect?.addEventListener('change', () => {

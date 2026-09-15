@@ -10,12 +10,17 @@ import { api } from '../utils/api';
 function formatPlanName(plan: string | undefined): string {
   if (!plan) return 'PRO';
   const clean = plan.toLowerCase();
+  if (clean.includes('trial_3') || clean.includes('3days') || clean.includes('3_dias')) return 'Prueba 3 Días ⏳';
+  if (clean.includes('trial_7') || clean.includes('7days') || clean.includes('7_dias')) return 'Prueba 7 Días ⏳';
+  if (clean.includes('trial')) return 'Prueba Gratuita ⏳';
   if (clean === 'basic') return 'Básico';
+  if (clean === 'basic_annual') return 'Básico Anual';
   if (clean === 'pro') return 'Pro Mensual';
-  if (clean === 'enterprise') return 'Enterprise';
   if (clean.includes('annual') || clean.includes('anual')) return 'Plan Anual';
-  if (clean.includes('2years') || clean.includes('2_years') || clean.includes('2 anos') || clean.includes('2 años')) return 'Plan 2 Años';
+  if (clean.includes('2years') || clean.includes('2_years') || clean.includes('2 anos') || clean.includes('2 años')) return 'Plan 2 Años 🚀';
   if (clean.includes('3years') || clean.includes('3_years') || clean.includes('3 anos') || clean.includes('3 años')) return 'Plan 3 Años';
+  if (clean === 'enterprise') return 'Enterprise';
+  if (clean === 'custom') return 'Personalizado';
   return plan.toUpperCase();
 }
 
@@ -194,39 +199,43 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
               <textarea class="form-control" id="prof-address" rows="2" placeholder="Ej. Calle 4 con Carrera 12, Local N° 3, Frente a la Plaza Bolívar">${b.address || ''}</textarea>
             </div>
 
-            <!-- SECCIÓN LOGOTIPO: SUBIDA LOCAL DIRECTA (SIN MOSTRAR ENLACES CONFUSOS) -->
+            <!-- SECCIÓN LOGOTIPO Y FOTO DEL COMERCIO / FACTURA -->
             <h3 style="font-size: 15px; font-weight: 700; color: var(--brand-blue); margin-bottom: 14px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-              <span>🖼️</span> Foto de Perfil & Logotipo del Comercio
+              <span>🖼️</span> Foto de Perfil, Logotipo & Factura
             </h3>
 
-            <!-- Campo oculto donde se guarda la ruta interna sin exponer el texto del link al usuario -->
+            <!-- Campo oculto donde se guarda la ruta interna / base64 -->
             <input type="hidden" id="prof-logo" value="${b.logo_url || ''}">
 
-            <div style="background: rgba(0, 119, 246, 0.05); border: 1px dashed rgba(0, 119, 246, 0.35); border-radius: 14px; padding: 18px; margin-bottom: 18px;">
+            <div id="prof-logo-dropzone" style="background: rgba(0, 119, 246, 0.05); border: 2px dashed rgba(0, 119, 246, 0.35); border-radius: 14px; padding: 18px; margin-bottom: 18px; transition: all 0.2s ease;">
               
               <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
                 
                 <!-- Caja de Vista Previa del Logo -->
-                <div id="prof-logo-preview-box" style="width: 88px; height: 88px; border-radius: 14px; background: rgba(0,0,0,0.35); border: 2px solid var(--border-glass); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                <div id="prof-logo-preview-box" style="width: 96px; height: 96px; border-radius: 14px; background: rgba(0,0,0,0.35); border: 2px solid var(--border-glass); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
                   ${b.logo_url 
                     ? `<img src="${b.logo_url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Logotipo">` 
-                    : '<span style="font-size: 36px;">🏪</span>'}
+                    : '<span style="font-size: 38px;">🏪</span>'}
                 </div>
 
                 <div style="flex-grow: 1; min-width: 240px;">
                   <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
-                    Foto de Perfil del Comercio
+                    Logotipo Principal para Mi Negocio y Factura
                   </div>
                   <div style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4;">
-                    Selecciona una foto o logotipo desde tu equipo (PNG, JPG, WEBP o SVG). Se almacena localmente y aparecerá en el encabezado de tus facturas y tienda.
+                    Puedes seleccionar una foto o logotipo local desde tu computadora o teléfono (PNG, JPG, WEBP o SVG). Aparecerá en el encabezado de tus facturas impresas, tickets y tienda online.
                   </div>
 
                   <!-- Input de archivo real (oculto) -->
                   <input type="file" id="prof-logo-file-input" accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml" style="display: none;">
                   
-                  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
                     <button type="button" class="btn btn-sm btn-primary" id="btn-browse-logo" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 8px 16px; border-radius: 8px;">
-                      <span>📁</span> ${b.logo_url ? 'Cambiar Foto de Perfil' : 'Subir Foto desde tu Equipo'}
+                      <span>📁</span> ${b.logo_url ? 'Cambiar Foto desde este Equipo' : '📁 Seleccionar Foto Local'}
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-secondary" id="btn-toggle-url-logo" style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; padding: 8px 14px; border-radius: 8px;">
+                      <span>🔗</span> Pegar Enlace URL
                     </button>
 
                     <button type="button" class="btn btn-sm btn-secondary" id="btn-remove-logo" style="display: ${b.logo_url ? 'inline-flex' : 'none'}; align-items: center; gap: 6px; color: var(--danger); border-color: rgba(239,68,68,0.3); border-radius: 8px; padding: 8px 14px;">
@@ -234,6 +243,14 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
                     </button>
 
                     <span id="prof-logo-upload-status" style="font-size: 12px; font-weight: 600;"></span>
+                  </div>
+
+                  <!-- Input alternativo para ingresar URL si lo desea -->
+                  <div id="prof-logo-url-container" style="display: ${b.logo_url && b.logo_url.startsWith('http') ? 'block' : 'none'}; margin-top: 8px;">
+                    <input type="url" class="form-control" id="prof-logo-url-input" placeholder="https://mi-dominio.com/logo.png" style="font-size: 12px; height: 34px;" value="${b.logo_url && b.logo_url.startsWith('http') ? b.logo_url : ''}">
+                    <small style="font-size: 10.5px; color: var(--text-muted); display: block; margin-top: 3px;">
+                      Ingresa el enlace directo a tu imagen web y se reflejará al instante.
+                    </small>
                   </div>
                 </div>
 
@@ -471,7 +488,7 @@ export function setupBusinessProfileEvents(
     if (logoPreviewBox) {
       logoPreviewBox.innerHTML = url
         ? `<img src="${url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Logo">`
-        : '<span style="font-size: 36px;">🏪</span>';
+        : '<span style="font-size: 38px;">🏪</span>';
     }
     if (previewLogo) {
       previewLogo.innerHTML = url
@@ -479,64 +496,121 @@ export function setupBusinessProfileEvents(
         : '<div style="font-size: 32px;">🛒</div>';
     }
     if (browseBtn) {
-      browseBtn.innerHTML = `<span>📁</span> ${url ? 'Cambiar Foto de Perfil' : 'Subir Foto desde tu Equipo'}`;
+      browseBtn.innerHTML = `<span>📁</span> ${url ? 'Cambiar Foto desde este Equipo' : '📁 Seleccionar Foto Local'}`;
     }
     if (removeLogoBtn) {
       removeLogoBtn.style.display = url ? 'inline-flex' : 'none';
     }
   };
 
-  // SUBIDA LOCAL DE ARCHIVO DE LOGOTIPO
+  // Toggle para contenedor de URL
+  const toggleUrlBtn = container.querySelector('#btn-toggle-url-logo') as HTMLButtonElement | null;
+  const urlContainer = container.querySelector('#prof-logo-url-container') as HTMLElement | null;
+  const urlInput = container.querySelector('#prof-logo-url-input') as HTMLInputElement | null;
+  const dropzone = container.querySelector('#prof-logo-dropzone') as HTMLElement | null;
+
+  toggleUrlBtn?.addEventListener('click', () => {
+    if (urlContainer) {
+      const isHidden = urlContainer.style.display === 'none';
+      urlContainer.style.display = isHidden ? 'block' : 'none';
+      if (isHidden && urlInput) urlInput.focus();
+    }
+  });
+
+  urlInput?.addEventListener('input', () => {
+    const val = urlInput.value.trim();
+    if (logoHiddenInput) logoHiddenInput.value = val;
+    updateLogoDisplay(val);
+  });
+
+  // Procesar archivo local (FileReader instantáneo + subida segura al servidor con respaldo Base64)
+  const processLocalFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('⚠️ Por favor selecciona un archivo de imagen válido (PNG, JPG, WEBP, SVG).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('⚠️ La imagen no debe superar 5MB de tamaño.');
+      return;
+    }
+
+    if (uploadStatus) uploadStatus.innerHTML = '<span style="color: var(--brand-blue); font-weight:700;">Cargando foto... ⏳</span>';
+    if (browseBtn) browseBtn.disabled = true;
+
+    // 1. Lectura inmediata como Data URL para visualización en tiempo real
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Url = event.target?.result as string;
+      if (base64Url) {
+        if (logoHiddenInput) logoHiddenInput.value = base64Url;
+        updateLogoDisplay(base64Url);
+      }
+
+      // 2. Intentar subida al endpoint multipart del backend
+      try {
+        const formData = new FormData();
+        formData.append('logo', file);
+        const res = await api.business.uploadLogo(formData);
+        if (res && res.imageUrl) {
+          if (logoHiddenInput) logoHiddenInput.value = res.imageUrl;
+          updateLogoDisplay(res.imageUrl);
+        }
+        if (uploadStatus) {
+          uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Foto guardada exitosamente!</span>';
+          setTimeout(() => { if (uploadStatus) uploadStatus.textContent = ''; }, 4000);
+        }
+      } catch (uploadErr) {
+        console.warn('Subida multipart al servidor local dio advertencia (modo fallback Base64):', uploadErr);
+        // Respaldo directo en BD con la cadena Base64
+        try {
+          await api.business.updateProfile({ logo_url: base64Url });
+          if (uploadStatus) {
+            uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Foto guardada con éxito!</span>';
+            setTimeout(() => { if (uploadStatus) uploadStatus.textContent = ''; }, 4000);
+          }
+        } catch (dbErr: any) {
+          console.error('Error guardando logo en BD:', dbErr);
+          if (uploadStatus) uploadStatus.innerHTML = `<span style="color: var(--danger);">❌ ${dbErr.message || 'Error al guardar'}</span>`;
+        }
+      } finally {
+        if (browseBtn) browseBtn.disabled = false;
+        if (fileInput) fileInput.value = '';
+        try {
+          const updated = await api.business.getMyProfile();
+          if (onProfileUpdated) onProfileUpdated(updated);
+        } catch (_) {}
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // SUBIDA LOCAL DE ARCHIVO DE LOGOTIPO MEDIANTE BOTÓN
   browseBtn?.addEventListener('click', () => {
     fileInput?.click();
   });
 
   fileInput?.addEventListener('change', async () => {
     if (!fileInput.files || fileInput.files.length === 0) return;
-    const file = fileInput.files[0];
+    await processLocalFile(fileInput.files[0]);
+  });
 
-    // Validar tipo y tamaño (5MB)
-    if (!file.type.startsWith('image/')) {
-      alert('⚠️ Por favor selecciona un archivo de imagen válido (PNG, JPG, WEBP, SVG).');
-      fileInput.value = '';
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('⚠️ La imagen no debe superar 5MB de tamaño.');
-      fileInput.value = '';
-      return;
-    }
-
-    if (uploadStatus) uploadStatus.innerHTML = '<span style="color: var(--brand-blue); font-weight:700;">Subiendo foto... ⏳</span>';
-    if (browseBtn) browseBtn.disabled = true;
-
-    try {
-      const formData = new FormData();
-      formData.append('logo', file);
-
-      const res = await api.business.uploadLogo(formData);
-      
-      // Guardar en el input oculto (sin mostrar texto de enlace confuso al usuario)
-      if (logoHiddenInput) logoHiddenInput.value = res.imageUrl;
-      updateLogoDisplay(res.imageUrl);
-
-      if (uploadStatus) {
-        uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Foto guardada exitosamente!</span>';
-        setTimeout(() => {
-          if (uploadStatus) uploadStatus.textContent = '';
-        }, 4000);
-      }
-
-      // Notificar actualización de perfil
-      const updated = await api.business.getMyProfile();
-      if (onProfileUpdated) onProfileUpdated(updated);
-    } catch (err: any) {
-      console.error('Error subiendo logo:', err);
-      if (uploadStatus) uploadStatus.innerHTML = `<span style="color: var(--danger);">❌ ${err.message || 'Error al subir'}</span>`;
-      alert(`❌ Error al subir la imagen: ${err.message || 'Error desconocido'}`);
-    } finally {
-      if (browseBtn) browseBtn.disabled = false;
-      fileInput.value = '';
+  // DRAG AND DROP SOBRE LA ZONA DE FOTO
+  dropzone?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'var(--brand-orange)';
+    dropzone.style.background = 'rgba(255, 115, 0, 0.08)';
+  });
+  dropzone?.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'rgba(0, 119, 246, 0.35)';
+    dropzone.style.background = 'rgba(0, 119, 246, 0.05)';
+  });
+  dropzone?.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'rgba(0, 119, 246, 0.35)';
+    dropzone.style.background = 'rgba(0, 119, 246, 0.05)';
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await processLocalFile(e.dataTransfer.files[0]);
     }
   });
 
@@ -544,6 +618,7 @@ export function setupBusinessProfileEvents(
   removeLogoBtn?.addEventListener('click', async () => {
     if (!confirm('¿Deseas quitar la foto de perfil y logo de tu negocio?')) return;
     if (logoHiddenInput) logoHiddenInput.value = '';
+    if (urlInput) urlInput.value = '';
     updateLogoDisplay('');
     try {
       await api.business.updateProfile({ logo_url: null });

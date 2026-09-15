@@ -120,9 +120,16 @@ async function getBusinessesList(_req, res) {
 async function createBusiness(req, res) {
     const conn = await db_1.default.getConnection();
     try {
-        const { name, slug, rif, legal_name, phone, email, address, ticket_message, license_plan = 'pro', license_days = 30, expires_at, price_monthly = 25.00, admin_name, admin_email, admin_password } = req.body;
+        const { name, slug, rif, legal_name, phone, email, address, ticket_message, license_status: reqLicenseStatus, license_plan = 'pro', license_days = 30, expires_at, price_monthly = 25.00, admin_name, admin_email, admin_password } = req.body;
         if (!name) {
             return res.status(400).json({ error: 'El nombre del negocio es obligatorio.' });
+        }
+        // Determinar status de licencia inicial (trial si es plan de prueba o días <= 7, activo si no)
+        let initialStatus = reqLicenseStatus || 'active';
+        if (!reqLicenseStatus) {
+            if (license_plan.includes('trial') || Number(license_days) <= 7) {
+                initialStatus = 'trial';
+            }
         }
         // Generar slug limpio
         const cleanSlug = (slug || name)
@@ -157,7 +164,7 @@ async function createBusiness(req, res) {
         name, slug, rif, legal_name, phone, email, address, ticket_message,
         license_status, license_plan, license_expires_at, price_monthly,
         google_sheet_id, google_sheet_url, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, 1)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `, [
             name,
             cleanSlug,
@@ -167,6 +174,7 @@ async function createBusiness(req, res) {
             email || null,
             address || null,
             ticket_message || `¡Gracias por tu compra en ${name}! 🐒`,
+            initialStatus,
             license_plan,
             finalExpiresAt,
             price_monthly,
@@ -259,7 +267,8 @@ async function updateBusinessLicense(req, res) {
         if (!isSuspending) {
             if (expires_at) {
                 newExpiresAt = new Date(expires_at);
-                newStatus = 'active';
+                if (!license_status)
+                    newStatus = 'active';
                 newIsActive = 1;
             }
             else if (add_days && Number(add_days) > 0) {
@@ -268,7 +277,8 @@ async function updateBusinessLicense(req, res) {
                     newExpiresAt = new Date();
                 }
                 newExpiresAt.setDate(newExpiresAt.getDate() + daysToAdd);
-                newStatus = 'active';
+                if (!license_status)
+                    newStatus = 'active';
                 newIsActive = 1;
             }
         }
