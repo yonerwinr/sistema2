@@ -307,10 +307,12 @@ function toggleTheme() {
 // Inicializar tema y listener global delegado al cargar script
 if (typeof document !== 'undefined') {
   document.documentElement.setAttribute('data-theme', currentTheme);
+  if (document.body) document.body.setAttribute('data-theme', currentTheme);
   document.addEventListener('click', (e) => {
     const toggle = (e.target as HTMLElement)?.closest?.('.apple-theme-toggle');
     if (toggle) {
       e.preventDefault();
+      e.stopPropagation();
       toggleTheme();
     }
   });
@@ -1088,14 +1090,16 @@ function renderNavbar(): string {
             <a class="nav-link ${currentView === 'auth' ? 'active' : ''}" id="link-login">Ingresar</a>
           `}
           
-          <!-- Botón de Modo Claro / Modo Oscuro Estilo Apple -->
-          <button type="button" class="apple-theme-toggle" id="theme-toggle-nav-btn" title="Cambiar a ${currentTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}" style="margin-right:6px;">
-            <span class="toggle-icon">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
-            <span class="toggle-track">
-              <span class="toggle-thumb"></span>
-            </span>
-            <span class="theme-label" style="font-size:11.5px;">${currentTheme === 'light' ? 'Claro' : 'Oscuro'}</span>
-          </button>
+          <!-- Botón de Modo Claro / Modo Oscuro Estilo Apple (Solo en Header de Info) -->
+          ${currentView === 'info' ? `
+            <button type="button" class="apple-theme-toggle" id="theme-toggle-nav-btn" title="Cambiar a ${currentTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}" style="margin-right:6px;">
+              <span class="toggle-icon">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
+              <span class="toggle-track">
+                <span class="toggle-thumb"></span>
+              </span>
+              <span class="theme-label" style="font-size:11.5px;">${currentTheme === 'light' ? 'Claro' : 'Oscuro'}</span>
+            </button>
+          ` : ''}
 
           <!-- Carrito de E-commerce -->
           <div class="cart-icon-container" id="nav-cart-btn">
@@ -1148,11 +1152,6 @@ function bindGeneralEvents() {
     }
   });
 
-  // Listener para el botón de Modo Claro / Modo Oscuro en Navbar
-  document.getElementById('theme-toggle-nav-btn')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    toggleTheme();
-  });
 
   document.getElementById('link-store')?.addEventListener('click', () => navigate('store'));
   document.getElementById('link-info')?.addEventListener('click', () => navigate('info'));
@@ -1495,13 +1494,6 @@ function renderInfoView(): string {
             <span class="pulsing-dot"></span>
             <span>ECOSISTEMA INTEGRAL DEFINITIVO • POS & TIENDA ONLINE</span>
           </div>
-          <button type="button" class="apple-theme-toggle" id="theme-toggle-info-btn" title="Alternar entre Modo Claro y Oscuro">
-            <span class="toggle-icon">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
-            <span class="toggle-track">
-              <span class="toggle-thumb"></span>
-            </span>
-            <span class="theme-label" style="font-size:11.5px;">${currentTheme === 'light' ? 'Modo Claro' : 'Modo Oscuro'}</span>
-          </button>
         </div>
 
         <h1 class="info-hero-title animate-on-scroll animate-fade-up">
@@ -2025,11 +2017,6 @@ function renderInfoView(): string {
 }
 
 function bindInfoEvents() {
-  // Alternar Modo Claro / Modo Oscuro
-  document.getElementById('theme-toggle-info-btn')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    toggleTheme();
-  });
 
   // Navegación a Demo / Registro
   document.getElementById('info-cta-demo')?.addEventListener('click', () => navigate('auth'));
@@ -3739,6 +3726,25 @@ function renderUserProfileModal(): string {
               </div>
             </div>
 
+            <!-- SECCIÓN: APARIENCIA DEL SISTEMA (MODO CLARO / MODO OSCURO) -->
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+              <div>
+                <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                  <span>🎨</span> Tema del Sistema
+                </div>
+                <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+                  Cambia entre el Modo Claro estilo Apple y el Modo Oscuro
+                </div>
+              </div>
+              <button type="button" class="apple-theme-toggle" id="theme-toggle-profile-btn" title="Cambiar a ${currentTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}">
+                <span class="toggle-icon">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
+                <span class="toggle-track">
+                  <span class="toggle-thumb"></span>
+                </span>
+                <span class="theme-label" style="font-size:12px;">${currentTheme === 'light' ? 'Modo Claro' : 'Modo Oscuro'}</span>
+              </button>
+            </div>
+
             <!-- SECCIÓN 3: CAMBIO DE CONTRASEÑA -->
             <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 14px; padding: 14px; margin-bottom: 18px;">
               <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" id="toggle-profile-password-section">
@@ -4801,17 +4807,9 @@ function renderAdminDashboard(): string {
               ${isSidebarOnRight ? '⬅ A la Izq' : '➡ A la Der'}
             </button>
           </div>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <button type="button" class="apple-theme-toggle" id="theme-toggle-sidebar-btn" title="Alternar entre Modo Claro y Oscuro" style="padding:2px 7px; height:24px; border-radius:14px;">
-              <span class="toggle-icon" style="font-size:11.5px;">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
-              <span class="toggle-track" style="width:26px; height:15px;">
-                <span class="toggle-thumb" style="width:11px; height:11px;"></span>
-              </span>
-            </button>
-            <button type="button" id="btn-collapse-sidebar" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); color:var(--text-primary); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px;" title="Ocultar barra de módulos">
-              <span>✕</span> Ocultar
-            </button>
-          </div>
+          <button type="button" id="btn-collapse-sidebar" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); color:var(--text-primary); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px;" title="Ocultar barra de módulos">
+            <span>✕</span> Ocultar
+          </button>
         </div>
 
         <!-- Recuadro Anclado de Tasas BCV & Binance (Siempre en la misma posición fija para todos los módulos) -->
@@ -5162,6 +5160,25 @@ function renderUserProfileInlineHtml(): string {
               <input type="text" class="form-control" id="inline-profile-address-input" value="${currentUser.address || ''}" placeholder="Ej. Caracas, Venezuela">
             </div>
           </div>
+        </div>
+
+        <!-- SECCIÓN: APARIENCIA DEL SISTEMA (MODO CLARO / MODO OSCURO) -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 14px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+          <div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              <span>🎨</span> Apariencia del Sistema
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+              Alterna entre el Modo Claro estilo Apple y el Modo Oscuro para todo el sistema
+            </div>
+          </div>
+          <button type="button" class="apple-theme-toggle" id="inline-theme-toggle-btn" title="Cambiar a ${currentTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}">
+            <span class="toggle-icon">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+            <span class="theme-label" style="font-size:12px;">${currentTheme === 'light' ? 'Modo Claro' : 'Modo Oscuro'}</span>
+          </button>
         </div>
 
         <!-- SECCIÓN 3: CAMBIO DE CONTRASEÑA -->
@@ -6576,13 +6593,6 @@ async function renderAdminPOS() {
               <h3 style="font-size:18px; font-weight:800; margin:0;">Catálogo de Productos</h3>
               <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:12px; font-weight:700; padding:6px 12px; border-radius:8px;">
                 ➕ Nueva Venta Libre
-              </button>
-              <button type="button" class="apple-theme-toggle" id="theme-toggle-pos-btn" title="Alternar entre Modo Claro y Oscuro" style="padding:4px 9px; height:28px; border-radius:14px;">
-                <span class="toggle-icon" style="font-size:13px;">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
-                <span class="toggle-track" style="width:28px; height:16px;">
-                  <span class="toggle-thumb" style="width:12px; height:12px;"></span>
-                </span>
-                <span class="theme-label" style="font-size:11px;">${currentTheme === 'light' ? 'Claro' : 'Oscuro'}</span>
               </button>
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
