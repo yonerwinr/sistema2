@@ -956,13 +956,6 @@ function renderNavbar(): string {
             <span style="color:#0084ff;">Facilito</span><span style="color:#ff7300;">App</span>
           </span>
         </a>
-
-        ${currentView === 'admin' ? `
-          <button type="button" id="btn-nav-toggle-sidebar" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; border-radius:10px; padding:6px 12px; margin-left:10px; background:rgba(0,119,246,0.14); border:1px solid rgba(0,119,246,0.35); color:#60a5fa; cursor:pointer;" title="Ocultar o mostrar barra de módulos">
-            <span>☰</span>
-            <span id="nav-toggle-sidebar-label">${isSidebarHidden ? 'Mostrar Módulos' : 'Ocultar Módulos'}</span>
-          </button>
-        ` : ''}
         
         <!-- Botón Toggle Menú Hamburguesa Móvil -->
         <button id="nav-toggle-btn" class="nav-toggle-btn" aria-label="Abrir menú de navegación" style="display:none;">
@@ -1105,11 +1098,6 @@ function bindGeneralEvents() {
     } else {
       navigate('store');
     }
-  });
-
-  // Toggle de la barra de módulos del dashboard
-  document.getElementById('btn-nav-toggle-sidebar')?.addEventListener('click', () => {
-    toggleDashboardSidebar();
   });
 
   document.getElementById('link-store')?.addEventListener('click', () => navigate('store'));
