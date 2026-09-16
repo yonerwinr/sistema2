@@ -174,6 +174,79 @@ function smartMatch(target: string | undefined | null, query: string | undefined
 type AdminSubView = 'stats' | 'pos' | 'products' | 'sales' | 'debtors' | 'quotations' | 'coupons' | 'staff' | 'expenses' | 'customers' | 'reports' | 'suppliers' | 'online_billing' | 'returns' | 'business_profile';
 let activeAdminView: AdminSubView = 'pos';
 
+// Estado de visibilidad y posición de la barra de módulos
+let isSidebarHidden = localStorage.getItem('facilito_sidebar_hidden') === 'true';
+let isSidebarOnRight = localStorage.getItem('facilito_sidebar_on_right') === 'true';
+let isModulesListCollapsed = localStorage.getItem('facilito_modules_list_collapsed') === 'true';
+
+function toggleDashboardSidebar(forceState?: boolean) {
+  if (typeof forceState === 'boolean') {
+    isSidebarHidden = forceState;
+  } else {
+    isSidebarHidden = !isSidebarHidden;
+  }
+  localStorage.setItem('facilito_sidebar_hidden', isSidebarHidden ? 'true' : 'false');
+
+  const layout = document.getElementById('dashboard-layout-container');
+  const floatingBtn = document.getElementById('btn-floating-restore-sidebar');
+  const navBtnLabel = document.getElementById('nav-toggle-sidebar-label');
+
+  if (layout) {
+    if (isSidebarHidden) {
+      layout.classList.add('sidebar-hidden');
+    } else {
+      layout.classList.remove('sidebar-hidden');
+    }
+  }
+
+  if (floatingBtn) {
+    floatingBtn.style.display = isSidebarHidden ? 'inline-flex' : 'none';
+  }
+
+  if (navBtnLabel) {
+    navBtnLabel.textContent = isSidebarHidden ? 'Mostrar Módulos' : 'Ocultar Módulos';
+  }
+}
+
+function toggleSidebarPosition() {
+  isSidebarOnRight = !isSidebarOnRight;
+  localStorage.setItem('facilito_sidebar_on_right', isSidebarOnRight ? 'true' : 'false');
+
+  const layout = document.getElementById('dashboard-layout-container');
+  const switchBtn = document.getElementById('btn-switch-sidebar-side');
+  const floatingBtn = document.getElementById('btn-floating-restore-sidebar');
+
+  if (layout) {
+    if (isSidebarOnRight) {
+      layout.classList.add('sidebar-on-right');
+    } else {
+      layout.classList.remove('sidebar-on-right');
+    }
+  }
+
+  if (switchBtn) {
+    switchBtn.textContent = isSidebarOnRight ? '⬅ A la Izq' : '➡ A la Der';
+  }
+
+  if (floatingBtn) {
+    floatingBtn.className = `floating-restore-sidebar-btn ${isSidebarOnRight ? 'on-right' : 'on-left'}`;
+  }
+}
+
+function toggleModulesGroupList() {
+  isModulesListCollapsed = !isModulesListCollapsed;
+  localStorage.setItem('facilito_modules_list_collapsed', isModulesListCollapsed ? 'true' : 'false');
+
+  const group = document.getElementById('sidebar-nav-group-container');
+  const arrow = document.getElementById('modules-group-arrow');
+  if (group) {
+    group.style.display = isModulesListCollapsed ? 'none' : 'flex';
+  }
+  if (arrow) {
+    arrow.textContent = isModulesListCollapsed ? '▶ Ver Módulos' : '▼ Ocultar';
+  }
+}
+
 // Nuevas variables de estado para el control en POS
 let posCustomersList: User[] = [];
 let posProductsCache: Product[] = [];
@@ -883,6 +956,13 @@ function renderNavbar(): string {
             <span style="color:#0084ff;">Facilito</span><span style="color:#ff7300;">App</span>
           </span>
         </a>
+
+        ${currentView === 'admin' ? `
+          <button type="button" id="btn-nav-toggle-sidebar" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; border-radius:10px; padding:6px 12px; margin-left:10px; background:rgba(0,119,246,0.14); border:1px solid rgba(0,119,246,0.35); color:#60a5fa; cursor:pointer;" title="Ocultar o mostrar barra de módulos">
+            <span>☰</span>
+            <span id="nav-toggle-sidebar-label">${isSidebarHidden ? 'Mostrar Módulos' : 'Ocultar Módulos'}</span>
+          </button>
+        ` : ''}
         
         <!-- Botón Toggle Menú Hamburguesa Móvil -->
         <button id="nav-toggle-btn" class="nav-toggle-btn" aria-label="Abrir menú de navegación" style="display:none;">
@@ -1025,6 +1105,11 @@ function bindGeneralEvents() {
     } else {
       navigate('store');
     }
+  });
+
+  // Toggle de la barra de módulos del dashboard
+  document.getElementById('btn-nav-toggle-sidebar')?.addEventListener('click', () => {
+    toggleDashboardSidebar();
   });
 
   document.getElementById('link-store')?.addEventListener('click', () => navigate('store'));
@@ -4702,10 +4787,29 @@ function renderAdminDashboard(): string {
   }
 
   return `
-    <div class="dashboard-layout">
+    <div class="dashboard-layout ${isSidebarHidden ? 'sidebar-hidden' : ''} ${isSidebarOnRight ? 'sidebar-on-right' : ''}" id="dashboard-layout-container">
+      <!-- Botón Flotante para reabrir la barra cuando esté oculta -->
+      <button type="button" id="btn-floating-restore-sidebar" class="floating-restore-sidebar-btn ${isSidebarOnRight ? 'on-right' : 'on-left'}" style="${isSidebarHidden ? 'display:inline-flex;' : 'display:none;'}" title="Mostrar barra de módulos">
+        <span>☰</span>
+        <span>Mostrar Módulos</span>
+      </button>
+
       <!-- Sidebar de Administracion -->
-      <aside class="dashboard-sidebar">
+      <aside class="dashboard-sidebar" id="admin-dashboard-sidebar">
         
+        <!-- Barra de Control del Menú Lateral -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:10.5px; font-weight:800; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Panel</span>
+            <button type="button" id="btn-switch-sidebar-side" style="background:none; border:none; color:#60a5fa; font-size:10.5px; cursor:pointer; text-decoration:underline; padding:0 2px;" title="Cambiar posición del panel (Izquierda / Derecha)">
+              ${isSidebarOnRight ? '⬅ A la Izq' : '➡ A la Der'}
+            </button>
+          </div>
+          <button type="button" id="btn-collapse-sidebar" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); color:var(--text-main); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px;" title="Ocultar barra de módulos">
+            <span>✕</span> Ocultar
+          </button>
+        </div>
+
         <!-- Recuadro Anclado de Tasas BCV & Binance (Siempre en la misma posición fija para todos los módulos) -->
         <div class="card rates-widget-sidebar">
           <div class="rates-widget-header">
@@ -4823,9 +4927,14 @@ function renderAdminDashboard(): string {
         })()}
 
         <div class="sidebar-section-divider"></div>
-        <div class="sidebar-section-label">Módulos del Sistema</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div class="sidebar-section-label" style="margin:0;">Módulos del Sistema</div>
+          <button type="button" id="btn-toggle-modules-group" style="background:none; border:none; color:#60a5fa; font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px;" title="Colapsar o expandir lista de módulos">
+            <span id="modules-group-arrow">${isModulesListCollapsed ? '▶ Ver Módulos' : '▼ Ocultar'}</span>
+          </button>
+        </div>
 
-        <div class="sidebar-nav-group">
+        <div class="sidebar-nav-group" id="sidebar-nav-group-container" style="${isModulesListCollapsed ? 'display:none;' : ''}">
           ${hasPermission('online_billing') ? `
             <button class="sidebar-nav-btn ${activeAdminView === 'online_billing' ? 'active' : ''}" id="admin-tab-online-billing">
               🔔 Facturac. Online
@@ -5535,6 +5644,20 @@ async function bindAdminEvents() {
   } else if (activeAdminView === 'business_profile') {
     await renderAdminBusinessProfile();
   }
+
+  // Controles de visibilidad y posición de la barra lateral de módulos
+  document.getElementById('btn-collapse-sidebar')?.addEventListener('click', () => {
+    toggleDashboardSidebar(true);
+  });
+  document.getElementById('btn-floating-restore-sidebar')?.addEventListener('click', () => {
+    toggleDashboardSidebar(false);
+  });
+  document.getElementById('btn-switch-sidebar-side')?.addEventListener('click', () => {
+    toggleSidebarPosition();
+  });
+  document.getElementById('btn-toggle-modules-group')?.addEventListener('click', () => {
+    toggleModulesGroupList();
+  });
 
   // Guardar Tasas de Cambio Manuales (BCV & Binance)
   document.getElementById('save-rates-btn')?.addEventListener('click', async () => {

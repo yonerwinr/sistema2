@@ -944,6 +944,61 @@ select option:hover {
   grid-template-columns: 260px 1fr;
   min-height: calc(100vh - 73px);
   align-items: start;
+  transition: grid-template-columns 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+/* Barra de módulos ubicada en el lado derecho */
+.dashboard-layout.sidebar-on-right {
+  grid-template-columns: 1fr 260px;
+}
+.dashboard-layout.sidebar-on-right .dashboard-sidebar {
+  order: 2;
+  border-right: none;
+  border-left: 1px solid var(--border-glass);
+}
+.dashboard-layout.sidebar-on-right .dashboard-content {
+  order: 1;
+}
+
+/* Barra de módulos totalmente oculta (pantalla completa para el contenido) */
+.dashboard-layout.sidebar-hidden {
+  grid-template-columns: 1fr !important;
+}
+.dashboard-layout.sidebar-hidden .dashboard-sidebar {
+  display: none !important;
+}
+
+/* Botón flotante para restaurar barra de módulos cuando esté oculta */
+.floating-restore-sidebar-btn {
+  position: fixed;
+  top: 85px;
+  z-index: 999;
+  background: linear-gradient(135deg, #0077f6, #0056b3);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 4px 18px rgba(0, 119, 246, 0.45);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.floating-restore-sidebar-btn.on-left {
+  left: 0;
+  border-radius: 0 12px 12px 0;
+}
+.floating-restore-sidebar-btn.on-right {
+  right: 0;
+  border-radius: 12px 0 0 12px;
+}
+.floating-restore-sidebar-btn:hover {
+  transform: scale(1.05);
+  background: #0084ff;
+  box-shadow: 0 6px 22px rgba(0, 132, 255, 0.6);
 }
 
 @media (max-width: 768px) {
