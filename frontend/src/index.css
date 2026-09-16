@@ -22,19 +22,19 @@
   --bg-glass: rgba(18, 24, 39, 0.8);
   --bg-glass-active: rgba(31, 39, 59, 0.9);
   --border-glass: rgba(255, 255, 255, 0.1);
-  --border-glass-focus: rgba(255, 115, 0, 0.5);
+  --border-glass-focus: rgba(255, 122, 0, 0.55);
   
   --brand-blue: #0077f6; /* Azul Eléctrico del Logo "Facilito" */
   --brand-blue-hover: #0066d6;
   --brand-blue-glow: rgba(0, 119, 246, 0.28);
-  --brand-orange: #ff7300; /* Naranja Sunset del Logo "App" */
-  --brand-orange-hover: #e66700;
-  --brand-orange-glow: rgba(255, 115, 0, 0.28);
+  --brand-orange: #ff7a00; /* Naranja Vibrante de la Camisa del Mono / App */
+  --brand-orange-hover: #e86d00;
+  --brand-orange-glow: rgba(255, 122, 0, 0.38);
   --brand-gold: #f59e0b; /* Dorado Estrellas y Monedas */
   --brand-gold-glow: rgba(245, 158, 11, 0.25);
 
-  --primary: #ff7300; /* Naranja Marca "App" */
-  --primary-glow: rgba(255, 115, 0, 0.25);
+  --primary: #ff7a00; /* Naranja Camisa del Mono (Color Firma) */
+  --primary-glow: rgba(255, 122, 0, 0.32);
   --secondary: #0077f6; /* Azul Eléctrico Marca "Facilito" */
   --secondary-glow: rgba(0, 119, 246, 0.25);
   --accent: #f59e0b;
@@ -47,7 +47,7 @@
   --text-muted: #64748b;
   
   --shadow-lg: 0 10px 30px -5px rgba(0, 0, 0, 0.4), 0 8px 15px -6px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 25px 0px rgba(255, 122, 0, 0.12);
+  --shadow-glow: 0 0 25px 0px rgba(255, 122, 0, 0.22);
   
   --radius-sm: 10px;
   --radius-md: 18px;
@@ -56,7 +56,7 @@
   /* Variables Apple Glass & Cards */
   --apple-card-bg: rgba(18, 24, 39, 0.65);
   --apple-card-border: rgba(255, 255, 255, 0.09);
-  --apple-card-hover-border: rgba(0, 119, 246, 0.4);
+  --apple-card-hover-border: rgba(255, 122, 0, 0.45);
   --apple-card-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
   --apple-text-title: #ffffff;
   --apple-text-body: #94a3b8;
@@ -71,24 +71,24 @@
 
   --bg-primary: #f5f5f7;
   --bg-secondary: #ffffff;
-  --bg-glass: rgba(255, 255, 255, 0.78);
-  --bg-glass-active: rgba(245, 245, 247, 0.92);
+  --bg-glass: rgba(255, 255, 255, 0.88);
+  --bg-glass-active: rgba(242, 244, 248, 0.96);
   --border-glass: rgba(0, 0, 0, 0.08);
-  --border-glass-focus: rgba(0, 119, 246, 0.4);
+  --border-glass-focus: rgba(255, 122, 0, 0.6);
 
   --text-primary: #1d1d1f;
-  --text-secondary: #6e6e73;
+  --text-secondary: #55575d;
   --text-muted: #86868b;
 
-  --shadow-lg: 0 12px 36px -4px rgba(0, 0, 0, 0.08), 0 4px 14px -2px rgba(0, 0, 0, 0.04);
-  --shadow-glow: 0 0 25px 0px rgba(0, 119, 246, 0.08);
+  --shadow-lg: 0 10px 30px -4px rgba(0, 0, 0, 0.07), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 0 25px 0px rgba(255, 122, 0, 0.15);
 
-  --apple-card-bg: rgba(255, 255, 255, 0.82);
-  --apple-card-border: rgba(0, 0, 0, 0.07);
-  --apple-card-hover-border: rgba(0, 119, 246, 0.35);
-  --apple-card-shadow: 0 18px 45px -10px rgba(0, 0, 0, 0.08);
+  --apple-card-bg: rgba(255, 255, 255, 0.88);
+  --apple-card-border: rgba(0, 0, 0, 0.08);
+  --apple-card-hover-border: rgba(255, 122, 0, 0.45);
+  --apple-card-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.08);
   --apple-text-title: #1d1d1f;
-  --apple-text-body: #6e6e73;
+  --apple-text-body: #55575d;
   --apple-device-bg: #ffffff;
 }
 
@@ -373,15 +373,15 @@ tr.cascade-item {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  background: linear-gradient(135deg, #ff8c00 0%, #ff6200 100%);
   color: #ffffff;
-  box-shadow: var(--shadow-glow);
+  box-shadow: 0 4px 16px rgba(255, 122, 0, 0.38);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  filter: brightness(1.1);
-  box-shadow: 0 0 25px 0px rgba(99, 102, 241, 0.3);
+  filter: brightness(1.08);
+  box-shadow: 0 6px 24px rgba(255, 122, 0, 0.52);
 }
 
 .btn-secondary {
@@ -1037,7 +1037,7 @@ select option:hover {
   position: fixed;
   top: 85px;
   z-index: 999;
-  background: linear-gradient(135deg, #0077f6, #0056b3);
+  background: linear-gradient(135deg, #ff8500, #ff5e00);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.25);
   padding: 8px 14px;
@@ -1047,7 +1047,7 @@ select option:hover {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  box-shadow: 0 4px 18px rgba(0, 119, 246, 0.45);
+  box-shadow: 0 4px 18px rgba(255, 122, 0, 0.45);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .floating-restore-sidebar-btn.on-left {
@@ -1060,8 +1060,8 @@ select option:hover {
 }
 .floating-restore-sidebar-btn:hover {
   transform: scale(1.05);
-  background: #0084ff;
-  box-shadow: 0 6px 22px rgba(0, 132, 255, 0.6);
+  background: #ff9100;
+  box-shadow: 0 6px 22px rgba(255, 122, 0, 0.6);
 }
 
 @media (max-width: 768px) {
@@ -1243,9 +1243,10 @@ select option:hover {
 }
 
 .sidebar-nav-btn.active {
-  background: var(--primary-glow);
-  color: var(--primary);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: rgba(255, 122, 0, 0.14);
+  color: #ff7a00;
+  border: 1px solid rgba(255, 122, 0, 0.35);
+  border-left: 3px solid #ff7a00;
 }
 
 .dashboard-content {
@@ -2911,8 +2912,8 @@ select option:hover {
 
 .apple-theme-toggle:hover {
   transform: scale(1.04);
-  border-color: var(--brand-blue);
-  box-shadow: 0 4px 14px rgba(0, 119, 246, 0.18);
+  border-color: var(--brand-orange);
+  box-shadow: 0 4px 14px rgba(255, 122, 0, 0.25);
 }
 
 .apple-theme-toggle .toggle-icon {
@@ -2949,7 +2950,7 @@ select option:hover {
 
 [data-theme="light"] .apple-theme-toggle .toggle-thumb {
   transform: translateX(16px);
-  background: #0077f6;
+  background: #ff7a00;
 }
 
 /* Contenedor Principal /info */
@@ -3781,6 +3782,334 @@ select option:hover {
   box-shadow: var(--apple-card-shadow);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
+}
+
+/* ==========================================================================
+   MODO CLARO GLOBAL (APPLE CLEAN LIGHT MODE PARA ABSOLUTAMENTE TODO EL SISTEMA)
+   ========================================================================== */
+
+[data-theme="light"] {
+  color-scheme: light;
+  color: #1d1d1f;
+  background-color: #f5f5f7;
+}
+
+[data-theme="light"] body {
+  background: radial-gradient(circle at 10% 20%, rgba(255, 122, 0, 0.08) 0%, transparent 45%),
+              radial-gradient(circle at 90% 80%, rgba(255, 140, 0, 0.05) 0%, transparent 45%),
+              radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.02) 0%, transparent 50%),
+              #f5f5f7 !important;
+  color: #1d1d1f !important;
+}
+
+/* 1. Header & Navbar Global */
+[data-theme="light"] .navbar {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.03) !important;
+}
+
+[data-theme="light"] .nav-link {
+  color: #2c2c2e !important;
+}
+
+[data-theme="light"] .nav-link:hover,
+[data-theme="light"] .nav-link.active {
+  color: #ff7a00 !important;
+  background: rgba(255, 122, 0, 0.1) !important;
+}
+
+[data-theme="light"] .nav-user-profile-btn {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #1d1d1f !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="light"] .exchange-rate-banner {
+  background: rgba(255, 122, 0, 0.06) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07) !important;
+  color: #2c2c2e !important;
+}
+
+/* 2. Barra Lateral de Módulos (Sidebar) */
+[data-theme="light"] .dashboard-sidebar {
+  background: #ffffff !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-left: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.03) !important;
+}
+
+[data-theme="light"] .sidebar-section-divider {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .sidebar-section-label {
+  color: #6e6e73 !important;
+}
+
+[data-theme="light"] .sidebar-nav-btn {
+  color: #2c2c2e !important;
+}
+
+[data-theme="light"] .sidebar-nav-btn:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: #ff7a00 !important;
+}
+
+[data-theme="light"] .sidebar-nav-btn.active {
+  background: rgba(255, 122, 0, 0.12) !important;
+  color: #ff7a00 !important;
+  border: 1px solid rgba(255, 122, 0, 0.3) !important;
+  border-left: 3px solid #ff7a00 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .rates-widget-sidebar {
+  background: #f8fafc !important;
+  border: 1px solid rgba(255, 122, 0, 0.3) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] .rates-widget-title {
+  color: #ff7a00 !important;
+}
+
+[data-theme="light"] .rates-input-field {
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+  border: 1px solid rgba(0, 0, 0, 0.14) !important;
+}
+
+[data-theme="light"] .rates-input-field.binance {
+  background: #fffbeb !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  color: #b45309 !important;
+}
+
+/* 3. Tarjetas, Paneles y Métricas */
+[data-theme="light"] .card,
+[data-theme="light"] .metric-card,
+[data-theme="light"] .stat-card,
+[data-theme="light"] .dashboard-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+  color: #1d1d1f !important;
+}
+
+[data-theme="light"] .metric-header {
+  color: #6e6e73 !important;
+}
+
+[data-theme="light"] .metric-value {
+  color: #1d1d1f !important;
+}
+
+[data-theme="light"] .metric-footer {
+  color: #86868b !important;
+}
+
+/* 4. Tablas del Sistema */
+[data-theme="light"] .table-custom {
+  background: #ffffff !important;
+}
+
+[data-theme="light"] .table-custom th {
+  background: #f4f5f8 !important;
+  color: #475569 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .table-custom td {
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .table-custom tr:hover td {
+  background: #f8fafc !important;
+}
+
+[data-theme="light"] .table-responsive {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 5. Formularios, Controles e Inputs */
+[data-theme="light"] .form-control,
+[data-theme="light"] input[type="text"],
+[data-theme="light"] input[type="number"],
+[data-theme="light"] input[type="email"],
+[data-theme="light"] input[type="password"],
+[data-theme="light"] input[type="date"],
+[data-theme="light"] input[type="search"],
+[data-theme="light"] textarea {
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+  border: 1px solid rgba(0, 0, 0, 0.16) !important;
+}
+
+[data-theme="light"] .form-control:focus,
+[data-theme="light"] input:focus,
+[data-theme="light"] textarea:focus {
+  border-color: #ff7a00 !important;
+  box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.2) !important;
+}
+
+[data-theme="light"] select,
+[data-theme="light"] select.form-control {
+  background-color: #ffffff !important;
+  color: #1d1d1f !important;
+  border: 1px solid rgba(0, 0, 0, 0.16) !important;
+}
+
+[data-theme="light"] select option {
+  background-color: #ffffff !important;
+  color: #1d1d1f !important;
+}
+
+[data-theme="light"] select option:checked,
+[data-theme="light"] select option:hover {
+  background-color: #ff7a00 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .form-label {
+  color: #3a3a3c !important;
+}
+
+[data-theme="light"] .btn-secondary {
+  background: #f1f3f7 !important;
+  color: #1d1d1f !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="light"] .btn-secondary:hover {
+  background: #e5e7eb !important;
+  border-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* 6. Modales y Ventanas Emergentes */
+[data-theme="light"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.45) !important;
+}
+
+[data-theme="light"] .modal-content,
+[data-theme="light"] [id$="-modal-overlay"] > div {
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.18) !important;
+}
+
+[data-theme="light"] .modal-close {
+  color: #6e6e73 !important;
+}
+
+/* 7. Punto de Venta (POS) */
+[data-theme="light"] .pos-cart-column {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .pos-cart-item {
+  background: #f8fafc !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #1d1d1f !important;
+}
+
+[data-theme="light"] .pos-product-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #1d1d1f !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] .qty-btn {
+  color: #1d1d1f !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Reemplazo de texto blanco forzado en modo claro dentro de contenedores */
+[data-theme="light"] .pos-cart-column span[style*="color:white"],
+[data-theme="light"] .pos-cart-column span[style*="color: white"],
+[data-theme="light"] .pos-cart-column div[style*="color:white"],
+[data-theme="light"] .pos-cart-column div[style*="color: white"],
+[data-theme="light"] .pos-responsive-layout strong[style*="color:white"],
+[data-theme="light"] .pos-responsive-layout strong[style*="color: white"],
+[data-theme="light"] .pos-responsive-layout div[style*="color:white"],
+[data-theme="light"] .pos-responsive-layout div[style*="color: white"],
+[data-theme="light"] .card span[style*="color:white"],
+[data-theme="light"] .card span[style*="color: white"],
+[data-theme="light"] .card div[style*="color:white"],
+[data-theme="light"] .card div[style*="color: white"],
+[data-theme="light"] .card h1, [data-theme="light"] .card h2, [data-theme="light"] .card h3,
+[data-theme="light"] .modal-content span[style*="color:white"],
+[data-theme="light"] .modal-content span[style*="color: white"],
+[data-theme="light"] .modal-content div[style*="color:white"],
+[data-theme="light"] .modal-content div[style*="color: white"],
+[data-theme="light"] .modal-content strong[style*="color:white"],
+[data-theme="light"] .modal-content strong[style*="color: white"],
+[data-theme="light"] .modal-content h1, [data-theme="light"] .modal-content h2, [data-theme="light"] .modal-content h3, [data-theme="light"] .modal-content h4,
+[data-theme="light"] .dashboard-content h1, [data-theme="light"] .dashboard-content h2, [data-theme="light"] .dashboard-content h3 {
+  color: #1d1d1f !important;
+}
+
+/* 8. Tienda E-commerce y Carrito Drawer */
+[data-theme="light"] .cart-sidebar {
+  background: #ffffff !important;
+  border-left: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .cart-item {
+  background: #f8fafc !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #1d1d1f !important;
+}
+
+[data-theme="light"] .product-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] .product-title {
+  color: #1d1d1f !important;
+}
+
+/* 9. Autenticación / Login */
+[data-theme="light"] .auth-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .auth-tab-btn {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .auth-tab-btn.active {
+  color: #ff7a00 !important;
+  border-bottom-color: #ff7a00 !important;
+}
+
+/* 10. Pie de Página (Footer) */
+[data-theme="light"] footer {
+  background: #f0f1f5 !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #55575d !important;
+}
+
+/* 11. Popups y SweetAlert2 */
+[data-theme="light"] .swal2-popup {
+  background: #ffffff !important;
+  color: #1d1d1f !important;
+}
+
+[data-theme="light"] .swal2-title,
+[data-theme="light"] .swal2-html-container {
+  color: #1d1d1f !important;
 }
 
 

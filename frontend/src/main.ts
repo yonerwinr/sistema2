@@ -296,6 +296,7 @@ function applyTheme(theme: 'dark' | 'light') {
     const icon = btn.querySelector('.toggle-icon');
     if (label) label.textContent = theme === 'light' ? 'Modo Claro' : 'Modo Oscuro';
     if (icon) icon.textContent = theme === 'light' ? '☀️' : '🌙';
+    btn.setAttribute('title', theme === 'light' ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro');
   });
 }
 
@@ -303,9 +304,16 @@ function toggleTheme() {
   applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
 }
 
-// Inicializar tema al cargar script
+// Inicializar tema y listener global delegado al cargar script
 if (typeof document !== 'undefined') {
   document.documentElement.setAttribute('data-theme', currentTheme);
+  document.addEventListener('click', (e) => {
+    const toggle = (e.target as HTMLElement)?.closest?.('.apple-theme-toggle');
+    if (toggle) {
+      e.preventDefault();
+      toggleTheme();
+    }
+  });
 }
 
 // Estado de Proveedores (Admin)
@@ -982,9 +990,9 @@ function renderNavbar(): string {
     <nav class="navbar">
       <div class="container navbar-container">
         <a class="logo" href="#" id="nav-logo" style="display:flex; align-items:center; gap:12px; text-decoration:none;">
-          <img src="${currentBusinessProfile?.logo_url || (currentUser as any)?.business?.logo_url || '/logo.png'}" onerror="this.onerror=null; this.src='/logo.png';" style="height:56px; width:56px; object-fit:contain; border-radius:12px; background:rgba(255,255,255,0.06); padding:4px; box-shadow: 0 4px 16px rgba(0, 119, 246, 0.25);" alt="Logo">
+          <img src="${currentBusinessProfile?.logo_url || (currentUser as any)?.business?.logo_url || '/logo.png'}" onerror="this.onerror=null; this.src='/logo.png';" style="height:56px; width:56px; object-fit:contain; border-radius:12px; background:rgba(255,255,255,0.06); padding:4px; box-shadow: 0 4px 16px rgba(255, 122, 0, 0.35);" alt="Logo">
           <span style="font-weight:900; font-size:24px; letter-spacing:-0.5px; display:inline-flex; align-items:baseline;">
-            <span style="color:#0084ff;">Facilito</span><span style="color:#ff7300;">App</span>
+            <span style="color:var(--brand-blue, #0084ff);">Facilito</span><span style="color:var(--brand-orange, #ff7a00);">App</span>
           </span>
         </a>
         
@@ -4793,9 +4801,17 @@ function renderAdminDashboard(): string {
               ${isSidebarOnRight ? '⬅ A la Izq' : '➡ A la Der'}
             </button>
           </div>
-          <button type="button" id="btn-collapse-sidebar" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); color:var(--text-main); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px;" title="Ocultar barra de módulos">
-            <span>✕</span> Ocultar
-          </button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button type="button" class="apple-theme-toggle" id="theme-toggle-sidebar-btn" title="Alternar entre Modo Claro y Oscuro" style="padding:2px 7px; height:24px; border-radius:14px;">
+              <span class="toggle-icon" style="font-size:11.5px;">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
+              <span class="toggle-track" style="width:26px; height:15px;">
+                <span class="toggle-thumb" style="width:11px; height:11px;"></span>
+              </span>
+            </button>
+            <button type="button" id="btn-collapse-sidebar" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); color:var(--text-primary); font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:4px;" title="Ocultar barra de módulos">
+              <span>✕</span> Ocultar
+            </button>
+          </div>
         </div>
 
         <!-- Recuadro Anclado de Tasas BCV & Binance (Siempre en la misma posición fija para todos los módulos) -->
@@ -6560,6 +6576,13 @@ async function renderAdminPOS() {
               <h3 style="font-size:18px; font-weight:800; margin:0;">Catálogo de Productos</h3>
               <button type="button" class="btn btn-success" id="open-free-sale-btn" style="background:#10b981; border:none; color:white; font-size:12px; font-weight:700; padding:6px 12px; border-radius:8px;">
                 ➕ Nueva Venta Libre
+              </button>
+              <button type="button" class="apple-theme-toggle" id="theme-toggle-pos-btn" title="Alternar entre Modo Claro y Oscuro" style="padding:4px 9px; height:28px; border-radius:14px;">
+                <span class="toggle-icon" style="font-size:13px;">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
+                <span class="toggle-track" style="width:28px; height:16px;">
+                  <span class="toggle-thumb" style="width:12px; height:12px;"></span>
+                </span>
+                <span class="theme-label" style="font-size:11px;">${currentTheme === 'light' ? 'Claro' : 'Oscuro'}</span>
               </button>
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
