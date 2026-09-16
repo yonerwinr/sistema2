@@ -10,6 +10,17 @@ import './index.css';
 
 Chart.register(...registerables);
 
+export function isAvatarImage(url?: string | null): boolean {
+  if (!url) return false;
+  const s = url.trim();
+  return s.startsWith('data:') ||
+         s.startsWith('http://') ||
+         s.startsWith('https://') ||
+         s.startsWith('/') ||
+         s.startsWith('./') ||
+         /\.(png|jpg|jpeg|webp|svg|gif)($|\?)/i.test(s);
+}
+
 // ==========================================================================
 // ESTADO GLOBAL DE LA APP
 // ==========================================================================
@@ -827,7 +838,7 @@ function renderNavbar(): string {
   const totalCartItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return `
-    ${currentView !== 'auth' && currentView !== 'info' ? `
+    ${currentView !== 'auth' && currentView !== 'info' && currentView !== 'admin' ? `
       <div class="exchange-rate-banner" style="background: rgba(16,185,129,0.06); border-bottom: 1px solid var(--border-glass); padding: 6px 0; font-size: 11px; font-weight: 600; text-align: center; color: var(--success); display: flex; justify-content: center; gap: 16px; align-items:center; flex-wrap: wrap;">
         <span>💵 BCV: <strong>Bs. ${formatRate(rateUsdToVes)}</strong></span>
         <span style="color:var(--text-muted);">|</span>
@@ -867,7 +878,7 @@ function renderNavbar(): string {
     <nav class="navbar">
       <div class="container navbar-container">
         <a class="logo" href="#" id="nav-logo" style="display:flex; align-items:center; gap:12px; text-decoration:none;">
-          <img src="${currentBusinessProfile?.logo_url || (currentUser as any)?.business?.logo_url || '/logo.png'}" style="height:56px; width:56px; object-fit:contain; border-radius:12px; background:rgba(255,255,255,0.06); padding:4px; box-shadow: 0 4px 16px rgba(0, 119, 246, 0.25);" alt="Logo">
+          <img src="${currentBusinessProfile?.logo_url || (currentUser as any)?.business?.logo_url || '/logo.png'}" onerror="this.onerror=null; this.src='/logo.png';" style="height:56px; width:56px; object-fit:contain; border-radius:12px; background:rgba(255,255,255,0.06); padding:4px; box-shadow: 0 4px 16px rgba(0, 119, 246, 0.25);" alt="Logo">
           <span style="font-weight:900; font-size:24px; letter-spacing:-0.5px; display:inline-flex; align-items:baseline;">
             <span style="color:#0084ff;">Facilito</span><span style="color:#ff7300;">App</span>
           </span>
@@ -950,8 +961,8 @@ function renderNavbar(): string {
             <button type="button" class="btn btn-secondary nav-user-profile-btn" id="nav-user-profile-btn" style="display:inline-flex; align-items:center; gap:8px; border-radius:24px; padding:3px 12px 3px 5px; font-size:12px; font-weight:600; border-color:var(--border-glass); background:rgba(255,255,255,0.06); color:var(--text-main); cursor:pointer;" title="Configurar mi cuenta y foto de perfil">
               <div style="width:26px; height:26px; border-radius:50%; overflow:hidden; background:linear-gradient(135deg, var(--brand-orange, #ff7300), var(--brand-blue, #0077f6)); display:flex; align-items:center; justify-content:center; color:white; font-size:12px; font-weight:800; flex-shrink:0; border:1px solid rgba(255,255,255,0.2);">
                 ${currentUser.photo_url
-                  ? (currentUser.photo_url.startsWith('data:') || currentUser.photo_url.startsWith('http') || currentUser.photo_url.startsWith('/uploads')
-                      ? `<img src="${currentUser.photo_url}" style="width:100%; height:100%; object-fit:cover;" alt="Avatar">`
+                  ? (isAvatarImage(currentUser.photo_url)
+                      ? `<img src="${currentUser.photo_url}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='/logo.png';" alt="Avatar">`
                       : `<span style="font-size:13px;">${currentUser.photo_url}</span>`)
                   : currentUser.name.charAt(0).toUpperCase()}
               </div>
@@ -2701,10 +2712,20 @@ function drawCode128OnCanvas(ctx: CanvasRenderingContext2D, codeText: string, x:
 function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
   return new Promise((resolve, reject) => {
     // Cargar la imagen del logotipo del comercio o predeterminado
+    const rawLogo = currentBusinessProfile?.logo_url || (currentUser as any)?.business?.logo_url || '/logo.png';
     const logoImg = new Image();
-    logoImg.src = currentBusinessProfile?.logo_url || '/logo.png';
+    logoImg.crossOrigin = 'anonymous';
+
+    let hasResolved = false;
+    const timeoutId = setTimeout(() => {
+      if (!hasResolved) {
+        hasResolved = true;
+        onLogoLoaded(false);
+      }
+    }, 2500);
 
     const onLogoLoaded = (loaded: boolean) => {
+      clearTimeout(timeoutId);
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return reject('No se pudo inicializar canvas');
@@ -2744,12 +2765,21 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
 
       let textY = 45;
 
-      // Dibujar Logo si se cargó con éxito - Con mayor tamaño y calidad
+      // Dibujar Logo si se cargó con éxito - Con mayor tamaño, calidad y aspecto proporcional
       if (loaded) {
         try {
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(logoImg, width / 2 - 40, 15, 80, 80);
+          const maxLogoW = 85;
+          const maxLogoH = 85;
+          let drawW = logoImg.naturalWidth || logoImg.width || 80;
+          let drawH = logoImg.naturalHeight || logoImg.height || 80;
+          const ratio = Math.min(maxLogoW / drawW, maxLogoH / drawH);
+          drawW = Math.round(drawW * ratio);
+          drawH = Math.round(drawH * ratio);
+          const drawX = Math.round((width - drawW) / 2);
+          const drawY = Math.round(15 + (maxLogoH - drawH) / 2);
+          ctx.drawImage(logoImg, drawX, drawY, drawW, drawH);
           textY = 135;
         } catch (e) {
           console.error('Error dibujando el logo en la factura:', e);
@@ -3030,20 +3060,61 @@ function generateReceiptPNG(sale: any, items: any[]): Promise<Blob> {
       ctx.font = '10px Outfit, Segoe UI';
       ctx.fillText(`Documento digital generado por ${currentBusinessProfile?.name || 'FacilitoApp'}.`, width / 2, y);
 
-      // Convertir canvas a Blob y retornar
-      canvas.toBlob((blob) => {
-        if (blob) resolve(blob);
-        else reject('Error al exportar blob');
-      }, 'image/png');
+      // Convertir canvas a Blob y retornar con manejo seguro
+      try {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject('Error al exportar comprobante');
+        }, 'image/png');
+      } catch (err) {
+        console.warn('Fallback al exportar comprobante:', err);
+        if (loaded) {
+          onLogoLoaded(false);
+        } else {
+          reject(err);
+        }
+      }
     };
 
     logoImg.onload = () => {
-      onLogoLoaded(true);
+      if (!hasResolved) {
+        hasResolved = true;
+        clearTimeout(timeoutId);
+        onLogoLoaded(true);
+      }
     };
 
     logoImg.onerror = () => {
-      onLogoLoaded(false);
+      if (!hasResolved) {
+        if (rawLogo !== '/logo.png') {
+          const fallback = new Image();
+          fallback.crossOrigin = 'anonymous';
+          fallback.onload = () => {
+            if (!hasResolved) {
+              hasResolved = true;
+              clearTimeout(timeoutId);
+              logoImg.src = fallback.src;
+              onLogoLoaded(true);
+            }
+          };
+          fallback.onerror = () => {
+            if (!hasResolved) {
+              hasResolved = true;
+              clearTimeout(timeoutId);
+              onLogoLoaded(false);
+            }
+          };
+          fallback.src = '/logo.png';
+          return;
+        }
+        hasResolved = true;
+        clearTimeout(timeoutId);
+        onLogoLoaded(false);
+      }
     };
+
+    // Asignar src DESPUÉS de registrar listeners
+    logoImg.src = rawLogo;
   });
 }
 
@@ -3501,8 +3572,8 @@ function renderUserProfileModal(): string {
                 <div style="position: relative; width: 96px; height: 96px; border-radius: 50%; padding: 4px; background: linear-gradient(135deg, var(--brand-orange, #ff7300), var(--brand-blue, #0077f6)); box-shadow: 0 8px 24px rgba(255,115,0,0.25);">
                   <div id="profile-avatar-preview" style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: var(--bg-main, #111); display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 800;">
                     ${profileEditPhotoUrl
-                      ? (profileEditPhotoUrl.startsWith('data:') || profileEditPhotoUrl.startsWith('http') || profileEditPhotoUrl.startsWith('/uploads')
-                          ? `<img src="${profileEditPhotoUrl}" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar">`
+                      ? (isAvatarImage(profileEditPhotoUrl)
+                          ? `<img src="${profileEditPhotoUrl}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src='/logo.png';" alt="Avatar">`
                           : `<span style="font-size: 40px;">${profileEditPhotoUrl}</span>`)
                       : `<span>${initials}</span>`
                     }
@@ -3515,9 +3586,12 @@ function renderUserProfileModal(): string {
                 <input type="file" id="profile-photo-file-input" accept="image/png, image/jpeg, image/webp, image/svg+xml" style="display: none;">
 
                 <!-- Botones de Acción de Foto -->
-                <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center;">
                   <button type="button" class="btn btn-secondary" id="btn-select-profile-file" style="font-size: 12px; padding: 5px 14px; display: inline-flex; align-items: center; gap: 6px;">
                     📁 Subir Archivo Local
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="btn-use-facilito-profile" style="font-size: 12px; padding: 5px 14px; display: inline-flex; align-items: center; gap: 6px; border-color: rgba(255,115,0,0.35); color: var(--brand-orange); font-weight: 600;">
+                    <img src="/logo.png" style="width: 16px; height: 16px; object-fit: contain;" alt="Logo"> Usar Logo Oficial Facilito
                   </button>
                   ${profileEditPhotoUrl ? `
                     <button type="button" class="btn btn-secondary" id="btn-remove-profile-photo" style="font-size: 12px; padding: 5px 12px; color: #ef4444; border-color: rgba(239,68,68,0.3);" title="Quitar foto y usar iniciales">
@@ -3674,6 +3748,15 @@ function bindUserProfileModalEvents() {
   const fileInput = document.getElementById('profile-photo-file-input') as HTMLInputElement | null;
   document.getElementById('btn-select-profile-file')?.addEventListener('click', () => {
     fileInput?.click();
+  });
+  document.getElementById('btn-use-facilito-profile')?.addEventListener('click', () => {
+    profileEditPhotoUrl = '/logo.png';
+    const preview = document.getElementById('profile-avatar-preview');
+    if (preview) {
+      preview.innerHTML = `<img src="/logo.png" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='/logo.png';" alt="Avatar">`;
+    }
+    const urlInput = document.getElementById('profile-photo-url-input') as HTMLInputElement;
+    if (urlInput) urlInput.value = '/logo.png';
   });
   document.getElementById('btn-trigger-upload-profile-photo')?.addEventListener('click', () => {
     fileInput?.click();
@@ -4811,7 +4894,7 @@ function renderAdminDashboard(): string {
               ${icons.dashboard} Estadísticas
             </button>
             <button class="sidebar-nav-btn ${activeAdminView === 'business_profile' ? 'active' : ''}" id="admin-tab-business-profile">
-              🏢 Mi Negocio & Factura
+              🏢 Mi Negocio y Perfil
             </button>
           ` : ''}
           ${(currentUser as any).role === 'superadmin' ? `
@@ -4819,26 +4902,7 @@ function renderAdminDashboard(): string {
               👑 Consola SuperAdmin SaaS
             </button>
           ` : ''}
-
-          <button class="sidebar-nav-btn" id="admin-tab-user-profile" style="display:flex; align-items:center; gap:8px; background:rgba(255,115,0,0.08); border-color:rgba(255,115,0,0.25); color:var(--brand-orange); font-weight:600; margin-top:6px;" title="Configuración de tu cuenta y foto de perfil">
-            👤 Mi Perfil de Usuario
-          </button>
         </div>
-
-        ${currentUser.role === 'admin' ? `
-          <!-- Diagnóstico SMTP Widget (al final del menú) -->
-          <div class="card smtp-widget-sidebar" style="margin-top: 8px; padding: 10px; font-size:10.5px; background:rgba(255,255,255,0.01); border:1px solid var(--border-glass); border-radius:12px;">
-            <div style="font-weight:700; margin-bottom: 6px; display:flex; align-items:center; gap:4px; color:#10b981; font-size:11px;">
-              ✉️ Diagnóstico SMTP
-            </div>
-            <div style="display:flex; flex-direction:column; gap:5px;">
-              <input type="email" id="smtp-test-email-input" placeholder="correo@test.com" style="width:100%; padding:3px 6px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:white; font-size:10.5px;">
-              <button type="button" class="btn btn-primary" id="run-smtp-diag-btn" style="padding:4px 6px; font-size:10px; width:100%; background:#10b981; border:none; color:white; font-weight:700; cursor:pointer;">
-                Probar Correo
-              </button>
-            </div>
-          </div>
-        ` : ''}
       </aside>
 
       <!-- Panel de Contenido -->
@@ -4851,6 +4915,341 @@ function renderAdminDashboard(): string {
   `;
 }
 
+let activeUnifiedProfileTab: 'business' | 'user' = 'business';
+
+function renderUserProfileInlineHtml(): string {
+  if (!currentUser) return '<div class="card" style="padding:20px;">No hay sesión de usuario activa.</div>';
+
+  const initials = (currentUser.name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+  const roleNameMap: Record<string, { label: string; icon: string }> = {
+    superadmin: { label: 'SuperAdministrador SaaS', icon: '👑' },
+    admin: { label: 'Administrador del Comercio', icon: '🛡️' },
+    seller: { label: 'Vendedor / POS', icon: '💼' },
+    billing: { label: 'Facturación y Caja', icon: '🧾' },
+    customer: { label: 'Cliente Registrado', icon: '🛍️' }
+  };
+  const roleInfo = roleNameMap[currentUser.role] || { label: currentUser.role, icon: '👤' };
+
+  const avatarPresets = [
+    { id: 'monkey', label: '🐒 Monito Facilito', icon: '🐒' },
+    { id: 'pro', label: '💼 Ejecutivo', icon: '💼' },
+    { id: 'dev', label: '👨‍💻 Desarrollador', icon: '👨‍💻' },
+    { id: 'pro_f', label: '👩‍💼 Profesional', icon: '👩‍💼' },
+    { id: 'star', label: '⭐ Estrella', icon: '⭐' },
+    { id: 'rocket', label: '🚀 Emprendedor', icon: '🚀' },
+    { id: 'cart', label: '🛒 Comprador', icon: '🛒' },
+    { id: 'cash', label: '💰 Finanzas', icon: '💰' },
+  ];
+
+  return `
+    <div class="card animate-fade-in" style="max-width: 880px; margin: 0 auto; padding: 26px; border-radius: 18px; background: var(--bg-glass); border: 1px solid var(--border-glass);">
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; border-bottom: 1px solid var(--border-glass); padding-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3 style="margin: 0; font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 8px; color: var(--text-main);">
+            <span>👤</span> Configuración de Mi Perfil de Usuario
+          </h3>
+          <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);">
+            Personaliza tus datos de acceso, foto de perfil / logo y contraseña
+          </p>
+        </div>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 14px; border-radius: 20px; background: rgba(0,119,246,0.12); color: var(--brand-blue, #0084ff); border: 1px solid rgba(0,119,246,0.25);">
+          <span>${roleInfo.icon}</span> ${roleInfo.label}
+        </span>
+      </div>
+
+      <form id="inline-user-profile-form">
+        
+        <!-- SECCIÓN 1: FOTO DE PERFIL / AVATAR -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 16px; padding: 22px; margin-bottom: 22px; text-align: center;">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 14px;">
+            
+            <!-- Contenedor Visual de la Foto / Avatar -->
+            <div style="position: relative; width: 104px; height: 104px; border-radius: 50%; padding: 4px; background: linear-gradient(135deg, var(--brand-orange, #ff7300), var(--brand-blue, #0077f6)); box-shadow: 0 8px 24px rgba(255,115,0,0.25);">
+              <div id="inline-profile-avatar-preview" style="width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: var(--bg-main, #111); display: flex; align-items: center; justify-content: center; color: white; font-size: 36px; font-weight: 800;">
+                ${profileEditPhotoUrl
+                  ? (isAvatarImage(profileEditPhotoUrl)
+                      ? `<img src="${profileEditPhotoUrl}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src='/logo.png';" alt="Avatar">`
+                      : `<span style="font-size: 42px;">${profileEditPhotoUrl}</span>`)
+                  : `<span>${initials}</span>`
+                }
+              </div>
+              <button type="button" id="inline-btn-trigger-upload-photo" style="position: absolute; bottom: 2px; right: 2px; background: var(--primary, #ff7300); color: white; border: 2px solid var(--bg-card, #1e293b); width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);" title="Subir foto desde archivo local">
+                📷
+              </button>
+            </div>
+
+            <input type="file" id="inline-profile-photo-file-input" accept="image/png, image/jpeg, image/webp, image/svg+xml" style="display: none;">
+
+            <!-- Botones de Acción de Foto -->
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center;">
+              <button type="button" class="btn btn-secondary" id="inline-btn-select-file" style="font-size: 12px; padding: 7px 16px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                📁 Subir Archivo Local
+              </button>
+              <button type="button" class="btn btn-secondary" id="inline-btn-use-facilito" style="font-size: 12px; padding: 7px 16px; display: inline-flex; align-items: center; gap: 6px; border-color: rgba(255,115,0,0.35); color: var(--brand-orange); font-weight: 700;">
+                <img src="/logo.png" style="width: 16px; height: 16px; object-fit: contain;" alt="Logo"> Usar Logo Oficial Facilito
+              </button>
+              ${profileEditPhotoUrl ? `
+                <button type="button" class="btn btn-secondary" id="inline-btn-remove-photo" style="font-size: 12px; padding: 7px 14px; color: #ef4444; border-color: rgba(239,68,68,0.3); font-weight: 600;" title="Quitar foto y usar iniciales">
+                  🗑️ Quitar Foto
+                </button>
+              ` : ''}
+            </div>
+
+            <!-- Selección de Avatares Rápida -->
+            <div style="width: 100%; border-top: 1px solid var(--border-glass); padding-top: 12px; margin-top: 4px;">
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">O elige un icono de avatar rápido:</div>
+              <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                ${avatarPresets.map(av => `
+                  <button type="button" class="inline-avatar-preset-btn" data-preset="${av.icon}" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); border-radius: 12px; width: 38px; height: 38px; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;" title="${av.label}">
+                    ${av.icon}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- Input opcional URL de foto -->
+            <div style="width: 100%; max-width: 500px; text-align: left; margin-top: 4px;">
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px;">O enlace web de imagen:</div>
+              <input type="text" class="form-control" id="inline-profile-photo-url-input" placeholder="https://ejemplo.com/mifoto.png" value="${profileEditPhotoUrl && !profileEditPhotoUrl.startsWith('data:') && !avatarPresets.some(a => a.icon === profileEditPhotoUrl) && profileEditPhotoUrl !== '/logo.png' ? profileEditPhotoUrl : ''}" style="font-size: 12px; padding: 7px 12px;">
+            </div>
+
+          </div>
+        </div>
+
+        <!-- SECCIÓN 2: INFORMACIÓN DE LA CUENTA -->
+        <div style="margin-bottom: 18px;">
+          <h4 style="font-size: 14px; font-weight: 700; color: var(--brand-orange); margin-bottom: 14px; border-bottom: 1px solid var(--border-glass); padding-bottom: 6px;">
+            📋 Datos Personales y de Contacto
+          </h4>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+            <div class="form-group" style="grid-column: span 2;">
+              <label class="form-label" for="inline-profile-name-input" style="font-size: 12px; font-weight: 600;">Nombre Completo *</label>
+              <input type="text" class="form-control" id="inline-profile-name-input" required value="${currentUser.name || ''}" placeholder="Ej. Juan Pérez">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="inline-profile-email-input" style="font-size: 12px; font-weight: 600;">Correo Electrónico *</label>
+              <input type="email" class="form-control" id="inline-profile-email-input" required value="${currentUser.email || ''}" placeholder="usuario@correo.com">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="inline-profile-phone-input" style="font-size: 12px; font-weight: 600;">Teléfono / WhatsApp</label>
+              <input type="text" class="form-control" id="inline-profile-phone-input" value="${currentUser.phone || ''}" placeholder="Ej. 04121234567">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="inline-profile-ci-input" style="font-size: 12px; font-weight: 600;">Cédula / RIF</label>
+              <input type="text" class="form-control" id="inline-profile-ci-input" value="${currentUser.ci || ''}" placeholder="Ej. V-12345678">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="inline-profile-address-input" style="font-size: 12px; font-weight: 600;">Dirección</label>
+              <input type="text" class="form-control" id="inline-profile-address-input" value="${currentUser.address || ''}" placeholder="Ej. Caracas, Venezuela">
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN 3: CAMBIO DE CONTRASEÑA -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 14px; padding: 16px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" id="inline-toggle-profile-password-section">
+            <div style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+              <span>🔒</span> Seguridad & Modificación de Contraseña
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="inline-btn-toggle-pass-fields" style="font-size: 11px; padding: 4px 12px;">
+              ${profileShowPassFields ? '▲ Ocultar' : '▼ Modificar Contraseña'}
+            </button>
+          </div>
+
+          ${profileShowPassFields ? `
+            <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border-glass); padding-top: 14px;">
+              <div class="form-group">
+                <label class="form-label" for="inline-profile-current-pass" style="font-size: 12px;">Contraseña Actual (si ya tenías una clave)</label>
+                <input type="password" class="form-control" id="inline-profile-current-pass" placeholder="••••••••" autocomplete="current-password">
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group">
+                  <label class="form-label" for="inline-profile-new-pass" style="font-size: 12px;">Nueva Contraseña (mín. 6 car.)</label>
+                  <input type="password" class="form-control" id="inline-profile-new-pass" minlength="6" placeholder="Nueva clave" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="inline-profile-confirm-pass" style="font-size: 12px;">Confirmar Contraseña</label>
+                  <input type="password" class="form-control" id="inline-profile-confirm-pass" minlength="6" placeholder="Repetir nueva clave" autocomplete="new-password">
+                </div>
+              </div>
+              <div style="font-size: 11.5px; color: var(--text-muted);">
+                💡 Deja estos campos vacíos si no deseas modificar tu contraseña.
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Botón Guardar -->
+        <div style="display: flex; justify-content: flex-end; align-items: center; border-top: 1px solid var(--border-glass); padding-top: 18px;">
+          <button type="submit" class="btn btn-primary" id="inline-btn-save-profile" style="padding: 10px 28px; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; gap: 8px;">
+            💾 Guardar Perfil de Usuario
+          </button>
+        </div>
+
+      </form>
+    </div>
+  `;
+}
+
+function bindInlineUserProfileEvents() {
+  document.querySelectorAll('.inline-avatar-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const preset = btn.getAttribute('data-preset');
+      if (preset) {
+        profileEditPhotoUrl = preset;
+        const preview = document.getElementById('inline-profile-avatar-preview');
+        if (preview) {
+          preview.innerHTML = `<span style="font-size:42px;">${preset}</span>`;
+        }
+        const urlInput = document.getElementById('inline-profile-photo-url-input') as HTMLInputElement;
+        if (urlInput) urlInput.value = '';
+      }
+    });
+  });
+
+  document.getElementById('inline-btn-use-facilito')?.addEventListener('click', () => {
+    profileEditPhotoUrl = '/logo.png';
+    const preview = document.getElementById('inline-profile-avatar-preview');
+    if (preview) {
+      preview.innerHTML = `<img src="/logo.png" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='/logo.png';" alt="Avatar">`;
+    }
+    const urlInput = document.getElementById('inline-profile-photo-url-input') as HTMLInputElement;
+    if (urlInput) urlInput.value = '/logo.png';
+  });
+
+  const fileInput = document.getElementById('inline-profile-photo-file-input') as HTMLInputElement | null;
+  document.getElementById('inline-btn-select-file')?.addEventListener('click', () => {
+    fileInput?.click();
+  });
+  document.getElementById('inline-btn-trigger-upload-photo')?.addEventListener('click', () => {
+    fileInput?.click();
+  });
+
+  fileInput?.addEventListener('change', async () => {
+    if (fileInput.files && fileInput.files[0]) {
+      const file = fileInput.files[0];
+      if (file.size > 8 * 1024 * 1024) {
+        alert('La imagen seleccionada no debe superar los 8MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        profileEditPhotoUrl = result;
+        const preview = document.getElementById('inline-profile-avatar-preview');
+        if (preview) {
+          preview.innerHTML = `<img src="${result}" style="width:100%; height:100%; object-fit:cover;" alt="Avatar">`;
+        }
+        const urlInput = document.getElementById('inline-profile-photo-url-input') as HTMLInputElement;
+        if (urlInput) urlInput.value = '';
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  document.getElementById('inline-profile-photo-url-input')?.addEventListener('input', (e) => {
+    const val = (e.target as HTMLInputElement).value.trim();
+    if (val) {
+      profileEditPhotoUrl = val;
+      const preview = document.getElementById('inline-profile-avatar-preview');
+      if (preview) {
+        preview.innerHTML = `<img src="${val}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='/logo.png'" alt="Avatar">`;
+      }
+    }
+  });
+
+  document.getElementById('inline-btn-remove-photo')?.addEventListener('click', () => {
+    profileEditPhotoUrl = '';
+    const preview = document.getElementById('inline-profile-avatar-preview');
+    if (preview && currentUser) {
+      const initials = (currentUser.name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+      preview.innerHTML = `<span>${initials}</span>`;
+    }
+    const urlInput = document.getElementById('inline-profile-photo-url-input') as HTMLInputElement;
+    if (urlInput) urlInput.value = '';
+  });
+
+  document.getElementById('inline-btn-toggle-pass-fields')?.addEventListener('click', () => {
+    profileShowPassFields = !profileShowPassFields;
+    renderAdminBusinessProfile();
+  });
+  document.getElementById('inline-toggle-profile-password-section')?.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).id !== 'inline-btn-toggle-pass-fields') {
+      profileShowPassFields = !profileShowPassFields;
+      renderAdminBusinessProfile();
+    }
+  });
+
+  document.getElementById('inline-user-profile-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    const name = (document.getElementById('inline-profile-name-input') as HTMLInputElement).value.trim();
+    const email = (document.getElementById('inline-profile-email-input') as HTMLInputElement).value.trim();
+    const phone = (document.getElementById('inline-profile-phone-input') as HTMLInputElement)?.value.trim() || '';
+    const ci = (document.getElementById('inline-profile-ci-input') as HTMLInputElement)?.value.trim() || '';
+    const address = (document.getElementById('inline-profile-address-input') as HTMLInputElement)?.value.trim() || '';
+
+    let currentPassword = '';
+    let newPassword = '';
+    if (profileShowPassFields) {
+      currentPassword = (document.getElementById('inline-profile-current-pass') as HTMLInputElement)?.value || '';
+      newPassword = (document.getElementById('inline-profile-new-pass') as HTMLInputElement)?.value || '';
+      const confirmPass = (document.getElementById('inline-profile-confirm-pass') as HTMLInputElement)?.value || '';
+
+      if (newPassword) {
+        if (newPassword.length < 6) {
+          alert('La nueva contraseña debe tener al menos 6 caracteres.');
+          return;
+        }
+        if (newPassword !== confirmPass) {
+          alert('Las contraseñas no coinciden. Por favor confirma la nueva clave.');
+          return;
+        }
+      }
+    }
+
+    const saveBtn = document.getElementById('inline-btn-save-profile') as HTMLButtonElement;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '⏳ Guardando...';
+
+    try {
+      const res = await api.auth.updateProfile({
+        name,
+        email,
+        phone,
+        ci,
+        address,
+        photo_url: profileEditPhotoUrl,
+        currentPassword: currentPassword || undefined,
+        newPassword: newPassword || undefined
+      });
+
+      currentUser = {
+        ...currentUser,
+        ...res.user
+      };
+      localStorage.setItem('facilito_pos_user', JSON.stringify(currentUser));
+      if (res.token) {
+        localStorage.setItem('facilito_pos_token', res.token);
+      }
+
+      alert(res.message || '¡Perfil actualizado con éxito!');
+      renderApp();
+    } catch (err: any) {
+      alert(err.message || 'Error al actualizar el perfil.');
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '💾 Guardar Perfil de Usuario';
+    }
+  });
+}
+
 async function renderAdminBusinessProfile() {
   const container = document.getElementById('dashboard-content-panel');
   if (!container) return;
@@ -4858,25 +5257,66 @@ async function renderAdminBusinessProfile() {
   container.innerHTML = `
     <div style="padding: 60px 20px; text-align: center; color: var(--text-muted);">
       <div style="font-size: 32px; margin-bottom: 12px; animation: spin 1s linear infinite;">🐒</div>
-      <p style="font-size: 15px; font-weight: 600; color: white;">Cargando perfil comercial y respaldo en Google Sheets...</p>
+      <p style="font-size: 15px; font-weight: 600; color: white;">Cargando perfil comercial y configuración...</p>
     </div>
   `;
 
   try {
     const profile = await api.business.getMyProfile();
     currentBusinessProfile = profile;
-    container.innerHTML = renderBusinessProfileHtml(profile);
-    setupBusinessProfileEvents(container, (updated: BusinessProfile) => {
-      currentBusinessProfile = updated;
-      if (updated.name) {
-        document.title = `${updated.name} - Sistema FacilitoApp 🐒`;
-      }
+
+    if (!profileEditPhotoUrl && currentUser) {
+      profileEditPhotoUrl = currentUser.photo_url || '';
+    }
+
+    container.innerHTML = `
+      <div class="business-profile-container animate-fade-in" style="max-width: 1040px; margin: 0 auto; padding: 10px 0 30px 0;">
+        <!-- Selector de Pestañas Unificadas -->
+        <div style="display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid var(--border-glass); padding-bottom: 14px; flex-wrap: wrap;">
+          <button id="tab-btn-unified-biz" class="btn ${activeUnifiedProfileTab === 'business' ? 'btn-primary' : 'btn-secondary'}" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; border-radius: 12px; padding: 10px 22px; font-size: 13.5px; cursor: pointer; transition: all 0.2s;">
+            <span>🏢</span> Mi Negocio & Factura
+          </button>
+          <button id="tab-btn-unified-user" class="btn ${activeUnifiedProfileTab === 'user' ? 'btn-primary' : 'btn-secondary'}" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; border-radius: 12px; padding: 10px 22px; font-size: 13.5px; cursor: pointer; transition: all 0.2s;">
+            <span>👤</span> Mi Perfil de Usuario
+          </button>
+        </div>
+
+        <div id="unified-tab-content-area">
+          ${activeUnifiedProfileTab === 'business'
+            ? renderBusinessProfileHtml(profile)
+            : renderUserProfileInlineHtml()
+          }
+        </div>
+      </div>
+    `;
+
+    document.getElementById('tab-btn-unified-biz')?.addEventListener('click', () => {
+      activeUnifiedProfileTab = 'business';
+      renderAdminBusinessProfile();
     });
+    document.getElementById('tab-btn-unified-user')?.addEventListener('click', () => {
+      activeUnifiedProfileTab = 'user';
+      renderAdminBusinessProfile();
+    });
+
+    if (activeUnifiedProfileTab === 'business') {
+      const contentArea = document.getElementById('unified-tab-content-area');
+      if (contentArea) {
+        setupBusinessProfileEvents(contentArea, (updated: BusinessProfile) => {
+          currentBusinessProfile = updated;
+          if (updated.name) {
+            document.title = `${updated.name} - Sistema FacilitoApp 🐒`;
+          }
+        });
+      }
+    } else {
+      bindInlineUserProfileEvents();
+    }
   } catch (err: any) {
     container.innerHTML = `
       <div class="card" style="padding: 24px; border: 1px solid var(--danger); background: rgba(239,68,68,0.06); margin: 20px;">
-        <h4 style="color: var(--danger); margin-bottom: 8px;">Error al cargar información del negocio</h4>
-        <p style="color: var(--text-secondary); font-size: 13px;">${err.message || 'No se pudo obtener el perfil del comercio.'}</p>
+        <h4 style="color: var(--danger); margin-bottom: 8px;">Error al cargar información</h4>
+        <p style="color: var(--text-secondary); font-size: 13px;">${err.message || 'No se pudo obtener la información solicitada.'}</p>
         <button class="btn btn-secondary" id="retry-business-profile-btn" style="margin-top: 12px; width: fit-content;">Reintentar</button>
       </div>
     `;
@@ -5158,37 +5598,6 @@ async function bindAdminEvents() {
       btn.innerText = '🔄 Auto';
     }
   });
-
-  // Diagnóstico SMTP
-  document.getElementById('run-smtp-diag-btn')?.addEventListener('click', async () => {
-    const emailInput = document.getElementById('smtp-test-email-input') as HTMLInputElement;
-    const testEmail = emailInput?.value?.trim();
-    if (!testEmail || !testEmail.includes('@')) {
-      alert('Por favor ingrese un correo válido de destino para la prueba.');
-      return;
-    }
-
-    const btn = document.getElementById('run-smtp-diag-btn') as HTMLButtonElement;
-    btn.disabled = true;
-    btn.innerText = 'Probando...';
-
-    try {
-      const res = await api.sales.testSMTP(testEmail);
-      let logsText = res.diagnostics.join('\n');
-      alert(`${res.message}\n\nDetalles del Diagnóstico:\n${logsText}`);
-    } catch (err: any) {
-      console.error(err);
-      let errMsg = err.message || 'Error desconocido';
-      let diagnosticsText = '';
-      if (err.diagnostics && Array.isArray(err.diagnostics)) {
-        diagnosticsText = '\n\nDetalles del Diagnóstico:\n' + err.diagnostics.join('\n');
-      }
-      alert(`Error al probar SMTP: ${errMsg}${diagnosticsText}`);
-    } finally {
-      btn.disabled = false;
-      btn.innerText = 'Probar Correo';
-    }
-  });
 }
 
 // ==========================================================================
@@ -5252,7 +5661,7 @@ async function renderAdminStats() {
               </span>
             </div>
             <p style="font-size:12px; color:var(--text-muted); margin-top:4px; margin-bottom:0;">
-              Métricas consolidadas de facturación • Tasas del día: <strong>USD: Bs. ${formatRate(rateUsdToVes)}</strong> | <strong>Binance: Bs. ${formatRate(rateBinanceToVes)}</strong>
+              Métricas consolidadas de facturación y rendimiento en tiempo real
             </p>
           </div>
 

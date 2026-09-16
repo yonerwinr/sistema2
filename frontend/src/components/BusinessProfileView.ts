@@ -214,8 +214,8 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
                 <!-- Caja de Vista Previa del Logo -->
                 <div id="prof-logo-preview-box" style="width: 96px; height: 96px; border-radius: 14px; background: rgba(0,0,0,0.35); border: 2px solid var(--border-glass); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
                   ${b.logo_url 
-                    ? `<img src="${b.logo_url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Logotipo">` 
-                    : '<span style="font-size: 38px;">🏪</span>'}
+                    ? `<img src="${b.logo_url}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.onerror=null; this.src='/logo.png';" alt="Logotipo">` 
+                    : '<img src="/logo.png" style="width: 100%; height: 100%; object-fit: contain;" alt="Logotipo">'}
                 </div>
 
                 <div style="flex-grow: 1; min-width: 240px;">
@@ -232,6 +232,10 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
                   <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
                     <button type="button" class="btn btn-sm btn-primary" id="btn-browse-logo" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 8px 16px; border-radius: 8px;">
                       <span>📁</span> ${b.logo_url ? 'Cambiar Foto desde este Equipo' : '📁 Seleccionar Foto Local'}
+                    </button>
+
+                    <button type="button" class="btn btn-sm btn-secondary" id="btn-use-facilito-logo" style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; padding: 8px 14px; border-radius: 8px;" title="Usar el logotipo oficial de Facilito">
+                      <span>🐒</span> Usar Logo Oficial Facilito
                     </button>
 
                     <button type="button" class="btn btn-sm btn-secondary" id="btn-toggle-url-logo" style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; padding: 8px 14px; border-radius: 8px;">
@@ -397,7 +401,9 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
           <!-- Ticket simulado -->
           <div style="text-align: center; border-bottom: 1px dashed #666666; padding-bottom: 12px; margin-bottom: 12px;">
             <div id="preview-ticket-logo" style="margin-bottom: 8px;">
-              ${b.logo_url ? `<img src="${b.logo_url}" style="max-width: 80px; max-height: 80px; object-fit: contain;" alt="Logo">` : '<div style="font-size: 32px;">🛒</div>'}
+              ${b.logo_url 
+                ? `<img src="${b.logo_url}" style="max-width: 80px; max-height: 80px; object-fit: contain;" onerror="this.onerror=null; this.src='/logo.png';" alt="Logo">` 
+                : '<img src="/logo.png" style="max-width: 80px; max-height: 80px; object-fit: contain;" alt="Logo">'}
             </div>
             <div id="preview-ticket-name" style="font-size: 15px; font-weight: bold;">${b.name || 'NOMBRE DE EMPRESA'}</div>
             <div id="preview-ticket-rif" style="font-size: 12px;">RIF: ${b.rif || 'J-00000000-0'}</div>
@@ -418,15 +424,16 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
             </div>
             <div style="display: flex; justify-content: space-between;">
               <span>2x Harina de Maíz</span>
-              <span>$2.40</span>
+              <span>$2.20</span>
             </div>
           </div>
 
-          <div style="text-align: right; font-size: 13px; font-weight: bold; margin-bottom: 14px;">
-            TOTAL: $4.90
+          <div style="font-size: 12px; font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 12px;">
+            <span>TOTAL:</span>
+            <span>$4.70</span>
           </div>
 
-          <div id="preview-ticket-footer" style="text-align: center; font-size: 10px; border-top: 1px dashed #666666; padding-top: 10px; color: #444444;">
+          <div id="preview-ticket-footer" style="text-align: center; font-size: 10px; color: #555555;">
             ${b.ticket_message || '¡Gracias por su compra!'}
           </div>
 
@@ -438,34 +445,72 @@ export function renderBusinessProfileHtml(business: BusinessProfile | null): str
   `;
 }
 
+function compressImageToBase64(file: File, maxDim: number = 450, quality: number = 0.9): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(event.target?.result as string);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+        const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        resolve(canvas.toDataURL(mime, quality));
+      };
+      img.onerror = () => resolve(event.target?.result as string);
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export function setupBusinessProfileEvents(
   container: HTMLElement,
-  onProfileUpdated?: (updated: BusinessProfile) => void
+  onProfileUpdated?: (b: BusinessProfile) => void
 ) {
+  const form = container.querySelector('#form-business-profile') as HTMLFormElement | null;
   const nameInput = container.querySelector('#prof-name') as HTMLInputElement | null;
   const rifInput = container.querySelector('#prof-rif') as HTMLInputElement | null;
   const legalInput = container.querySelector('#prof-legal') as HTMLInputElement | null;
-  const addressInput = container.querySelector('#prof-address') as HTMLInputElement | null;
   const phoneInput = container.querySelector('#prof-phone') as HTMLInputElement | null;
   const emailInput = container.querySelector('#prof-email') as HTMLInputElement | null;
-  const msgInput = container.querySelector('#prof-ticket-msg') as HTMLTextAreaElement | null;
+  const addressInput = container.querySelector('#prof-address') as HTMLTextAreaElement | null;
   const logoHiddenInput = container.querySelector('#prof-logo') as HTMLInputElement | null;
-  const sheetUrlInput = container.querySelector('#prof-sheet-url') as HTMLInputElement | null;
-  const sheetWebhookInput = container.querySelector('#prof-sheet-webhook') as HTMLInputElement | null;
-  const openSheetLink = container.querySelector('#btn-open-sheet-link') as HTMLAnchorElement | null;
-
+  const msgInput = container.querySelector('#prof-ticket-msg') as HTMLTextAreaElement | null;
   const fileInput = container.querySelector('#prof-logo-file-input') as HTMLInputElement | null;
   const browseBtn = container.querySelector('#btn-browse-logo') as HTMLButtonElement | null;
+  const useFacilitoBtn = container.querySelector('#btn-use-facilito-logo') as HTMLButtonElement | null;
   const removeLogoBtn = container.querySelector('#btn-remove-logo') as HTMLButtonElement | null;
   const uploadStatus = container.querySelector('#prof-logo-upload-status') as HTMLElement | null;
   const logoPreviewBox = container.querySelector('#prof-logo-preview-box') as HTMLElement | null;
 
-  const previewName = container.querySelector('#preview-ticket-name');
-  const previewRif = container.querySelector('#preview-ticket-rif');
-  const previewAddress = container.querySelector('#preview-ticket-address');
-  const previewPhone = container.querySelector('#preview-ticket-phone');
-  const previewFooter = container.querySelector('#preview-ticket-footer');
-  const previewLogo = container.querySelector('#preview-ticket-logo');
+  const sheetUrlInput = container.querySelector('#prof-sheet-url') as HTMLInputElement | null;
+  const sheetWebhookInput = container.querySelector('#prof-sheet-webhook') as HTMLInputElement | null;
+  const openSheetLink = container.querySelector('#btn-open-sheet-link') as HTMLAnchorElement | null;
+
+  // Elementos de la vista previa del ticket
+  const previewLogo = container.querySelector('#preview-ticket-logo') as HTMLElement | null;
+  const previewName = container.querySelector('#preview-ticket-name') as HTMLElement | null;
+  const previewRif = container.querySelector('#preview-ticket-rif') as HTMLElement | null;
+  const previewAddress = container.querySelector('#preview-ticket-address') as HTMLElement | null;
+  const previewPhone = container.querySelector('#preview-ticket-phone') as HTMLElement | null;
+  const previewFooter = container.querySelector('#preview-ticket-footer') as HTMLElement | null;
 
   // Vista previa interactiva en tiempo real del ticket térmico
   nameInput?.addEventListener('input', () => {
@@ -487,13 +532,13 @@ export function setupBusinessProfileEvents(
   const updateLogoDisplay = (url: string) => {
     if (logoPreviewBox) {
       logoPreviewBox.innerHTML = url
-        ? `<img src="${url}" style="width: 100%; height: 100%; object-fit: contain;" alt="Logo">`
-        : '<span style="font-size: 38px;">🏪</span>';
+        ? `<img src="${url}" style="width: 100%; height: 100%; object-fit: contain;" onerror="this.onerror=null; this.src='/logo.png';" alt="Logo">`
+        : '<img src="/logo.png" style="width: 100%; height: 100%; object-fit: contain;" alt="Logo">';
     }
     if (previewLogo) {
       previewLogo.innerHTML = url
-        ? `<img src="${url}" style="max-width: 80px; max-height: 80px; object-fit: contain;" alt="Logo">`
-        : '<div style="font-size: 32px;">🛒</div>';
+        ? `<img src="${url}" style="max-width: 80px; max-height: 80px; object-fit: contain;" onerror="this.onerror=null; this.src='/logo.png';" alt="Logo">`
+        : '<img src="/logo.png" style="max-width: 80px; max-height: 80px; object-fit: contain;" alt="Logo">';
     }
     if (browseBtn) {
       browseBtn.innerHTML = `<span>📁</span> ${url ? 'Cambiar Foto desde este Equipo' : '📁 Seleccionar Foto Local'}`;
@@ -523,65 +568,59 @@ export function setupBusinessProfileEvents(
     updateLogoDisplay(val);
   });
 
-  // Procesar archivo local (FileReader instantáneo + subida segura al servidor con respaldo Base64)
+  // Botón para usar el logo oficial de Facilito
+  useFacilitoBtn?.addEventListener('click', async () => {
+    if (logoHiddenInput) logoHiddenInput.value = '/logo.png';
+    if (urlInput) urlInput.value = '/logo.png';
+    updateLogoDisplay('/logo.png');
+    if (uploadStatus) uploadStatus.innerHTML = '<span style="color: var(--brand-orange); font-weight:700;">Aplicando logo oficial... ⏳</span>';
+    try {
+      await api.business.updateProfile({ logo_url: '/logo.png' });
+      if (uploadStatus) {
+        uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Logo Oficial Facilito activado!</span>';
+        setTimeout(() => { if (uploadStatus) uploadStatus.textContent = ''; }, 4000);
+      }
+      const updated = await api.business.getMyProfile();
+      if (onProfileUpdated) onProfileUpdated(updated);
+    } catch (e: any) {
+      alert('Error al aplicar logo: ' + e.message);
+    }
+  });
+
+  // Procesar archivo local optimizado en Base64 permanente
   const processLocalFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('⚠️ Por favor selecciona un archivo de imagen válido (PNG, JPG, WEBP, SVG).');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      alert('⚠️ La imagen no debe superar 5MB de tamaño.');
+    if (file.size > 8 * 1024 * 1024) {
+      alert('⚠️ La imagen no debe superar 8MB de tamaño.');
       return;
     }
 
-    if (uploadStatus) uploadStatus.innerHTML = '<span style="color: var(--brand-blue); font-weight:700;">Cargando foto... ⏳</span>';
+    if (uploadStatus) uploadStatus.innerHTML = '<span style="color: var(--brand-blue); font-weight:700;">Optimizando y guardando... ⏳</span>';
     if (browseBtn) browseBtn.disabled = true;
 
-    // 1. Lectura inmediata como Data URL para visualización en tiempo real
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64Url = event.target?.result as string;
-      if (base64Url) {
-        if (logoHiddenInput) logoHiddenInput.value = base64Url;
-        updateLogoDisplay(base64Url);
-      }
+    try {
+      const compressedBase64 = await compressImageToBase64(file);
+      if (logoHiddenInput) logoHiddenInput.value = compressedBase64;
+      updateLogoDisplay(compressedBase64);
 
-      // 2. Intentar subida al endpoint multipart del backend
-      try {
-        const formData = new FormData();
-        formData.append('logo', file);
-        const res = await api.business.uploadLogo(formData);
-        if (res && res.imageUrl) {
-          if (logoHiddenInput) logoHiddenInput.value = res.imageUrl;
-          updateLogoDisplay(res.imageUrl);
-        }
-        if (uploadStatus) {
-          uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Foto guardada exitosamente!</span>';
-          setTimeout(() => { if (uploadStatus) uploadStatus.textContent = ''; }, 4000);
-        }
-      } catch (uploadErr) {
-        console.warn('Subida multipart al servidor local dio advertencia (modo fallback Base64):', uploadErr);
-        // Respaldo directo en BD con la cadena Base64
-        try {
-          await api.business.updateProfile({ logo_url: base64Url });
-          if (uploadStatus) {
-            uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Foto guardada con éxito!</span>';
-            setTimeout(() => { if (uploadStatus) uploadStatus.textContent = ''; }, 4000);
-          }
-        } catch (dbErr: any) {
-          console.error('Error guardando logo en BD:', dbErr);
-          if (uploadStatus) uploadStatus.innerHTML = `<span style="color: var(--danger);">❌ ${dbErr.message || 'Error al guardar'}</span>`;
-        }
-      } finally {
-        if (browseBtn) browseBtn.disabled = false;
-        if (fileInput) fileInput.value = '';
-        try {
-          const updated = await api.business.getMyProfile();
-          if (onProfileUpdated) onProfileUpdated(updated);
-        } catch (_) {}
+      // Guardado directo en BD para garantizar persistencia universal
+      await api.business.updateProfile({ logo_url: compressedBase64 });
+      if (uploadStatus) {
+        uploadStatus.innerHTML = '<span style="color: var(--success); font-weight: 700;">✅ ¡Logotipo guardado con éxito!</span>';
+        setTimeout(() => { if (uploadStatus) uploadStatus.textContent = ''; }, 4000);
       }
-    };
-    reader.readAsDataURL(file);
+      const updated = await api.business.getMyProfile();
+      if (onProfileUpdated) onProfileUpdated(updated);
+    } catch (err: any) {
+      console.error('Error guardando logo en BD:', err);
+      if (uploadStatus) uploadStatus.innerHTML = `<span style="color: var(--danger);">❌ ${err.message || 'Error al guardar'}</span>`;
+    } finally {
+      if (browseBtn) browseBtn.disabled = false;
+      if (fileInput) fileInput.value = '';
+    }
   };
 
   // SUBIDA LOCAL DE ARCHIVO DE LOGOTIPO MEDIANTE BOTÓN
@@ -616,14 +655,14 @@ export function setupBusinessProfileEvents(
 
   // Botón Quitar Foto
   removeLogoBtn?.addEventListener('click', async () => {
-    if (!confirm('¿Deseas quitar la foto de perfil y logo de tu negocio?')) return;
+    if (!confirm('¿Deseas quitar el logotipo personalizado y volver al de Facilito?')) return;
     if (logoHiddenInput) logoHiddenInput.value = '';
     if (urlInput) urlInput.value = '';
     updateLogoDisplay('');
     try {
       await api.business.updateProfile({ logo_url: null });
       if (uploadStatus) {
-        uploadStatus.innerHTML = '<span style="color: var(--text-muted);">Foto eliminada</span>';
+        uploadStatus.innerHTML = '<span style="color: var(--text-muted);">Logo restaurado por defecto</span>';
         setTimeout(() => {
           if (uploadStatus) uploadStatus.textContent = '';
         }, 3000);
@@ -751,7 +790,6 @@ export function setupBusinessProfileEvents(
   });
 
   // Guardado general del formulario
-  const form = container.querySelector('#form-business-profile') as HTMLFormElement | null;
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const submitBtn = container.querySelector('#btn-save-business-profile') as HTMLButtonElement | null;
