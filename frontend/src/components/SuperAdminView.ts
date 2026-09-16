@@ -484,33 +484,29 @@ export function renderSuperAdminHtml(
               </div>
             </div>
 
-            <!-- Opciones de Extensión -->
-            <div class="form-group" style="margin-bottom: 14px;">
-              <label class="form-label" for="manage-add-option">Período a Extender o Asignar *</label>
-              <select class="form-control" id="manage-add-option">
-                <option value="keep_date" selected>Mantener fecha actual (Solo cambiar estado/plan/tarifa)</option>
-                <option value="3">⏳ +3 Días (Prueba / Extensión corta de 3 Días)</option>
-                <option value="7">⏳ +7 Días (1 Semana de Prueba)</option>
-                <option value="15">+15 Días (Quincena)</option>
-                <option value="30">+30 Días (1 Mes)</option>
-                <option value="90">+90 Días (3 Meses)</option>
-                <option value="180">+180 Días (6 Meses)</option>
-                <option value="365">+1 Año (365 Días)</option>
-                <option value="730">+2 Años (730 Días) 🚀</option>
-                <option value="1095">+3 Años (1095 Días)</option>
-                <option value="custom_days">Días específicos a sumar (Personalizable)</option>
-                <option value="exact_date">Fecha fija de vencimiento (Calendario)</option>
-              </select>
-            </div>
-
-            <div id="manage-custom-days-group" style="display: none; margin-bottom: 14px;">
-              <label class="form-label" for="manage-custom-days">Días a sumar:</label>
-              <input type="number" class="form-control" id="manage-custom-days" min="1" placeholder="Ej. 3, 7, 730...">
-            </div>
-
-            <div id="manage-exact-date-group" style="display: none; margin-bottom: 14px;">
-              <label class="form-label" for="manage-exact-date">Nueva fecha exacta de vencimiento:</label>
-              <input type="date" class="form-control" id="manage-exact-date">
+            <!-- Fecha de Vencimiento Directa y Editable -->
+            <div class="form-group" style="margin-bottom: 16px; background: rgba(0,119,246,0.06); border: 1px solid rgba(0,119,246,0.25); border-radius: 12px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <label class="form-label" for="manage-exact-date" style="font-weight: 800; font-size: 13px; color: #60a5fa; margin: 0;">
+                  📅 Fecha de Vencimiento de la Licencia *
+                </label>
+                <span id="manage-date-feedback" style="font-size: 11px; font-weight: 700; color: #34d399;"></span>
+              </div>
+              <input type="date" class="form-control" id="manage-exact-date" required style="font-size: 15px; font-weight: 800; padding: 10px 14px; background: #0f172a; color: white; border: 1px solid rgba(0,119,246,0.4); border-radius: 8px; width: 100%;">
+              
+              <!-- Botones Rápidos para Sumar Tiempo -->
+              <div style="margin-top: 10px;">
+                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">Accesos rápidos para cambiar o sumar vigencia:</div>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="quick-extend-btn-group">
+                  <button type="button" class="btn btn-sm btn-secondary btn-quick-date" data-days="3" style="font-size: 11px; padding: 4px 8px; border-radius: 6px;">⏳ +3 Días</button>
+                  <button type="button" class="btn btn-sm btn-secondary btn-quick-date" data-days="7" style="font-size: 11px; padding: 4px 8px; border-radius: 6px;">⏳ +7 Días</button>
+                  <button type="button" class="btn btn-sm btn-secondary btn-quick-date" data-days="30" style="font-size: 11px; padding: 4px 8px; border-radius: 6px;">+1 Mes (30d)</button>
+                  <button type="button" class="btn btn-sm btn-secondary btn-quick-date" data-days="365" style="font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: 700; color: #60a5fa;">+1 Año (365d)</button>
+                  <button type="button" class="btn btn-sm btn-primary btn-quick-date" data-days="730" style="font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: 800;">+2 Años (730d) 🚀</button>
+                  <button type="button" class="btn btn-sm btn-secondary btn-quick-date" data-days="1095" style="font-size: 11px; padding: 4px 8px; border-radius: 6px;">+3 Años</button>
+                  <button type="button" class="btn btn-sm btn-secondary btn-quick-date" data-years="2099" style="font-size: 11px; padding: 4px 8px; border-radius: 6px; color: #f59e0b;">⭐ Vitalicio (2099)</button>
+                </div>
+              </div>
             </div>
 
             <!-- Plan y Tarifa -->
@@ -675,6 +671,23 @@ export function setupSuperAdminEvents(container: HTMLElement) {
   const exactDateGroup = container.querySelector('#bus-exact-date-group') as HTMLElement | null;
   const planSelect = container.querySelector('#bus-plan') as HTMLSelectElement | null;
   const priceInput = container.querySelector('#bus-price') as HTMLInputElement | null;
+  const busNameInput = container.querySelector('#bus-name') as HTMLInputElement | null;
+  const busSlugInput = container.querySelector('#bus-slug') as HTMLInputElement | null;
+
+  busNameInput?.addEventListener('input', () => {
+    if (busSlugInput && (!busSlugInput.dataset.touched || busSlugInput.value === '')) {
+      busSlugInput.value = busNameInput.value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+  });
+  busSlugInput?.addEventListener('input', () => {
+    if (busSlugInput) busSlugInput.dataset.touched = 'true';
+  });
 
   // Ajustar precio sugerido automáticamente según el plan
   planSelect?.addEventListener('change', () => {
@@ -812,17 +825,95 @@ export function setupSuperAdminEvents(container: HTMLElement) {
   const manageCurrentExpires = container.querySelector('#manage-current-expires');
   const manageCurrentDays = container.querySelector('#manage-current-days') as HTMLElement | null;
   const manageBusinessIdInput = container.querySelector('#manage-business-id') as HTMLInputElement | null;
-
-  const manageAddOptionSelect = container.querySelector('#manage-add-option') as HTMLSelectElement | null;
-  const manageCustomDaysGroup = container.querySelector('#manage-custom-days-group') as HTMLElement | null;
-  const manageExactDateGroup = container.querySelector('#manage-exact-date-group') as HTMLElement | null;
+  const manageExactDateInput = container.querySelector('#manage-exact-date') as HTMLInputElement | null;
+  const manageDateFeedback = container.querySelector('#manage-date-feedback') as HTMLElement | null;
   const managePlanSelect = container.querySelector('#manage-plan') as HTMLSelectElement | null;
   const managePriceInput = container.querySelector('#manage-price') as HTMLInputElement | null;
   const manageStatusSelect = container.querySelector('#manage-status') as HTMLSelectElement | null;
 
-  manageAddOptionSelect?.addEventListener('change', () => {
-    if (manageCustomDaysGroup) manageCustomDaysGroup.style.display = manageAddOptionSelect.value === 'custom_days' ? 'block' : 'none';
-    if (manageExactDateGroup) manageExactDateGroup.style.display = manageAddOptionSelect.value === 'exact_date' ? 'block' : 'none';
+  const setExpirationDate = (d: Date, label?: string) => {
+    if (!manageExactDateInput) return;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    manageExactDateInput.value = `${yyyy}-${mm}-${dd}`;
+    if (manageDateFeedback) {
+      const formatted = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+      manageDateFeedback.textContent = label ? `✨ ${label}: ${formatted}` : `📅 ${formatted}`;
+    }
+  };
+
+  // Botones rápidos de extensión
+  container.querySelectorAll('.btn-quick-date').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const days = btn.getAttribute('data-days');
+      const years = btn.getAttribute('data-years');
+      
+      let baseDate = new Date();
+      if (manageExactDateInput?.value) {
+        const curr = new Date(manageExactDateInput.value + 'T00:00:00');
+        if (!isNaN(curr.getTime()) && curr > baseDate) {
+          baseDate = curr;
+        }
+      }
+
+      if (years === '2099') {
+        setExpirationDate(new Date('2099-12-31T00:00:00'), 'Vitalicio');
+      } else if (days) {
+        const num = Number(days);
+        const newD = new Date(baseDate);
+        newD.setDate(newD.getDate() + num);
+        setExpirationDate(newD, `+${num} días`);
+      }
+    });
+  });
+
+  // Al cambiar el plan de licencia en el modal, sugerir tarifa y fecha
+  managePlanSelect?.addEventListener('change', () => {
+    const p = managePlanSelect.value;
+    let base = new Date();
+    if (p === 'trial_3days') {
+      if (managePriceInput) managePriceInput.value = '0';
+      base.setDate(base.getDate() + 3);
+      setExpirationDate(base, 'Prueba 3 días');
+    } else if (p === 'trial_7days') {
+      if (managePriceInput) managePriceInput.value = '0';
+      base.setDate(base.getDate() + 7);
+      setExpirationDate(base, 'Prueba 7 días');
+    } else if (p === 'pro_2years') {
+      if (managePriceInput) managePriceInput.value = '450';
+      base.setDate(base.getDate() + 730);
+      setExpirationDate(base, 'Plan 2 Años (730d)');
+    } else if (p === 'pro_annual') {
+      if (managePriceInput) managePriceInput.value = '250';
+      base.setDate(base.getDate() + 365);
+      setExpirationDate(base, 'Plan Anual (365d)');
+    } else if (p === 'pro') {
+      if (managePriceInput) managePriceInput.value = '25';
+      base.setDate(base.getDate() + 30);
+      setExpirationDate(base, 'Plan Pro (30d)');
+    } else if (p === 'basic') {
+      if (managePriceInput) managePriceInput.value = '15';
+      base.setDate(base.getDate() + 30);
+      setExpirationDate(base, 'Plan Básico (30d)');
+    } else if (p === 'basic_annual') {
+      if (managePriceInput) managePriceInput.value = '150';
+      base.setDate(base.getDate() + 365);
+      setExpirationDate(base, 'Básico Anual (365d)');
+    } else if (p === 'enterprise') {
+      if (managePriceInput) managePriceInput.value = '50';
+      base.setDate(base.getDate() + 30);
+      setExpirationDate(base, 'Enterprise (30d)');
+    } else if (p === 'enterprise_annual') {
+      if (managePriceInput) managePriceInput.value = '500';
+      base.setDate(base.getDate() + 365);
+      setExpirationDate(base, 'Enterprise Anual');
+    } else if (p === 'enterprise_2years') {
+      if (managePriceInput) managePriceInput.value = '900';
+      base.setDate(base.getDate() + 730);
+      setExpirationDate(base, 'Enterprise 2 Años');
+    }
   });
 
   const closeManageModal = () => {
@@ -862,10 +953,26 @@ export function setupSuperAdminEvents(container: HTMLElement) {
       if (managePlanSelect) managePlanSelect.value = plan;
       if (managePriceInput) managePriceInput.value = price;
       if (manageStatusSelect) manageStatusSelect.value = status === 'suspended' ? 'suspended' : (status === 'trial' ? 'trial' : 'active');
-      if (manageAddOptionSelect) {
-        manageAddOptionSelect.value = 'keep_date';
-        manageAddOptionSelect.dispatchEvent(new Event('change'));
+
+      // Pre-cargar fecha en el input editable
+      if (manageExactDateInput) {
+        if (expires) {
+          const expDate = new Date(expires);
+          if (!isNaN(expDate.getTime())) {
+            const yyyy = expDate.getFullYear();
+            const mm = String(expDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(expDate.getDate()).padStart(2, '0');
+            manageExactDateInput.value = `${yyyy}-${mm}-${dd}`;
+          } else {
+            setExpirationDate(new Date());
+          }
+        } else {
+          const def = new Date();
+          def.setDate(def.getDate() + 30);
+          setExpirationDate(def);
+        }
       }
+      if (manageDateFeedback) manageDateFeedback.textContent = '';
 
       const sheetUrl = btn.getAttribute('data-sheet-url') || '';
       const manageSheetUrlInput = container.querySelector('#manage-sheet-url') as HTMLInputElement | null;
@@ -917,34 +1024,20 @@ export function setupSuperAdminEvents(container: HTMLElement) {
     }
 
     try {
-      const opt = manageAddOptionSelect?.value || 'keep_date';
       const selectedPlan = managePlanSelect?.value || 'pro';
       const priceVal = Number(managePriceInput?.value || 25);
       const statusVal = manageStatusSelect?.value || 'active';
       const sheetUrlVal = (container.querySelector('#manage-sheet-url') as HTMLInputElement | null)?.value.trim() || null;
       const isSuspending = statusVal === 'suspended';
 
-      let add_days: number | undefined = undefined;
-      let expires_at: string | undefined = undefined;
-
-      if (!isSuspending) {
-        if (opt === 'exact_date') {
-          const dateInput = (container.querySelector('#manage-exact-date') as HTMLInputElement).value;
-          if (!dateInput) throw new Error('Por favor selecciona una fecha de vencimiento.');
-          expires_at = dateInput;
-        } else if (opt === 'custom_days') {
-          const daysInput = Number((container.querySelector('#manage-custom-days') as HTMLInputElement).value);
-          if (!daysInput || daysInput <= 0) throw new Error('Por favor ingresa una cantidad válida de días.');
-          add_days = daysInput;
-        } else if (opt !== 'keep_date') {
-          add_days = Number(opt);
-        }
+      const dateVal = manageExactDateInput?.value;
+      if (!dateVal && !isSuspending) {
+        throw new Error('Por favor ingresa o selecciona una fecha de vencimiento.');
       }
 
       await api.superadmin.updateLicense(id, {
-        action: isSuspending ? 'suspend' : (add_days ? 'renew' : undefined),
-        add_days,
-        expires_at,
+        action: isSuspending ? 'suspend' : 'renew',
+        expires_at: isSuspending ? undefined : dateVal,
         license_plan: selectedPlan,
         price_monthly: priceVal,
         license_status: statusVal,
@@ -952,7 +1045,7 @@ export function setupSuperAdminEvents(container: HTMLElement) {
         google_sheet_url: sheetUrlVal
       });
 
-      alert(isSuspending ? '⛔ ¡Licencia del comercio pausada/suspendida con éxito!' : '🎉 ¡Licencia y vigencia actualizadas con éxito!');
+      alert(isSuspending ? '⛔ ¡Licencia del comercio pausada/suspendida con éxito!' : '🎉 ¡Licencia y fecha de vencimiento actualizadas con éxito!');
       closeManageModal();
       await renderSuperAdminView(container);
     } catch (err: any) {

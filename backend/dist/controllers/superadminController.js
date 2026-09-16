@@ -121,8 +121,17 @@ async function createBusiness(req, res) {
     const conn = await db_1.default.getConnection();
     try {
         const { name, slug, rif, legal_name, phone, email, address, ticket_message, license_status: reqLicenseStatus, license_plan = 'pro', license_days = 30, expires_at, price_monthly = 25.00, admin_name, admin_email, admin_password } = req.body;
-        if (!name) {
+        if (!name || !name.trim()) {
             return res.status(400).json({ error: 'El nombre del negocio es obligatorio.' });
+        }
+        const cleanAdminEmail = admin_email ? admin_email.trim().toLowerCase() : null;
+        if (cleanAdminEmail) {
+            const [existingUser] = await conn.query('SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1', [cleanAdminEmail]);
+            if (existingUser.length > 0) {
+                return res.status(400).json({
+                    error: `El correo "${cleanAdminEmail}" ya está registrado como usuario en el sistema. Por favor ingresa un correo diferente para el nuevo administrador del comercio.`
+                });
+            }
         }
         // Determinar status de licencia inicial (trial si es plan de prueba o días <= 7, activo si no)
         let initialStatus = reqLicenseStatus || 'active';
@@ -132,31 +141,49 @@ async function createBusiness(req, res) {
             }
         }
         // Generar slug limpio
-        const cleanSlug = (slug || name)
+        let cleanSlug = (slug || name)
             .toLowerCase()
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
             .replace(/[^a-z0-9]/g, '-')
             .replace(/-+/g, '-')
             .replace(/^-|-$/g, '');
-        // Verificar slug único
+        if (!cleanSlug)
+            cleanSlug = `comercio-${Date.now()}`;
+        // Verificar slug único o generar sufijo
         const [existing] = await conn.query('SELECT id FROM businesses WHERE slug = ? LIMIT 1', [cleanSlug]);
         if (existing.length > 0) {
-            return res.status(400).json({ error: `El identificador/slug "${cleanSlug}" ya está en uso por otro comercio.` });
+            cleanSlug = `${cleanSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
         }
-        // Calcular fecha de vencimiento (por fecha específica o días de duración)
+        // Calcular fecha de vencimiento (por fecha específica o días de duración a las 23:59:59)
         let finalExpiresAt = new Date();
-        if (expires_at) {
-            finalExpiresAt = new Date(expires_at);
+        if (expires_at && !isNaN(new Date(expires_at).getTime())) {
+            if (typeof expires_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(expires_at.trim())) {
+                const [y, m, d] = expires_at.trim().split('-').map(Number);
+                finalExpiresAt = new Date(Date.UTC(y, m - 1, d, 23, 59, 59));
+            }
+            else {
+                finalExpiresAt = new Date(expires_at);
+                finalExpiresAt.setUTCHours(23, 59, 59, 999);
+            }
         }
         else {
-            finalExpiresAt.setDate(finalExpiresAt.getDate() + Number(license_days || 30));
+            const days = Number(license_days) || 30;
+            finalExpiresAt.setDate(finalExpiresAt.getDate() + days);
+            finalExpiresAt.setHours(23, 59, 59, 999);
         }
         // Aprovisionar automáticamente Google Sheets para el nuevo comercio si hay credenciales
-        const targetEmail = admin_email || email || '';
+        const targetEmail = cleanAdminEmail || email || '';
         const sheetInfo = await (0, googleSheetsAuto_1.provisionBusinessSheet)(name, targetEmail);
         const realSheetId = sheetInfo.isSimulated ? null : sheetInfo.sheetId;
         const realSheetUrl = sheetInfo.isSimulated ? null : sheetInfo.sheetUrl;
+        const safeBusinessName = name.trim().slice(0, 150);
+        const safeRif = rif ? String(rif).trim().slice(0, 50) : null;
+        const safeLegalName = (legal_name || name).trim().slice(0, 150);
+        const safeBusinessPhone = phone ? String(phone).trim().slice(0, 50) : null;
+        const safeBusinessEmail = (email || cleanAdminEmail || '').trim().slice(0, 100) || null;
+        const safeUserPhone = phone ? String(phone).trim().slice(0, 20) : null;
+        const safeAdminName = (admin_name || `Admin ${name}`).trim().slice(0, 100);
         await conn.beginTransaction();
         // 1. Insertar Comercio
         const [busRes] = await conn.query(`
@@ -166,12 +193,12 @@ async function createBusiness(req, res) {
         google_sheet_id, google_sheet_url, is_active
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `, [
-            name,
+            safeBusinessName,
             cleanSlug,
-            rif || null,
-            legal_name || name,
-            phone || null,
-            email || null,
+            safeRif,
+            safeLegalName,
+            safeBusinessPhone,
+            safeBusinessEmail,
             address || null,
             ticket_message || `¡Gracias por tu compra en ${name}! 🐒`,
             initialStatus,
@@ -183,16 +210,16 @@ async function createBusiness(req, res) {
         ]);
         const newBusinessId = busRes.insertId;
         // 2. Crear usuario Administrador del nuevo comercio si se proporcionó credenciales
-        if (admin_email && admin_password) {
+        if (cleanAdminEmail && admin_password) {
             const hashedPass = await bcryptjs_1.default.hash(admin_password, 10);
             const [userRes] = await conn.query(`
         INSERT INTO users (name, email, password, role, phone, business_id)
         VALUES (?, ?, ?, 'admin', ?, ?)
       `, [
-                admin_name || `Admin ${name}`,
-                admin_email,
+                safeAdminName,
+                cleanAdminEmail,
                 hashedPass,
-                phone || null,
+                safeUserPhone,
                 newBusinessId
             ]);
             await conn.query('UPDATE businesses SET owner_user_id = ? WHERE id = ?', [userRes.insertId, newBusinessId]);
@@ -204,7 +231,7 @@ async function createBusiness(req, res) {
                 : `Comercio "${name}" y Google Sheet aprovisionados exitosamente.`,
             business: {
                 id: newBusinessId,
-                name,
+                name: safeBusinessName,
                 slug: cleanSlug,
                 google_sheet_url: realSheetUrl
             }
@@ -246,6 +273,7 @@ async function updateBusinessLicense(req, res) {
             if (newExpiresAt < new Date()) {
                 newExpiresAt = new Date();
                 newExpiresAt.setDate(newExpiresAt.getDate() + 30);
+                newExpiresAt.setHours(23, 59, 59, 999);
             }
         }
         else {
@@ -266,17 +294,27 @@ async function updateBusinessLicense(req, res) {
         // 2. Manejar vigencia / expiración (solo si no se está suspendiendo)
         if (!isSuspending) {
             if (expires_at) {
-                newExpiresAt = new Date(expires_at);
+                if (typeof expires_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(expires_at.trim())) {
+                    const [y, m, d] = expires_at.trim().split('-').map(Number);
+                    newExpiresAt = new Date(Date.UTC(y, m - 1, d, 23, 59, 59));
+                }
+                else {
+                    newExpiresAt = new Date(expires_at);
+                    newExpiresAt.setUTCHours(23, 59, 59, 999);
+                }
                 if (!license_status)
                     newStatus = 'active';
                 newIsActive = 1;
             }
             else if (add_days && Number(add_days) > 0) {
                 const daysToAdd = Number(add_days);
-                if (newExpiresAt < new Date()) {
-                    newExpiresAt = new Date();
+                let baseDate = business.license_expires_at ? new Date(business.license_expires_at) : new Date();
+                if (baseDate < new Date()) {
+                    baseDate = new Date();
                 }
-                newExpiresAt.setDate(newExpiresAt.getDate() + daysToAdd);
+                baseDate.setDate(baseDate.getDate() + daysToAdd);
+                baseDate.setHours(23, 59, 59, 999);
+                newExpiresAt = baseDate;
                 if (!license_status)
                     newStatus = 'active';
                 newIsActive = 1;
