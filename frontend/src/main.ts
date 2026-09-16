@@ -6358,6 +6358,27 @@ async function renderAdminStats() {
   }
 }
 
+function renderPOSProductCard(prod: Product, index: number): string {
+  const isOutOfStock = Number(prod.stock || 0) <= 0;
+  return `
+    <div class="card pos-product-card add-to-pos-cart cascade-item" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease; animation-delay: ${Math.min(index * 35, 700)}ms; ${isOutOfStock ? 'opacity:0.7; border:1px dashed #ef4444;' : ''}">
+      <div style="position:relative; width:100%; height:90px; margin-bottom:6px;">
+        <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">
+        ${isOutOfStock ? `
+          <span style="position:absolute; top:4px; right:4px; background:#ef4444; color:white; font-size:9px; font-weight:800; padding:2px 6px; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.5);">
+            AGOTADO
+          </span>
+        ` : ''}
+      </div>
+      <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${prod.name}">${prod.name}</div>
+      <div style="font-weight:800; color:var(--primary); font-size:13px; margin-top:2px;">$${Number(prod.price).toFixed(2)}</div>
+      <div style="font-size:10px; color:${isOutOfStock ? '#ef4444; font-weight:700;' : 'var(--text-muted);'}">
+        ${isOutOfStock ? 'Agotado (0)' : `Stock: ${prod.stock}`}
+      </div>
+    </div>
+  `;
+}
+
 // ==========================================================================
 // SUB-VISTA: PUNTO DE VENTA (POS) - REGISTRO DE VENTAS FÍSICAS
 // ==========================================================================
@@ -6459,9 +6480,14 @@ async function renderAdminPOS() {
       }
     }
 
-    const posProducts = posProductsCache.filter(prod =>
-      smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, posSearchQuery)
-    );
+    const isSearching = Boolean(posSearchQuery && posSearchQuery.trim().length > 0);
+    const posProducts = posProductsCache.filter(prod => {
+      // Si no se está buscando manualmente, omitir productos agotados (stock <= 0)
+      if (!isSearching && Number(prod.stock || 0) <= 0) {
+        return false;
+      }
+      return smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, posSearchQuery);
+    });
     const posProductsToShow = posProducts.slice(0, 24);
     
     if (currentUser?.role !== 'admin') {
@@ -6556,14 +6582,7 @@ async function renderAdminPOS() {
           </div>
 
           <div class="pos-products-grid stagger-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:12px;">
-            ${posProductsToShow.map((prod, index) => `
-              <div class="card pos-product-card add-to-pos-cart cascade-item" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease; animation-delay: ${Math.min(index * 35, 700)}ms;">
-                <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:90px; object-fit:cover; border-radius:8px; margin-bottom:6px;">
-                <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.name}</div>
-                <div style="font-weight:800; color:var(--primary); font-size:13px; margin-top:2px;">$${Number(prod.price).toFixed(2)}</div>
-                <div style="font-size:10px; color:var(--text-muted);">Stock: ${prod.stock}</div>
-              </div>
-            `).join('')}
+            ${posProductsToShow.map((prod, index) => renderPOSProductCard(prod, index)).join('')}
             ${posProducts.length > 24 ? `
               <div style="grid-column:1/-1; text-align:center; padding:12px; color:var(--text-secondary); font-size:11px; border:1px dashed var(--border-glass); border-radius:8px; background:rgba(255,255,255,0.01); margin-top:8px;">
                 ⚠️ Se encontraron ${posProducts.length} productos. Mostrando los primeros 24. Refina la búsqueda si no ves el producto deseado.
@@ -7318,18 +7337,23 @@ function bindPOSEvents() {
     posSearchTimeout = setTimeout(() => {
       const grid = document.querySelector('.pos-products-grid');
       if (grid) {
-        const filtered = posProductsCache.filter(prod =>
-          smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, val)
-        );
+        const isSearching = Boolean(val && val.trim().length > 0);
+        const filtered = posProductsCache.filter(prod => {
+          // Si no se está buscando manualmente, omitir productos agotados (stock <= 0)
+          if (!isSearching && Number(prod.stock || 0) <= 0) {
+            return false;
+          }
+          return smartMatch(`${prod.name} ${prod.code || ''} ${prod.category || ''} ${prod.description || ''}`, val);
+        });
 
-        grid.innerHTML = filtered.map((prod, index) => `
-          <div class="card pos-product-card add-to-pos-cart cascade-item" data-id="${prod.id}" style="cursor:pointer; padding:10px; border-radius:12px; text-align:center; transition:transform 0.15s ease; animation-delay: ${Math.min(index * 35, 700)}ms;">
-            <img src="${prod.image_url || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200'}" alt="${prod.name}" style="width:100%; height:90px; object-fit:cover; border-radius:8px; margin-bottom:6px;">
-            <div class="pos-product-name" style="font-size:12px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${prod.name}</div>
-            <div style="font-weight:800; color:var(--primary); font-size:13px; margin-top:2px;">$${Number(prod.price).toFixed(2)}</div>
-            <div style="font-size:10px; color:var(--text-muted);">Stock: ${prod.stock}</div>
+        const cardsHtml = filtered.slice(0, 24).map((prod, index) => renderPOSProductCard(prod, index)).join('');
+        const limitNotice = filtered.length > 24 ? `
+          <div style="grid-column:1/-1; text-align:center; padding:12px; color:var(--text-secondary); font-size:11px; border:1px dashed var(--border-glass); border-radius:8px; background:rgba(255,255,255,0.01); margin-top:8px;">
+            ⚠️ Se encontraron ${filtered.length} productos. Mostrando los primeros 24. Refina la búsqueda si no ves el producto deseado.
           </div>
-        `).join('') || '<p style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-secondary);">No se encontraron productos.</p>';
+        ` : '';
+
+        grid.innerHTML = (cardsHtml ? (cardsHtml + limitNotice) : '<p style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-secondary);">No se encontraron productos.</p>');
       }
     }, 120);
   });
@@ -8305,13 +8329,13 @@ async function addToPOSCart(product: Product) {
   const existing = posCart.find(item => item.product.id === product.id);
   if (existing) {
     if (existing.quantity >= product.stock) {
-      alert('Stock máximo alcanzado');
+      alert(`Stock máximo alcanzado para "${product.name}" (${product.stock} disponibles).`);
       return;
     }
     existing.quantity++;
   } else {
-    if (product.stock < 1) {
-      alert('Producto agotado');
+    if (Number(product.stock || 0) < 1) {
+      alert(`El producto "${product.name}" está agotado (Stock: 0) y no se puede agregar a la venta.`);
       return;
     }
     posCart.push({ product, quantity: 1 });
