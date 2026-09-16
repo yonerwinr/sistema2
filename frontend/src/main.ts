@@ -277,8 +277,36 @@ let showIdentifyCustomerModal = false;
 let adminCustomerSearchQuery = '';
 let editingCustomer: User | null = null;
 let showEditCustomerModal = false;
-let customerHistoryData: { customer: User; sales: Sale[] } | null = null;
 let showCustomerHistoryModal = false;
+let customerHistoryData: any = null;
+
+// Estado y funciones para Modo Claro / Modo Oscuro estilo Apple
+let currentTheme: 'dark' | 'light' = (localStorage.getItem('facilito_theme') as 'dark' | 'light') || 'dark';
+
+function applyTheme(theme: 'dark' | 'light') {
+  currentTheme = theme;
+  try {
+    localStorage.setItem('facilito_theme', theme);
+  } catch (e) {}
+  document.documentElement.setAttribute('data-theme', theme);
+  if (document.body) document.body.setAttribute('data-theme', theme);
+
+  document.querySelectorAll('.apple-theme-toggle').forEach(btn => {
+    const label = btn.querySelector('.theme-label');
+    const icon = btn.querySelector('.toggle-icon');
+    if (label) label.textContent = theme === 'light' ? 'Modo Claro' : 'Modo Oscuro';
+    if (icon) icon.textContent = theme === 'light' ? '☀️' : '🌙';
+  });
+}
+
+function toggleTheme() {
+  applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+}
+
+// Inicializar tema al cargar script
+if (typeof document !== 'undefined') {
+  document.documentElement.setAttribute('data-theme', currentTheme);
+}
 
 // Estado de Proveedores (Admin)
 let suppliersList: any[] = [];
@@ -813,6 +841,9 @@ function renderApp() {
   const appDiv = document.getElementById('app');
   if (!appDiv) return;
 
+  document.documentElement.setAttribute('data-theme', currentTheme);
+  if (document.body) document.body.setAttribute('data-theme', currentTheme);
+
   // Si la cuenta está suspendida y el usuario no es superadmin
   const isSuspended = currentUser && currentUser.role !== 'superadmin' && currentBusinessProfile && (
     currentBusinessProfile.license_status === 'suspended' || 
@@ -1049,6 +1080,15 @@ function renderNavbar(): string {
             <a class="nav-link ${currentView === 'auth' ? 'active' : ''}" id="link-login">Ingresar</a>
           `}
           
+          <!-- Botón de Modo Claro / Modo Oscuro Estilo Apple -->
+          <button type="button" class="apple-theme-toggle" id="theme-toggle-nav-btn" title="Cambiar a ${currentTheme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}" style="margin-right:6px;">
+            <span class="toggle-icon">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+            <span class="theme-label" style="font-size:11.5px;">${currentTheme === 'light' ? 'Claro' : 'Oscuro'}</span>
+          </button>
+
           <!-- Carrito de E-commerce -->
           <div class="cart-icon-container" id="nav-cart-btn">
             ${icons.cart}
@@ -1098,6 +1138,12 @@ function bindGeneralEvents() {
     } else {
       navigate('store');
     }
+  });
+
+  // Listener para el botón de Modo Claro / Modo Oscuro en Navbar
+  document.getElementById('theme-toggle-nav-btn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleTheme();
   });
 
   document.getElementById('link-store')?.addEventListener('click', () => navigate('store'));
@@ -1428,282 +1474,259 @@ function bindStoreEvents() {
 }
 
 // ==========================================================================
-// VISTA: INFORMACIÓN (/info) - SAAS POS & GESTIÓN EN LA NUBE CON SCROLL ANIMATION
+// VISTA: INFORMACIÓN (/info) - SAAS POS & GESTIÓN EN LA NUBE ESTILO APPLE
 // ==========================================================================
 function renderInfoView(): string {
   return `
-    <div class="info-page-wrapper" style="max-width:1200px; margin:0 auto; padding:20px 20px 80px; overflow-x:hidden;">
+    <div class="info-page-wrapper">
       
-      <!-- 1. HERO SAAS CON SCROLL ANIMATION -->
-      <section class="info-hero animate-on-scroll animate-fade-up">
-        <div class="info-hero-badge">
-          <span class="pulsing-dot"></span>
-          <span>SISTEMA INTEGRAL DEFINITIVO • POS & E-COMMERCE</span>
+      <!-- 1. HERO APPLE CON SCROLL ANIMATIONS -->
+      <section class="info-hero animate-on-scroll animate-blur-in">
+        <div style="display:flex; justify-content:center; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom: 22px;">
+          <div class="info-hero-badge">
+            <span class="pulsing-dot"></span>
+            <span>ECOSISTEMA INTEGRAL DEFINITIVO • POS & TIENDA ONLINE</span>
+          </div>
+          <button type="button" class="apple-theme-toggle" id="theme-toggle-info-btn" title="Alternar entre Modo Claro y Oscuro">
+            <span class="toggle-icon">${currentTheme === 'light' ? '☀️' : '🌙'}</span>
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+            <span class="theme-label" style="font-size:11.5px;">${currentTheme === 'light' ? 'Modo Claro' : 'Modo Oscuro'}</span>
+          </button>
         </div>
-        <h1 class="info-hero-title">
-          FacilitoApp 🐒: El Ecosistema Definitivo de Punto de Venta (POS) y E-Commerce
+
+        <h1 class="info-hero-title animate-on-scroll animate-fade-up">
+          Tu comercio, simplificado con la elegancia de <span class="info-hero-title-gradient">FacilitoApp 🐒</span>
         </h1>
-        <p class="info-hero-subtitle">
-          Software moderno, rápido y robusto que integra Punto de Venta Físico y Tienda Online en un solo panel. Con sincronización de inventario único en tiempo real, blindaje contra la devaluación (Ventana de 6 Horas), respaldo automático en Google Sheets y cobranza automatizada de deudores.
+        <p class="info-hero-subtitle animate-on-scroll animate-fade-up">
+          Software de alta precisión que unifica tu Punto de Venta físico (POS) y tu Tienda Virtual en un solo panel. Con inventario sincronizado en tiempo real, protección cambiaria de 6 horas, respaldo automático en Google Sheets y recuperación inteligente de cartera de deudores.
         </p>
-        <div class="info-hero-ctas">
-          <button class="btn-hero-primary" id="info-cta-demo" style="font-size:15px; padding:14px 28px;">
+        <div class="info-hero-ctas animate-on-scroll animate-fade-up">
+          <button class="btn-apple-primary" id="info-cta-demo">
             🚀 Comenzar Demo Gratis (3 Días)
           </button>
-          <a href="#planes" class="btn-hero-secondary" id="info-cta-pricing" style="font-size:15px; padding:14px 28px; text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
+          <a href="#planes" class="btn-apple-secondary" id="info-cta-pricing">
             💎 Ver Planes y Precios
           </a>
-          <button class="btn-hero-secondary" id="info-cta-store" style="font-size:15px; padding:14px 24px;">
+          <button class="btn-apple-secondary" id="info-cta-store">
             🛍️ Ver Tienda Demo
           </button>
         </div>
       </section>
 
-      <!-- 2. PROPUESTA DE VALOR COMERCIAL (BENTO CARDS) -->
-      <section class="animate-on-scroll animate-fade-up" style="margin-top:50px;">
+      <!-- 2. PROPUESTA DE VALOR COMERCIAL (BENTO CARDS APPLE) -->
+      <section class="animate-on-scroll animate-fade-up">
         <div class="info-section-header">
-          <div class="info-section-tag">¿POR QUÉ ES LA SOLUCIÓN IDEAL PARA SU NEGOCIO?</div>
-          <h2 class="info-section-title">Propuesta de Valor Comercial & Blindaje</h2>
-          <p class="info-section-desc">Cinco pilares diseñados para proteger el margen de ganancia y optimizar el flujo de caja en entornos económicos exigentes.</p>
+          <div class="info-section-tag">INGENIERÍA & BLINDAJE</div>
+          <h2 class="info-section-title">Pilares Diseñados para la Rentabilidad</h2>
+          <p class="info-section-desc">Cinco ventajas estratégicas que protegen el margen de ganancia y optimizan el flujo de caja diario.</p>
         </div>
 
-        <div class="info-metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-          <div class="info-metric-card animate-on-scroll animate-fade-up">
-            <div class="info-metric-number" style="font-size:32px;">🔄 Omnicanal</div>
-            <div class="info-metric-label">Sincronización Total</div>
-            <div class="info-metric-sub">Administre tienda física y virtual compartiendo un inventario único en tiempo real.</div>
+        <div class="info-metrics-grid stagger-container">
+          <div class="info-metric-card animate-on-scroll animate-scale-up">
+            <div class="info-metric-number">🔄</div>
+            <div class="info-metric-label">Omnicanal Real</div>
+            <div class="info-metric-sub">Sincronización instantánea de inventario único entre tu mostrador y tu tienda web.</div>
           </div>
-          <div class="info-metric-card animate-on-scroll animate-fade-up">
-            <div class="info-metric-number" style="font-size:32px; color:#f59e0b;">🛡️ 6 Horas</div>
-            <div class="info-metric-label">Blindaje Económico</div>
-            <div class="info-metric-sub">Protección contra devaluación: mantiene la tasa más alta registrada en la ventana del día.</div>
+          <div class="info-metric-card animate-on-scroll animate-scale-up">
+            <div class="info-metric-number" style="color:#f59e0b;">🛡️ 6h</div>
+            <div class="info-metric-label">Protección de Tasa</div>
+            <div class="info-metric-sub">Ventana de 6 horas que conserva la tasa más alta del día contra devaluaciones repentinas.</div>
           </div>
-          <div class="info-metric-card animate-on-scroll animate-fade-up">
-            <div class="info-metric-number" style="font-size:32px; color:#10b981;">☁️ Sheets</div>
-            <div class="info-metric-label">Integración Cloud</div>
-            <div class="info-metric-sub">Respaldo automático de cada transacción en Google Sheets para auditoría externa garantizada.</div>
+          <div class="info-metric-card animate-on-scroll animate-scale-up">
+            <div class="info-metric-number" style="color:#10b981;">☁️ Sheets</div>
+            <div class="info-metric-label">Respaldo Automático</div>
+            <div class="info-metric-sub">Cada factura se envía en tiempo real a tu Google Sheets para auditoría externa blindada.</div>
           </div>
-          <div class="info-metric-card animate-on-scroll animate-fade-up">
-            <div class="info-metric-number" style="font-size:32px; color:#06b6d4;">💳 Cada 6h</div>
-            <div class="info-metric-label">Recuperación de Cartera</div>
-            <div class="info-metric-sub">Automatización de recordatorios de pago para deudores por correo, optimizando el flujo de caja.</div>
+          <div class="info-metric-card animate-on-scroll animate-scale-up">
+            <div class="info-metric-number" style="color:#06b6d4;">💳 Cada 6h</div>
+            <div class="info-metric-label">Cobranza Automática</div>
+            <div class="info-metric-sub">Recordatorios recurrentes por correo electrónico a cuentas por cobrar para acelerar liquidez.</div>
           </div>
-          <div class="info-metric-card animate-on-scroll animate-fade-up">
-            <div class="info-metric-number" style="font-size:32px; color:#a855f7;">🔐 Supervisor</div>
-            <div class="info-metric-label">Seguridad Jerárquica</div>
-            <div class="info-metric-sub">Acciones críticas (anulaciones, sangrías de caja) resguardadas por aprobación de supervisor.</div>
+          <div class="info-metric-card animate-on-scroll animate-scale-up">
+            <div class="info-metric-number" style="color:#a855f7;">🔐 Supervisor</div>
+            <div class="info-metric-label">Control Jerárquico</div>
+            <div class="info-metric-sub">Anulaciones y sangrías de caja protegidas con clave de supervisor en pantalla.</div>
           </div>
         </div>
       </section>
 
-      <!-- 3. MÓDULOS CON IMÁGENES DEL SISTEMA (SPLIT SHOWCASES) -->
+      <!-- 3. MÓDULOS PRINCIPALES CON MARCOS APPLE (SPLIT SHOWCASES) -->
       
-      <!-- SHOWCASE 1: MÓDULO 1 - POS FÍSICO CON IMAGEN -->
+      <!-- SHOWCASE 1: POS FÍSICO CON MARCO APPLE -->
       <section class="info-showcase-split animate-on-scroll animate-slide-left">
-        <div class="info-showcase-img-wrap">
-          <img src="/images/facilito_pos_terminal.jpg" alt="Punto de Venta POS FacilitoApp" loading="lazy">
+        <div class="apple-device-mockup">
+          <div class="apple-mockup-header">
+            <span class="apple-dot apple-dot-red"></span>
+            <span class="apple-dot apple-dot-yellow"></span>
+            <span class="apple-dot apple-dot-green"></span>
+            <span style="margin-left: 8px; font-size: 11px; opacity: 0.5; font-family: -apple-system, sans-serif;">pos.facilitoapp.com — Mostrador</span>
+          </div>
+          <div class="apple-mockup-body">
+            <img src="/images/facilito_pos_terminal.jpg" alt="Punto de Venta POS FacilitoApp" loading="lazy">
+          </div>
         </div>
         <div class="info-showcase-content">
-          <span class="info-showcase-tag" style="background:rgba(0,119,246,0.15); color:#60a5fa; border:1px solid rgba(0,119,246,0.3);">
+          <span class="info-showcase-tag" style="background:rgba(0,119,246,0.12); color:#0077f6; border:1px solid rgba(0,119,246,0.25);">
             🛒 MÓDULO 1: PUNTO DE VENTA FÍSICO (POS)
           </span>
-          <h3 class="info-showcase-title">Facturación de Alta Velocidad en Mostrador</h3>
+          <h3 class="info-showcase-title">Facturación Ultrasónica en Mostrador</h3>
           <p class="info-showcase-text">
-            Diseñado para eliminar filas en caja y garantizar que cada transacción quede debidamente registrada y respaldada al instante.
+            Diseñado para eliminar filas en caja, registrar ventas en segundos y brindar una experiencia fluida a tus clientes.
           </p>
           <ul class="info-showcase-bullets">
             <li class="info-showcase-bullet-item">
               <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Validación de Stock en Tiempo Real:</strong> Descuenta existencias automáticamente al procesar cada venta.</span>
+              <span><strong>Descuento Inmediato de Stock:</strong> Valida existencias en tiempo real y oculta productos agotados automáticamente.</span>
             </li>
             <li class="info-showcase-bullet-item">
               <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Soporte Periférico:</strong> Lector de código de barras integrado con alertas sonoras y teclado numérico rápido.</span>
+              <span><strong>Escaneo Físico y por Cámara:</strong> Compatibilidad con pistolas de códigos de barra estándar y cámara de tu dispositivo.</span>
             </li>
             <li class="info-showcase-bullet-item">
               <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Flexibilidad Multimoneda:</strong> Conversión instantánea a Bolívares (Bs.) basada en tasas BCV o Binance P2P.</span>
+              <span><strong>Multimoneda Dinámica:</strong> Conversión instantánea a Bolívares (Bs.) con tasa oficial BCV o Binance P2P.</span>
             </li>
             <li class="info-showcase-bullet-item">
               <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Pagos Mixtos y Combinados:</strong> Procesa una sola factura combinando Efectivo en divisas, Pago Móvil, Tarjetas o Zelle.</span>
+              <span><strong>Líneas de Pago Combinadas:</strong> Cobra una misma venta con Efectivo USD, Pago Móvil, Tarjeta o Zelle.</span>
             </li>
             <li class="info-showcase-bullet-item">
               <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Documentación Digital:</strong> Emisión para impresoras térmicas (58mm/80mm) y envío por WhatsApp con código QR.</span>
+              <span><strong>Ticket Térmico & Digital:</strong> Compatible con impresoras de 58mm/80mm y envío de recibo digital por WhatsApp.</span>
             </li>
           </ul>
         </div>
       </section>
 
-      <!-- SHOWCASE 2: MÓDULO 2 - TIENDA VIRTUAL CON IMAGEN -->
+      <!-- SHOWCASE 2: TIENDA VIRTUAL CON MARCO APPLE -->
       <section class="info-showcase-split animate-on-scroll animate-slide-right">
         <div class="info-showcase-content">
-          <span class="info-showcase-tag" style="background:rgba(255,115,0,0.15); color:#fb923c; border:1px solid rgba(255,115,0,0.3);">
+          <span class="info-showcase-tag" style="background:rgba(255,115,0,0.12); color:#ff7300; border:1px solid rgba(255,115,0,0.25);">
             🌐 MÓDULO 2: TIENDA VIRTUAL (E-COMMERCE)
           </span>
-          <h3 class="info-showcase-title">Canal de Ventas 24/7 Enfocado en la Conversión</h3>
+          <h3 class="info-showcase-title">Ventas 24/7 con la Misma Base de Datos</h3>
           <p class="info-showcase-text">
-            Tu tienda en internet conectada al mismo almacén del punto de venta físico, sin duplicar inventarios ni discrepancias.
+            Tu tienda en internet conectada al almacén central del negocio, sin duplicar inventarios ni vender productos inexistentes.
           </p>
           <ul class="info-showcase-bullets">
             <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#fb923c;">✓</span>
-              <span><strong>Catálogo Interactivo:</strong> Filtros avanzados por categorías, marcas, precios y disponibilidad en stock.</span>
+              <span class="info-showcase-bullet-icon" style="color:#ff7300;">✓</span>
+              <span><strong>Catálogo Visual Interactivo:</strong> Filtros veloces por categoría, marcas, disponibilidad y precios.</span>
             </li>
             <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#fb923c;">✓</span>
-              <span><strong>Checkout Adaptativo:</strong> Opciones para "Retiro en Tienda" o "Delivery" con integración de geolocalización vía Google Maps.</span>
+              <span class="info-showcase-bullet-icon" style="color:#ff7300;">✓</span>
+              <span><strong>Checkout Adaptativo:</strong> Modalidades para Retiro en Tienda o Delivery con mapa y geolocalización.</span>
             </li>
             <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#fb923c;">✓</span>
-              <span><strong>Gestión de Pagos por el Cliente:</strong> Carga de capturas de pantalla de comprobantes bancarios directamente al sistema para aprobación del facturador.</span>
+              <span class="info-showcase-bullet-icon" style="color:#ff7300;">✓</span>
+              <span><strong>Carga de Comprobantes Bancarios:</strong> El cliente adjunta su captura de pago para validación del facturador.</span>
             </li>
             <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#fb923c;">✓</span>
-              <span><strong>Total Bimoneda en Línea:</strong> Cálculo transparente de montos en dólares y bolívares a la tasa oficial del día sin sobreprecios.</span>
+              <span class="info-showcase-bullet-icon" style="color:#ff7300;">✓</span>
+              <span><strong>Precios Bimoneda Transparentes:</strong> Visualización simultánea en USD y Bs. a la tasa oficial del día.</span>
             </li>
           </ul>
         </div>
-        <div class="info-showcase-img-wrap">
-          <img src="/images/facilito_ecommerce_mobile.jpg" alt="Tienda Virtual E-commerce FacilitoApp" loading="lazy">
+        <div class="apple-device-mockup">
+          <div class="apple-mockup-header">
+            <span class="apple-dot apple-dot-red"></span>
+            <span class="apple-dot apple-dot-yellow"></span>
+            <span class="apple-dot apple-dot-green"></span>
+            <span style="margin-left: 8px; font-size: 11px; opacity: 0.5; font-family: -apple-system, sans-serif;">tienda.facilitoapp.com — Catálogo E-Commerce</span>
+          </div>
+          <div class="apple-mockup-body">
+            <img src="/images/facilito_ecommerce_mobile.jpg" alt="Tienda Virtual E-commerce FacilitoApp" loading="lazy">
+          </div>
         </div>
       </section>
 
-      <!-- SHOWCASE 3: MÓDULO 4 - DASHBOARD & GOOGLE SHEETS -->
+      <!-- SHOWCASE 3: DASHBOARD & RESPALDO CLOUD CON MARCO APPLE -->
       <section class="info-showcase-split animate-on-scroll animate-slide-left">
-        <div class="info-showcase-img-wrap">
-          <img src="/images/facilito_dashboard_analytics.jpg" alt="Dashboard y Estadísticas FacilitoApp" loading="lazy">
+        <div class="apple-device-mockup">
+          <div class="apple-mockup-header">
+            <span class="apple-dot apple-dot-red"></span>
+            <span class="apple-dot apple-dot-yellow"></span>
+            <span class="apple-dot apple-dot-green"></span>
+            <span style="margin-left: 8px; font-size: 11px; opacity: 0.5; font-family: -apple-system, sans-serif;">admin.facilitoapp.com — Analítica en Tiempo Real</span>
+          </div>
+          <div class="apple-mockup-body">
+            <img src="/images/facilito_dashboard_analytics.jpg" alt="Dashboard y Estadísticas FacilitoApp" loading="lazy">
+          </div>
         </div>
         <div class="info-showcase-content">
-          <span class="info-showcase-tag" style="background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3);">
-            📈 MÓDULO 4: DASHBOARD, ANALÍTICA & RESPALDO CLOUD
+          <span class="info-showcase-tag" style="background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.25);">
+            📈 MÓDULO 4: ANALÍTICA & RESPALDO EN LA NUBE
           </span>
-          <h3 class="info-showcase-title">Toma de Decisiones Financieras Basada en Datos</h3>
+          <h3 class="info-showcase-title">Toma Decisiones con Métricas Claras</h3>
           <p class="info-showcase-text">
-            Visualiza el rendimiento de tu negocio en tiempo real con reportes interactivos y auditoría externa garantizada.
+            Control integral del rendimiento financiero de tu comercio en tiempo real con gráficos y auditoría externa garantizada.
           </p>
           <ul class="info-showcase-bullets">
             <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#34d399;">✓</span>
-              <span><strong>Métricas Clave (KPIs):</strong> Visualización instantánea de ganancia neta, margen porcentual, ticket promedio y alertas de stock crítico.</span>
+              <span class="info-showcase-bullet-icon" style="color:#10b981;">✓</span>
+              <span><strong>Métricas Clave (KPIs):</strong> Ganancia neta, margen porcentual, ticket promedio y alertas de stock bajo.</span>
             </li>
             <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#34d399;">✓</span>
-              <span><strong>Gráficos de Tendencia (Chart.js):</strong> Análisis histórico de ventas de los últimos 7 días y distribución por métodos de pago.</span>
+              <span class="info-showcase-bullet-icon" style="color:#10b981;">✓</span>
+              <span><strong>Tendencias Históricas:</strong> Gráficos interactivos de ventas de los últimos 7 días y distribución por método de pago.</span>
             </li>
             <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#34d399;">✓</span>
-              <span><strong>Respaldo Paralelo en Google Sheets:</strong> Cada venta emite un Webhook a Google Apps Script sincronizando todos los campos para una contabilidad externa inmutable.</span>
+              <span class="info-showcase-bullet-icon" style="color:#10b981;">✓</span>
+              <span><strong>Sincronización con Google Sheets:</strong> Cada venta confirmada emite un Webhook automático para persistencia externa inalterable.</span>
             </li>
           </ul>
         </div>
       </section>
 
-      <!-- 4. MÓDULOS OPERATIVOS ADICIONALES (BENTO GRID) -->
-      <section class="animate-on-scroll animate-fade-up" style="margin-top:50px;">
+      <!-- 4. OPERACIONES AVANZADAS (BENTO GRID APPLE) -->
+      <section class="animate-on-scroll animate-fade-up">
         <div class="info-section-header">
           <div class="info-section-tag">CONTROL DE OPERACIONES</div>
           <h2 class="info-section-title">Flujo de Efectivo, Cobranza y Catálogo</h2>
-          <p class="info-section-desc">Módulos avanzados diseñados para blindar las finanzas de tu comercio contra pérdidas y morosidad.</p>
+          <p class="info-section-desc">Herramientas diseñadas para blindar la tesorería de tu comercio contra pérdidas y descuidos.</p>
         </div>
 
-        <div class="system-features-bento">
-          <!-- Módulo 3: Flujo de Efectivo -->
-          <div class="system-feature-card animate-on-scroll animate-fade-up">
-            <div class="system-feature-icon" style="color:#a855f7; background:rgba(168,85,247,0.1); border-color:rgba(168,85,247,0.25);">💰</div>
-            <span class="system-feature-badge" style="color:#c084fc; background:rgba(192,132,252,0.12); border-color:rgba(192,132,252,0.25);">Módulo 3</span>
-            <h3 class="system-feature-title">Flujo de Efectivo y Arqueo (X / Z)</h3>
+        <div class="system-features-bento stagger-container">
+          <div class="system-feature-card animate-on-scroll animate-scale-up">
+            <div class="system-feature-icon" style="color:#a855f7; background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.25);">💰</div>
+            <span class="system-feature-badge" style="color:#a855f7; background:rgba(168,85,247,0.12); border:1px solid rgba(168,85,247,0.25);">Módulo 3</span>
+            <h3 class="system-feature-title">Flujo de Efectivo y Arqueo (Cierres X / Z)</h3>
             <p class="system-feature-desc">
-              Apertura y cierre blindado con registro obligatorio de balance inicial. Cálculo automático de diferencias (sobrante/faltante) al cierre. Límite de seguridad en caja y control de sangrías con validación digital de supervisor en el dispositivo.
+              Apertura y cierre con balance inicial obligatorio. Cálculo automático de diferencias (sobrante/faltante), límite de seguridad en gaveta y control de sangrías con clave de supervisor.
             </p>
           </div>
 
-          <!-- Módulo 5: Gestión de Cuentas por Cobrar -->
-          <div class="system-feature-card animate-on-scroll animate-fade-up">
-            <div class="system-feature-icon" style="color:#06b6d4; background:rgba(6,182,212,0.1); border-color:rgba(6,182,212,0.25);">💳</div>
-            <span class="system-feature-badge" style="color:#22d3ee; background:rgba(34,211,238,0.12); border-color:rgba(34,211,238,0.25);">Módulo 5</span>
+          <div class="system-feature-card animate-on-scroll animate-scale-up">
+            <div class="system-feature-icon" style="color:#06b6d4; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.25);">💳</div>
+            <span class="system-feature-badge" style="color:#06b6d4; background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.25);">Módulo 5</span>
             <h3 class="system-feature-title">Gestión de Cuentas por Cobrar (Deudores)</h3>
             <p class="system-feature-desc">
-              Servicio en segundo plano (Cron Job) que despacha recordatorios automáticos por correo electrónico cada 6 horas según configuración. Registro de abonos parciales con actualización de saldo pendiente en tiempo real.
+              Servicio en segundo plano que despacha recordatorios automáticos por correo cada 6 horas. Registro de abonos parciales y actualización inmediata del saldo pendiente.
             </p>
           </div>
 
-          <!-- Módulo 6: Catálogo e Inventario -->
-          <div class="system-feature-card animate-on-scroll animate-fade-up">
-            <div class="system-feature-icon" style="color:#f59e0b; background:rgba(245,158,11,0.1); border-color:rgba(245,158,11,0.25);">📦</div>
-            <span class="system-feature-badge" style="color:#fbbf24; background:rgba(251,191,36,0.12); border-color:rgba(251,191,36,0.25);">Módulo 6</span>
+          <div class="system-feature-card animate-on-scroll animate-scale-up">
+            <div class="system-feature-icon" style="color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.25);">📦</div>
+            <span class="system-feature-badge" style="color:#f59e0b; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.25);">Módulo 6</span>
             <h3 class="system-feature-title">Catálogo e Inventario Centralizado</h3>
             <p class="system-feature-desc">
-              Generador inteligente de SKU en formato metodológico <code>CC-SSS-NNNN</code>. Buscador global de alta velocidad por nombre, código SKU, marca o descripción con filtros de disponibilidad y carga de fotos de productos.
+              Generador inteligente de SKU en formato metodológico <code>CC-SSS-NNNN</code>. Búsqueda instantánea por nombre, código de barras o descripción, y carga de fotos optimizada.
             </p>
           </div>
         </div>
       </section>
 
-      <!-- 5. ESPECIFICACIÓN TÉCNICA Y ARQUITECTURA -->
-      <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
+      <!-- 5. TABLA DE RESUMEN DE VALOR COMERCIAL APPLE (SIN RESPONSABLE) -->
+      <section class="animate-on-scroll animate-fade-up">
         <div class="info-section-header">
-          <div class="info-section-tag">INGENIERÍA MODERNA</div>
-          <h2 class="info-section-title">Especificación Técnica y Arquitectura</h2>
-          <p class="info-section-desc">Diseñado bajo estándares rigurosos de ingeniería de software para máxima velocidad, seguridad y escalabilidad.</p>
-        </div>
-
-        <div class="info-tech-stack-grid">
-          <div class="info-tech-item animate-on-scroll animate-fade-up">
-            <div class="info-tech-icon">⚡</div>
-            <div>
-              <div class="info-tech-name">Backend Node.js & TS</div>
-              <div class="info-tech-desc">Express con TypeScript tipado y seguro</div>
-            </div>
-          </div>
-          <div class="info-tech-item animate-on-scroll animate-fade-up">
-            <div class="info-tech-icon">🗄️</div>
-            <div>
-              <div class="info-tech-name">MySQL & TiDB Cloud</div>
-              <div class="info-tech-desc">Alta disponibilidad y tolerancia a fallos</div>
-            </div>
-          </div>
-          <div class="info-tech-item animate-on-scroll animate-fade-up">
-            <div class="info-tech-icon">🚀</div>
-            <div>
-              <div class="info-tech-name">Frontend SPA & Vite</div>
-              <div class="info-tech-desc">Vanilla TypeScript ultraliviano y veloz</div>
-            </div>
-          </div>
-          <div class="info-tech-item animate-on-scroll animate-fade-up">
-            <div class="info-tech-icon">🔒</div>
-            <div>
-              <div class="info-tech-name">Seguridad Grado Bancario</div>
-              <div class="info-tech-desc">JWT + bcryptjs + Google OAuth 2.0</div>
-            </div>
-          </div>
-          <div class="info-tech-item animate-on-scroll animate-fade-up">
-            <div class="info-tech-icon">📊</div>
-            <div>
-              <div class="info-tech-name">Visualización Chart.js</div>
-              <div class="info-tech-desc">Gráficos dinámicos e interactivos</div>
-            </div>
-          </div>
-          <div class="info-tech-item animate-on-scroll animate-fade-up">
-            <div class="info-tech-icon">👥</div>
-            <div>
-              <div class="info-tech-name">Roles y Permisos Granulares</div>
-              <div class="info-tech-desc">Admin, Vendedor, Facturador y Cliente</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 6. TABLA COMPARATIVA: RESUMEN DE VALOR COMERCIAL -->
-      <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
-        <div class="info-section-header">
-          <div class="info-section-tag">IMPACTO EN SU NEGOCIO</div>
+          <div class="info-section-tag">IMPACTO DIRECTO</div>
           <h2 class="info-section-title">Resumen de Valor Comercial</h2>
-          <p class="info-section-desc">Cómo cada característica del sistema se traduce en ahorro de tiempo y protección de capital.</p>
+          <p class="info-section-desc">Cómo cada innovación del sistema se traduce en ahorro de tiempo y protección de capital.</p>
         </div>
 
-        <div class="info-table-container">
+        <div class="info-table-container animate-on-scroll animate-blur-in">
           <table class="info-commercial-table">
             <thead>
               <tr>
@@ -1741,37 +1764,22 @@ function renderInfoView(): string {
             </tbody>
           </table>
         </div>
-
-        <!-- Tarjeta del Responsable del Proyecto -->
-        <div class="info-author-card animate-on-scroll animate-fade-up">
-          <div>
-            <div style="font-size:12px; font-weight:800; text-transform:uppercase; color:#60a5fa; letter-spacing:0.5px; margin-bottom:4px;">RESPONSABLE DEL PROYECTO</div>
-            <div style="font-size:17px; font-weight:800; color:#ffffff;">Yonerwin Rodriguez</div>
-            <div style="font-size:13px; color:#94a3b8;">Contacto directo: <a href="mailto:yonerwinrodriguez19@gmail.com" style="color:#38bdf8; text-decoration:none;">yonerwinrodriguez19@gmail.com</a></div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-size:12px; color:#94a3b8;">Fecha de Emisión Oficial</div>
-            <div style="font-size:14px; font-weight:700; color:#ffffff;">7/27/2026</div>
-          </div>
-        </div>
       </section>
 
-      <!-- ==================================================================== -->
-      <!-- 7. SECCIÓN DE LA FOTO: PLANES Y PRECIOS (ESTILO VE-COMMERCE)        -->
-      <!-- ==================================================================== -->
+      <!-- 6. SECCIÓN DE PLANES Y PRECIOS APPLE PRO -->
       <div id="planes" style="position:relative; top:-40px;"></div>
-      <section class="pricing-section-container animate-on-scroll animate-fade-up" style="margin-top:60px;">
+      <section class="pricing-section-container animate-on-scroll animate-fade-up">
         <div class="info-section-header">
           <div class="info-section-tag">PLANES Y SUSCRIPCIÓN</div>
           <h2 class="info-section-title">
-            Planes que se adaptan a tu <span style="background: linear-gradient(135deg, #0084ff 0%, #ff7300 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">tipo de negocio</span>
+            Planes adaptados a tu <span class="info-hero-title-gradient">tipo de negocio</span>
           </h2>
-          <p class="info-section-desc">Desde el pequeño comercio hasta la cadena multi-sucursal.</p>
+          <p class="info-section-desc">Desde pequeños comercios hasta cadenas con múltiples puntos de venta.</p>
         </div>
 
-        <div class="pricing-cards-grid">
+        <div class="pricing-cards-grid stagger-container">
           <!-- TARJETA 1: DEMO GRATUITA -->
-          <div class="pricing-card animate-on-scroll animate-fade-up">
+          <div class="pricing-card animate-on-scroll animate-scale-up">
             <div>
               <div class="pricing-card-header">
                 <span class="pricing-plan-tag">DEMO GRATUITA</span>
@@ -1781,13 +1789,13 @@ function renderInfoView(): string {
                 <span class="pricing-cycle">por 3 días</span>
               </div>
               <p class="pricing-desc">
-                Prueba el sistema completo y conoce todas las herramientas sin compromiso. Depuración automática tras 2 días hábiles de vencido.
+                Prueba el sistema completo y conoce todas las herramientas sin compromiso alguno.
               </p>
 
               <ul class="pricing-features-list">
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Punto de venta e inventario</span>
+                  <span>Punto de venta e inventario activo</span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
@@ -1795,15 +1803,15 @@ function renderInfoView(): string {
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Tasas BCV en tiempo real</span>
+                  <span>Tasas oficiales BCV y Binance P2P</span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Múltiples métodos de pago</span>
+                  <span>Múltiples métodos de pago combinados</span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Prueba de 3 días sin compromiso</span>
+                  <span>Prueba de 3 días sin costo</span>
                 </li>
               </ul>
             </div>
@@ -1813,8 +1821,8 @@ function renderInfoView(): string {
             </button>
           </div>
 
-          <!-- TARJETA 2: PRO (RECOMENDADO) -->
-          <div class="pricing-card featured animate-on-scroll animate-fade-up">
+          <!-- TARJETA 2: PRO (RECOMENDADO APPLE STYLE) -->
+          <div class="pricing-card featured animate-on-scroll animate-scale-up">
             <div>
               <div class="pricing-card-header">
                 <span class="pricing-plan-tag">PRO</span>
@@ -1825,7 +1833,7 @@ function renderInfoView(): string {
                 <span class="pricing-cycle">/ mes</span>
               </div>
               <p class="pricing-desc">
-                Para negocios en crecimiento. Todo lo que necesitas sin límites.
+                Para negocios en crecimiento. Todo lo que necesitas sin límites operativos.
               </p>
 
               <ul class="pricing-features-list">
@@ -1835,27 +1843,23 @@ function renderInfoView(): string {
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span><strong>Productos ilimitados</strong></span>
+                  <span><strong>Productos y ventas ilimitadas</strong></span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Inventario en tiempo real</span>
+                  <span>Inventario sincronizado en tiempo real</span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Reportes avanzados + dashboard</span>
+                  <span>Dashboard analítico & Google Sheets</span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Múltiples usuarios y roles</span>
+                  <span>Múltiples usuarios y roles jerárquicos</span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Soporte multimoneda completo</span>
-                </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>IGTF automático</span>
+                  <span>Cálculo de IGTF y facturación rápida</span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
@@ -1869,34 +1873,33 @@ function renderInfoView(): string {
             </button>
           </div>
 
-          <!-- TARJETA 3: VERSIÓN FISCAL (SENIAT) - EN DESARROLLO -->
-          <div class="pricing-card animate-on-scroll animate-fade-up">
+          <!-- TARJETA 3: VERSIÓN FISCAL (SENIAT) -->
+          <div class="pricing-card animate-on-scroll animate-scale-up">
             <div>
               <div class="pricing-card-header">
                 <span class="pricing-plan-tag">VERSIÓN FISCAL</span>
-                <span class="pricing-badge-wip">⏳ MUY PRONTO</span>
+                <span class="pricing-badge-wip">⏳ PRONTO</span>
               </div>
               <div class="pricing-price-box">
                 <span class="pricing-amount">Fiscal</span>
                 <span class="pricing-cycle">integración</span>
               </div>
               <p class="pricing-desc">
-                Emisión de facturas y cumplimiento tributario mediante integración con sistemas fiscales homologados.
+                Emisión de facturas y cumplimiento tributario mediante integración homologada.
               </p>
 
-              <!-- AVISO EXPLÍCITO SENIAT (REQUERIDO) -->
               <div class="pricing-wip-notice">
                 <span style="font-size:18px;">⚠️</span>
                 <div>
-                  <strong>Estamos trabajando en el plan del SENIAT / Integración Fiscal.</strong>
-                  <br>Aún no está disponible de forma comercial. ¡Muy pronto estará disponible para todos! Únete a la lista de espera para ser el primero en activarlo.
+                  <strong>Integración SENIAT en desarrollo activo.</strong>
+                  <br>¡Muy pronto disponible! Únete a la lista de espera para ser el primero en activarlo en tu negocio.
                 </div>
               </div>
 
               <ul class="pricing-features-list">
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Todo lo incluido en el plan Pro</span>
+                  <span>Todo lo incluido en el Plan Pro</span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
@@ -1904,35 +1907,26 @@ function renderInfoView(): string {
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Soporte para sistemas homologados</span>
+                  <span>Sistemas homologados y providencias</span>
                 </li>
                 <li class="pricing-feature-item">
                   <span class="pricing-feature-check">✓</span>
-                  <span>Configuración personalizada</span>
-                </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Cumplimiento normativo SENIAT</span>
-                </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Soporte técnico especializado</span>
+                  <span>Soporte técnico tributario especializado</span>
                 </li>
               </ul>
             </div>
 
             <a href="https://wa.me/584120000000?text=${encodeURIComponent('Hola, me interesa conocer más sobre la Versión Fiscal SENIAT de FacilitoApp y anotarme en la lista de espera.')}" target="_blank" class="btn-pricing-fiscal" id="btn-plan-fiscal">
-              💬 Contactar por WhatsApp
+              💬 Anotarme por WhatsApp
             </a>
           </div>
         </div>
       </section>
 
-      <!-- 8. PREGUNTAS FRECUENTES (FAQ ACORDEÓN) -->
-      <div id="info-faq-anchor" style="position:relative; top:-40px;"></div>
-      <section class="animate-on-scroll animate-fade-up" style="margin-top:70px;">
+      <!-- 7. PREGUNTAS FRECUENTES (FAQ APPLE ACORDEÓN) -->
+      <section class="animate-on-scroll animate-fade-up">
         <div class="info-section-header">
-          <div class="info-section-tag">RESOLVEMOS TUS DUDAS</div>
+          <div class="info-section-tag">DUDAS COMUNES</div>
           <h2 class="info-section-title">Preguntas Frecuentes</h2>
           <p class="info-section-desc">Todo lo que necesitas saber sobre FacilitoApp, tus datos y la suscripción.</p>
         </div>
@@ -1944,7 +1938,7 @@ function renderInfoView(): string {
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              El sistema se conecta de forma automática a los servidores oficiales del Banco Central de Venezuela (BCV) y a Binance P2P. Además, implementa el algoritmo de <strong>Protección de Ventana de 6 Horas</strong>, conservando la tasa más alta registrada en ese lapso para proteger tu margen de utilidad contra devaluaciones repentinas.
+              El sistema se conecta automáticamente a los servidores oficiales del Banco Central de Venezuela (BCV) y a Binance P2P. Además, implementa el algoritmo de <strong>Protección de Ventana de 6 Horas</strong>, conservando la tasa más alta registrada en ese lapso para proteger tu margen de utilidad contra devaluaciones repentinas.
             </div>
           </div>
 
@@ -1954,17 +1948,17 @@ function renderInfoView(): string {
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              Actualmente estamos trabajando activamente en el módulo fiscal para homologar impresoras fiscales y cumplir al 100% con las normativas y providencias del SENIAT. Aún no está disponible, ¡muy pronto anunciaremos su lanzamiento oficial! Puedes contactarnos por WhatsApp para anotarte en la lista de espera prioritaria.
+              Actualmente nos encontramos homologando impresoras fiscales para cumplir con todas las providencias del SENIAT. Puedes escribirnos a través del botón de WhatsApp para reservar tu cupo en la lista de espera preferencial.
             </div>
           </div>
 
           <div class="info-faq-item">
             <button class="info-faq-question">
-              <span>¿Cómo se respaldan mis transacciones en Google Sheets?</span>
+              <span>¿Cómo se respaldan mis ventas en Google Sheets?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              Cada venta confirmada dispara una petición fetch en tiempo real hacia un Webhook seguro de Google Apps Script. Todos los datos de la transacción se escriben en tu propia hoja de cálculo de Google Drive, garantizando persistencia financiera externa incluso si tu servidor local o conexión llegaran a fallar.
+              Cada venta completada emite un Webhook seguro hacia un script de Google Apps Script. Todos los datos de la transacción se escriben en tu propia hoja de cálculo de Google Drive en tiempo real, garantizando persistencia financiera externa.
             </div>
           </div>
 
@@ -1974,45 +1968,45 @@ function renderInfoView(): string {
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              El sistema ejecuta un servicio Cron en segundo plano que inspecciona las cuentas por cobrar y despacha recordatorios de pago automáticos cada 6 horas por correo electrónico. Cuando el cliente realiza un abono parcial, el saldo pendiente se descuenta de inmediato.
+              El sistema ejecuta un servicio Cron en segundo plano que inspecciona las ventas a crédito y despacha recordatorios de pago automáticos cada 6 horas por correo electrónico. Al registrar un abono parcial, el saldo se actualiza de inmediato.
             </div>
           </div>
 
           <div class="info-faq-item">
             <button class="info-faq-question">
-              <span>¿Qué ocurre cuando vencen los 3 días de la Demo Gratuita?</span>
+              <span>¿Qué ocurre tras vencer los 3 días de la Demo Gratuita?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              Puedes probar todas las funciones sin costo. Si decides activar el Plan Pro ($30/mes), conservas todos tus productos, clientes y ventas intactos. Tienes 2 días hábiles de gracia para formalizar tu pago antes de la depuración automática del comercio demo.
+              Al activar el Plan Pro ($30/mes), conservas todos tus productos, clientes y ventas registradas intactos. Cuentas con 2 días hábiles de gracia para formalizar tu activación antes de la depuración automática del comercio demo.
             </div>
           </div>
 
           <div class="info-faq-item">
             <button class="info-faq-question">
-              <span>¿Puedo tener varios empleados con roles y niveles de acceso separados?</span>
+              <span>¿Puedo tener empleados con distintos niveles de acceso?</span>
               <span class="info-faq-chevron">▼</span>
             </button>
             <div class="info-faq-answer">
-              Sí. El sistema cuenta con roles jerárquicos: Administrador (control total), Vendedor (solo POS y clientes), Facturador (ventas online y conciliación) y Cliente. Además, cualquier acción crítica como anulación de factura o retiro de efectivo en caja requiere autorización de supervisor en tiempo real.
+              Sí. El sistema cuenta con roles jerárquicos: Administrador (control total), Vendedor (acceso al POS y clientes), Facturador (ventas online y conciliación) y Cliente. Acciones críticas como anulaciones o retiros de caja requieren autorización de supervisor.
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 9. LLAMADO A LA ACCIÓN FINAL -->
-      <section class="info-cta-box animate-on-scroll animate-zoom-in" style="margin-top:60px;">
-        <h2 style="font-size:clamp(26px, 3.5vw, 38px); font-weight:900; color:#ffffff; margin-bottom:12px; letter-spacing:-0.5px;">
+      <!-- 8. LLAMADO A LA ACCIÓN FINAL APPLE -->
+      <section class="info-cta-box animate-on-scroll animate-zoom-in">
+        <h2 style="font-size:clamp(26px, 3.8vw, 42px); font-weight:900; color:var(--apple-text-title); margin-bottom:14px; letter-spacing:-0.8px;">
           ¿Listo para transformar la gestión de tu comercio?
         </h2>
-        <p style="font-size:15.5px; color:#94a3b8; max-width:600px; margin:0 auto 26px; line-height:1.6;">
+        <p style="font-size:16px; color:var(--apple-text-body); max-width:620px; margin:0 auto 28px; line-height:1.6;">
           Prueba FacilitoApp gratis por 3 días y descubre la velocidad de un Punto de Venta moderno, multi-moneda y en la nube.
         </p>
         <div style="display:flex; justify-content:center; gap:16px; flex-wrap:wrap;">
-          <button class="btn-hero-primary" id="info-cta-bottom" style="font-size:16px; padding:16px 36px;">
+          <button class="btn-apple-primary" id="info-cta-bottom" style="font-size:15.5px; padding:15px 34px;">
             🚀 Comenzar Demo Gratis Ahora
           </button>
-          <a href="https://wa.me/584120000000?text=${encodeURIComponent('Hola, deseo una demostración personalizada del sistema FacilitoApp POS.')}" target="_blank" class="btn-hero-secondary" style="font-size:16px; padding:16px 28px; text-decoration:none; display:inline-flex; align-items:center; gap:8px;">
+          <a href="https://wa.me/584120000000?text=${encodeURIComponent('Hola, deseo una demostración personalizada del sistema FacilitoApp POS.')}" target="_blank" class="btn-apple-secondary" style="font-size:15.5px; padding:15px 28px;">
             💬 Hablar con un Asesor
           </a>
         </div>
@@ -2023,6 +2017,12 @@ function renderInfoView(): string {
 }
 
 function bindInfoEvents() {
+  // Alternar Modo Claro / Modo Oscuro
+  document.getElementById('theme-toggle-info-btn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleTheme();
+  });
+
   // Navegación a Demo / Registro
   document.getElementById('info-cta-demo')?.addEventListener('click', () => navigate('auth'));
   document.getElementById('btn-plan-demo')?.addEventListener('click', () => navigate('auth'));
@@ -11683,7 +11683,7 @@ async function renderAdminCustomers() {
               <div class="card" style="padding:12px; background:rgba(16,185,129,0.05); text-align:center; border:1px solid rgba(16,185,129,0.2);">
                 <div style="font-size:11px; color:#10b981; font-weight:700;">Monto Total Comprado ($)</div>
                 <div style="font-size:20px; font-weight:900; color:#10b981;">
-                  $${customerHistoryData.sales.filter(s => s.status !== 'cancelled' && !s.is_quotation).reduce((sum, s) => sum + Number(s.total), 0).toFixed(2)}
+                  $${customerHistoryData.sales.filter((s: any) => s.status !== 'cancelled' && !s.is_quotation).reduce((sum: number, s: any) => sum + Number(s.total), 0).toFixed(2)}
                 </div>
               </div>
             </div>
@@ -11702,7 +11702,7 @@ async function renderAdminCustomers() {
                   </tr>
                 </thead>
                 <tbody>
-                  ${customerHistoryData.sales.map(sale => `
+                  ${customerHistoryData.sales.map((sale: any) => `
                     <tr>
                       <td><strong>#${sale.id}</strong></td>
                       <td style="font-size:12px;">${new Date(sale.created_at).toLocaleString()}</td>
