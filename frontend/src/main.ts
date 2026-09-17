@@ -1481,533 +1481,504 @@ function bindStoreEvents() {
 }
 
 // ==========================================================================
-// VISTA: INFORMACIÓN (/info) - SAAS POS & GESTIÓN EN LA NUBE ESTILO APPLE
+// VISTA: INFORMACIÓN (/info) - SAAS POS & GESTIÓN LIMPIA INSPIRADA EN TREINTA.CO
 // ==========================================================================
 function renderInfoView(): string {
   return `
     <div class="info-page-wrapper">
       
-      <!-- 1. HERO APPLE CON SCROLL ANIMATIONS -->
-      <section class="info-hero animate-on-scroll animate-blur-in">
-        <div style="display:flex; justify-content:center; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom: 22px;">
-          <div class="info-hero-badge">
+      <!-- 1. HERO ESTILO TREINTA (2 COLUMNAS ASIMÉTRICAS) -->
+      <section class="treinta-hero animate-on-scroll animate-fade-up">
+        <div class="treinta-hero-left">
+          <div class="treinta-hero-badge">
             <span class="pulsing-dot"></span>
-            <span>ECOSISTEMA INTEGRAL DEFINITIVO • POS & TIENDA ONLINE</span>
+            <span>SISTEMA DE GESTIÓN Y POS PARA COMERCIOS</span>
+          </div>
+
+          <h1 class="treinta-hero-title">
+            El sistema de <span class="treinta-hero-title-highlight">Punto de Venta</span> y Gestión para tu negocio
+          </h1>
+
+          <p class="treinta-hero-subtitle">
+            Controla tus ventas, inventario, caja y cobranza desde el celular o computador. Todo en una sola plataforma, fácil, rápida y sin enredos.
+          </p>
+
+          <div class="treinta-hero-benefits">
+            <div class="treinta-benefit-item">
+              <span class="treinta-benefit-icon">✓</span>
+              <span><strong>Fácil e intuitivo:</strong> Diseñado para aprender en minutos sin complicaciones.</span>
+            </div>
+            <div class="treinta-benefit-item">
+              <span class="treinta-benefit-icon">✓</span>
+              <span><strong>En celular y computador:</strong> Sincronizado en tiempo real estés en tu local o de viaje.</span>
+            </div>
+            <div class="treinta-benefit-item">
+              <span class="treinta-benefit-icon">✓</span>
+              <span><strong>Estadísticas al día:</strong> Conoce tus ventas, ganancias y stock en tiempo real.</span>
+            </div>
+          </div>
+
+          <div class="treinta-hero-ctas">
+            <button class="btn-treinta-primary" id="info-cta-demo">
+              🚀 Prueba gratis (3 Días)
+            </button>
+            <button class="btn-treinta-secondary" id="info-cta-store">
+              🛍️ Ver Tienda Demo
+            </button>
+            <a href="#planes" class="btn-treinta-secondary" id="info-cta-pricing">
+              💎 Ver Planes
+            </a>
+          </div>
+
+          <div class="treinta-social-proof">
+            <span class="treinta-stars">★★★★★</span>
+            <span><strong>4.8 de 5</strong> en valoración de comerciantes • <strong>+5,000</strong> negocios digitalizados</span>
           </div>
         </div>
 
-        <h1 class="info-hero-title animate-on-scroll animate-fade-up">
-          Tu comercio, simplificado con la elegancia de <span class="info-hero-title-gradient">FacilitoApp 🐒</span>
-        </h1>
-        <p class="info-hero-subtitle animate-on-scroll animate-fade-up">
-          Software de alta precisión que unifica tu Punto de Venta físico (POS) y tu Tienda Virtual en un solo panel. Con inventario sincronizado en tiempo real, protección cambiaria de 6 horas, respaldo automático en Google Sheets y recuperación inteligente de cartera de deudores.
-        </p>
-        <div class="info-hero-ctas animate-on-scroll animate-fade-up">
-          <button class="btn-apple-primary" id="info-cta-demo">
-            🚀 Comenzar Demo Gratis (3 Días)
+        <div class="treinta-hero-right">
+          <div class="treinta-mockup-wrapper">
+            <!-- Chip superior flotante -->
+            <div class="treinta-floating-chip chip-top-right">
+              <span style="font-size:18px;">📈</span>
+              <div>
+                <div style="font-size:11px; color:var(--text-secondary,#64748b); text-transform:uppercase;">Ventas de hoy</div>
+                <div style="font-size:14px; font-weight:800; color:#10b981;">+$420.00 USD</div>
+              </div>
+            </div>
+
+            <!-- Marco de Dispositivo Limpio -->
+            <div class="treinta-device-card">
+              <div class="treinta-device-header">
+                <span class="treinta-dot" style="background:#ff5f56;"></span>
+                <span class="treinta-dot" style="background:#ffbd2e;"></span>
+                <span class="treinta-dot" style="background:#27c93f;"></span>
+                <span style="margin-left:8px; font-size:11.5px; color:var(--text-secondary,#64748b); font-weight:600;">pos.facilitoapp.com — Mostrador</span>
+              </div>
+              <img src="/images/facilito_pos_terminal.jpg" alt="Punto de Venta POS FacilitoApp" class="treinta-device-img" loading="lazy" />
+            </div>
+
+            <!-- Chip inferior flotante -->
+            <div class="treinta-floating-chip chip-bottom-left">
+              <span style="font-size:18px;">📦</span>
+              <div>
+                <div style="font-size:11px; color:var(--text-secondary,#64748b); text-transform:uppercase;">Inventario Central</div>
+                <div style="font-size:13px; font-weight:800; color:#ff7a00;">100% Sincronizado</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. ¿QUÉ PUEDES HACER CON FACILITOAPP? (6 TARJETAS TREINTA) -->
+      <section class="animate-on-scroll animate-fade-up">
+        <div class="treinta-section-header">
+          <span class="treinta-section-tag">FUNCIONALIDADES</span>
+          <h2 class="treinta-section-title">¿Qué puedes hacer con FacilitoApp?</h2>
+          <p class="treinta-section-desc">Herramientas prácticas creadas para el ritmo diario de tu comercio, sin funciones de relleno.</p>
+        </div>
+
+        <div class="treinta-features-grid">
+          <!-- Tarjeta 1: Flujo de Caja -->
+          <div class="treinta-feature-card">
+            <div class="treinta-feature-icon-circle" style="background:rgba(255,122,0,0.1); color:#ff7a00;">
+              💰
+            </div>
+            <h3 class="treinta-feature-card-title">Controla tu flujo de caja</h3>
+            <p class="treinta-feature-card-text">
+              Registra ventas y gastos en segundos. Sabrás exactamente cuánto dinero entra y sale cada día, evitando descuadres y fugas en tu gaveta.
+            </p>
+          </div>
+
+          <!-- Tarjeta 2: Inventario -->
+          <div class="treinta-feature-card">
+            <div class="treinta-feature-icon-circle" style="background:rgba(16,185,129,0.1); color:#10b981;">
+              📦
+            </div>
+            <h3 class="treinta-feature-card-title">Gestiona tu inventario</h3>
+            <p class="treinta-feature-card-text">
+              Conoce qué productos rotan más, existencias en tiempo real y recibe alertas preventivas antes de que se agote tu mercancía clave.
+            </p>
+          </div>
+
+          <!-- Tarjeta 3: Punto de Venta POS -->
+          <div class="treinta-feature-card">
+            <div class="treinta-feature-icon-circle" style="background:rgba(0,132,255,0.1); color:#0084ff;">
+              🛒
+            </div>
+            <h3 class="treinta-feature-card-title">Punto de Venta (POS) rápido</h3>
+            <p class="treinta-feature-card-text">
+              Facturación ágil con lector de códigos de barra o cámara, calculadora de vueltos en Bolívares y USD, y recibos listos para WhatsApp.
+            </p>
+          </div>
+
+          <!-- Tarjeta 4: Multidispositivo -->
+          <div class="treinta-feature-card">
+            <div class="treinta-feature-icon-circle" style="background:rgba(168,85,247,0.1); color:#a855f7;">
+              📱
+            </div>
+            <h3 class="treinta-feature-card-title">Accede desde cualquier equipo</h3>
+            <p class="treinta-feature-card-text">
+              Administra tu negocio desde el celular, tablet o computadora portátil sin descargas pesadas ni configuraciones complicadas.
+            </p>
+          </div>
+
+          <!-- Tarjeta 5: Estadísticas y Reportes -->
+          <div class="treinta-feature-card">
+            <div class="treinta-feature-icon-circle" style="background:rgba(245,158,11,0.1); color:#f59e0b;">
+              📊
+            </div>
+            <h3 class="treinta-feature-card-title">Toma decisiones con datos reales</h3>
+            <p class="treinta-feature-card-text">
+              Reportes automáticos de ganancias netas, productos más vendidos y tendencias de venta para comprar con inteligencia y rentabilidad.
+            </p>
+          </div>
+
+          <!-- Tarjeta 6: Control de Deudas -->
+          <div class="treinta-feature-card">
+            <div class="treinta-feature-icon-circle" style="background:rgba(6,182,212,0.1); color:#06b6d4;">
+              💳
+            </div>
+            <h3 class="treinta-feature-card-title">Cobranza y control de fiados</h3>
+            <p class="treinta-feature-card-text">
+              Registra clientes con cuentas pendientes, recibe abonos parciales y envía recordatorios amables para cobrar a tiempo sin pérdidas.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. PARA TODO TIPO DE NEGOCIO (CATEGORÍAS TREINTA) -->
+      <section class="animate-on-scroll animate-fade-up">
+        <div class="treinta-section-header">
+          <span class="treinta-section-tag">ADAPTABILIDAD</span>
+          <h2 class="treinta-section-title">No importa el tipo de negocio que tengas</h2>
+          <p class="treinta-section-desc">FacilitoApp se adapta perfectamente a la dinámica de tu sector comercial.</p>
+        </div>
+
+        <div class="treinta-categories-grid">
+          <!-- Categoría 1: Gastronomía -->
+          <div class="treinta-category-card">
+            <span class="treinta-category-icon">🍔</span>
+            <h3 class="treinta-category-title">Gastronomía</h3>
+            <p class="treinta-category-desc">
+              Control de comandas, ingredientes, pedidos y ventas ágiles en mostrador o delivery.
+            </p>
+            <div class="treinta-category-chips">
+              <span class="treinta-mini-chip">Cafeterías</span>
+              <span class="treinta-mini-chip">Restaurantes</span>
+              <span class="treinta-mini-chip">Comida rápida</span>
+              <span class="treinta-mini-chip">Panaderías</span>
+            </div>
+          </div>
+
+          <!-- Categoría 2: Comercios & Retail -->
+          <div class="treinta-category-card">
+            <span class="treinta-category-icon">👗</span>
+            <h3 class="treinta-category-title">Comercios & Retail</h3>
+            <p class="treinta-category-desc">
+              Control de inventario por variantes, tallas, colores, marcas y códigos de barra.
+            </p>
+            <div class="treinta-category-chips">
+              <span class="treinta-mini-chip">Ropa</span>
+              <span class="treinta-mini-chip">Calzado</span>
+              <span class="treinta-mini-chip">Tecnología</span>
+              <span class="treinta-mini-chip">Ferreterías</span>
+            </div>
+          </div>
+
+          <!-- Categoría 3: Mercados & Bodegones -->
+          <div class="treinta-category-card">
+            <span class="treinta-category-icon">🛒</span>
+            <h3 class="treinta-category-title">Mercados & Bodegones</h3>
+            <p class="treinta-category-desc">
+              Cobro bimoneda instantáneo (USD y Bs.), arqueo rápido de caja y ventas por volumen.
+            </p>
+            <div class="treinta-category-chips">
+              <span class="treinta-mini-chip">Minimarkets</span>
+              <span class="treinta-mini-chip">Bodegones</span>
+              <span class="treinta-mini-chip">Víveres</span>
+              <span class="treinta-mini-chip">Charcuterías</span>
+            </div>
+          </div>
+
+          <!-- Categoría 4: Servicios & Oficios -->
+          <div class="treinta-category-card">
+            <span class="treinta-category-icon">💈</span>
+            <h3 class="treinta-category-title">Servicios & Oficios</h3>
+            <p class="treinta-category-desc">
+              Registro de clientes, control de comisiones y cobro por servicios profesionales.
+            </p>
+            <div class="treinta-category-chips">
+              <span class="treinta-mini-chip">Barberías</span>
+              <span class="treinta-mini-chip">Salones</span>
+              <span class="treinta-mini-chip">Talleres</span>
+              <span class="treinta-mini-chip">Consultorios</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. SHOWCASE INTERACTIVO POR PESTAÑAS (TABS) -->
+      <section class="animate-on-scroll animate-fade-up">
+        <div class="treinta-section-header">
+          <span class="treinta-section-tag">EXPLORA LA PLATAFORMA</span>
+          <h2 class="treinta-section-title">Diseñado para la velocidad de tu mostrador</h2>
+          <p class="treinta-section-desc">Haz clic en cada módulo para ver cómo simplifica la operación de tu negocio.</p>
+        </div>
+
+        <div class="treinta-tabs-container">
+          <button class="treinta-tab-btn active" data-tab="pos">
+            🛒 Punto de Venta (POS)
           </button>
-          <a href="#planes" class="btn-apple-secondary" id="info-cta-pricing">
-            💎 Ver Planes y Precios
-          </a>
-          <button class="btn-apple-secondary" id="info-cta-store">
-            🛍️ Ver Tienda Demo
+          <button class="treinta-tab-btn" data-tab="store">
+            🌐 Tienda Virtual (E-Commerce)
+          </button>
+          <button class="treinta-tab-btn" data-tab="analytics">
+            📈 Analítica & Google Sheets
           </button>
         </div>
-      </section>
 
-      <!-- 2. PROPUESTA DE VALOR COMERCIAL (BENTO CARDS APPLE) -->
-      <section class="animate-on-scroll animate-fade-up">
-        <div class="info-section-header">
-          <div class="info-section-tag">INGENIERÍA & BLINDAJE</div>
-          <h2 class="info-section-title">Pilares Diseñados para la Rentabilidad</h2>
-          <p class="info-section-desc">Cinco ventajas estratégicas que protegen el margen de ganancia y optimizan el flujo de caja diario.</p>
-        </div>
-
-        <div class="info-metrics-grid stagger-container">
-          <div class="info-metric-card animate-on-scroll animate-scale-up">
-            <div class="info-metric-number">🔄</div>
-            <div class="info-metric-label">Omnicanal Real</div>
-            <div class="info-metric-sub">Sincronización instantánea de inventario único entre tu mostrador y tu tienda web.</div>
-          </div>
-          <div class="info-metric-card animate-on-scroll animate-scale-up">
-            <div class="info-metric-number" style="color:#f59e0b;">🛡️ 6h</div>
-            <div class="info-metric-label">Protección de Tasa</div>
-            <div class="info-metric-sub">Ventana de 6 horas que conserva la tasa más alta del día contra devaluaciones repentinas.</div>
-          </div>
-          <div class="info-metric-card animate-on-scroll animate-scale-up">
-            <div class="info-metric-number" style="color:#10b981;">☁️ Sheets</div>
-            <div class="info-metric-label">Respaldo Automático</div>
-            <div class="info-metric-sub">Cada factura se envía en tiempo real a tu Google Sheets para auditoría externa blindada.</div>
-          </div>
-          <div class="info-metric-card animate-on-scroll animate-scale-up">
-            <div class="info-metric-number" style="color:#06b6d4;">💳 Cada 6h</div>
-            <div class="info-metric-label">Cobranza Automática</div>
-            <div class="info-metric-sub">Recordatorios recurrentes por correo electrónico a cuentas por cobrar para acelerar liquidez.</div>
-          </div>
-          <div class="info-metric-card animate-on-scroll animate-scale-up">
-            <div class="info-metric-number" style="color:#a855f7;">🔐 Supervisor</div>
-            <div class="info-metric-label">Control Jerárquico</div>
-            <div class="info-metric-sub">Anulaciones y sangrías de caja protegidas con clave de supervisor en pantalla.</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 3. MÓDULOS PRINCIPALES CON MARCOS APPLE (SPLIT SHOWCASES) -->
-      
-      <!-- SHOWCASE 1: POS FÍSICO CON MARCO APPLE -->
-      <section class="info-showcase-split animate-on-scroll animate-slide-left">
-        <div class="apple-device-mockup">
-          <div class="apple-mockup-header">
-            <span class="apple-dot apple-dot-red"></span>
-            <span class="apple-dot apple-dot-yellow"></span>
-            <span class="apple-dot apple-dot-green"></span>
-            <span style="margin-left: 8px; font-size: 11px; opacity: 0.5; font-family: -apple-system, sans-serif;">pos.facilitoapp.com — Mostrador</span>
-          </div>
-          <div class="apple-mockup-body">
-            <img src="/images/facilito_pos_terminal.jpg" alt="Punto de Venta POS FacilitoApp" loading="lazy">
-          </div>
-        </div>
-        <div class="info-showcase-content">
-          <span class="info-showcase-tag" style="background:rgba(0,119,246,0.12); color:#0077f6; border:1px solid rgba(0,119,246,0.25);">
-            🛒 MÓDULO 1: PUNTO DE VENTA FÍSICO (POS)
-          </span>
-          <h3 class="info-showcase-title">Facturación Ultrasónica en Mostrador</h3>
-          <p class="info-showcase-text">
-            Diseñado para eliminar filas en caja, registrar ventas en segundos y brindar una experiencia fluida a tus clientes.
-          </p>
-          <ul class="info-showcase-bullets">
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Descuento Inmediato de Stock:</strong> Valida existencias en tiempo real y oculta productos agotados automáticamente.</span>
-            </li>
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Escaneo Físico y por Cámara:</strong> Compatibilidad con pistolas de códigos de barra estándar y cámara de tu dispositivo.</span>
-            </li>
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Multimoneda Dinámica:</strong> Conversión instantánea a Bolívares (Bs.) con tasa oficial BCV o Binance P2P.</span>
-            </li>
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Líneas de Pago Combinadas:</strong> Cobra una misma venta con Efectivo USD, Pago Móvil, Tarjeta o Zelle.</span>
-            </li>
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon">✓</span>
-              <span><strong>Ticket Térmico & Digital:</strong> Compatible con impresoras de 58mm/80mm y envío de recibo digital por WhatsApp.</span>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <!-- SHOWCASE 2: TIENDA VIRTUAL CON MARCO APPLE -->
-      <section class="info-showcase-split animate-on-scroll animate-slide-right">
-        <div class="info-showcase-content">
-          <span class="info-showcase-tag" style="background:rgba(255,115,0,0.12); color:#ff7300; border:1px solid rgba(255,115,0,0.25);">
-            🌐 MÓDULO 2: TIENDA VIRTUAL (E-COMMERCE)
-          </span>
-          <h3 class="info-showcase-title">Ventas 24/7 con la Misma Base de Datos</h3>
-          <p class="info-showcase-text">
-            Tu tienda en internet conectada al almacén central del negocio, sin duplicar inventarios ni vender productos inexistentes.
-          </p>
-          <ul class="info-showcase-bullets">
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#ff7300;">✓</span>
-              <span><strong>Catálogo Visual Interactivo:</strong> Filtros veloces por categoría, marcas, disponibilidad y precios.</span>
-            </li>
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#ff7300;">✓</span>
-              <span><strong>Checkout Adaptativo:</strong> Modalidades para Retiro en Tienda o Delivery con mapa y geolocalización.</span>
-            </li>
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#ff7300;">✓</span>
-              <span><strong>Carga de Comprobantes Bancarios:</strong> El cliente adjunta su captura de pago para validación del facturador.</span>
-            </li>
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#ff7300;">✓</span>
-              <span><strong>Precios Bimoneda Transparentes:</strong> Visualización simultánea en USD y Bs. a la tasa oficial del día.</span>
-            </li>
-          </ul>
-        </div>
-        <div class="apple-device-mockup">
-          <div class="apple-mockup-header">
-            <span class="apple-dot apple-dot-red"></span>
-            <span class="apple-dot apple-dot-yellow"></span>
-            <span class="apple-dot apple-dot-green"></span>
-            <span style="margin-left: 8px; font-size: 11px; opacity: 0.5; font-family: -apple-system, sans-serif;">tienda.facilitoapp.com — Catálogo E-Commerce</span>
-          </div>
-          <div class="apple-mockup-body">
-            <img src="/images/facilito_ecommerce_mobile.jpg" alt="Tienda Virtual E-commerce FacilitoApp" loading="lazy">
-          </div>
-        </div>
-      </section>
-
-      <!-- SHOWCASE 3: DASHBOARD & RESPALDO CLOUD CON MARCO APPLE -->
-      <section class="info-showcase-split animate-on-scroll animate-slide-left">
-        <div class="apple-device-mockup">
-          <div class="apple-mockup-header">
-            <span class="apple-dot apple-dot-red"></span>
-            <span class="apple-dot apple-dot-yellow"></span>
-            <span class="apple-dot apple-dot-green"></span>
-            <span style="margin-left: 8px; font-size: 11px; opacity: 0.5; font-family: -apple-system, sans-serif;">admin.facilitoapp.com — Analítica en Tiempo Real</span>
-          </div>
-          <div class="apple-mockup-body">
-            <img src="/images/facilito_dashboard_analytics.jpg" alt="Dashboard y Estadísticas FacilitoApp" loading="lazy">
-          </div>
-        </div>
-        <div class="info-showcase-content">
-          <span class="info-showcase-tag" style="background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.25);">
-            📈 MÓDULO 4: ANALÍTICA & RESPALDO EN LA NUBE
-          </span>
-          <h3 class="info-showcase-title">Toma Decisiones con Métricas Claras</h3>
-          <p class="info-showcase-text">
-            Control integral del rendimiento financiero de tu comercio en tiempo real con gráficos y auditoría externa garantizada.
-          </p>
-          <ul class="info-showcase-bullets">
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#10b981;">✓</span>
-              <span><strong>Métricas Clave (KPIs):</strong> Ganancia neta, margen porcentual, ticket promedio y alertas de stock bajo.</span>
-            </li>
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#10b981;">✓</span>
-              <span><strong>Tendencias Históricas:</strong> Gráficos interactivos de ventas de los últimos 7 días y distribución por método de pago.</span>
-            </li>
-            <li class="info-showcase-bullet-item">
-              <span class="info-showcase-bullet-icon" style="color:#10b981;">✓</span>
-              <span><strong>Sincronización con Google Sheets:</strong> Cada venta confirmada emite un Webhook automático para persistencia externa inalterable.</span>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <!-- 4. OPERACIONES AVANZADAS (BENTO GRID APPLE) -->
-      <section class="animate-on-scroll animate-fade-up">
-        <div class="info-section-header">
-          <div class="info-section-tag">CONTROL DE OPERACIONES</div>
-          <h2 class="info-section-title">Flujo de Efectivo, Cobranza y Catálogo</h2>
-          <p class="info-section-desc">Herramientas diseñadas para blindar la tesorería de tu comercio contra pérdidas y descuidos.</p>
-        </div>
-
-        <div class="system-features-bento stagger-container">
-          <div class="system-feature-card animate-on-scroll animate-scale-up">
-            <div class="system-feature-icon" style="color:#a855f7; background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.25);">💰</div>
-            <span class="system-feature-badge" style="color:#a855f7; background:rgba(168,85,247,0.12); border:1px solid rgba(168,85,247,0.25);">Módulo 3</span>
-            <h3 class="system-feature-title">Flujo de Efectivo y Arqueo (Cierres X / Z)</h3>
-            <p class="system-feature-desc">
-              Apertura y cierre con balance inicial obligatorio. Cálculo automático de diferencias (sobrante/faltante), límite de seguridad en gaveta y control de sangrías con clave de supervisor.
+        <!-- Panel Interactivo Dinámico -->
+        <div class="treinta-showcase-split" id="treinta-showcase-panel">
+          <div class="treinta-showcase-content">
+            <div class="treinta-hero-badge" id="tab-badge" style="margin:0;">
+              🛒 MÓDULO DE CAJA Y MOSTRADOR
+            </div>
+            <h3 class="treinta-showcase-title" id="tab-title">Facturación Ultrasónica en Caja</h3>
+            <p class="treinta-showcase-text" id="tab-desc">
+              Diseñado para eliminar filas en caja, registrar ventas en segundos y brindar una experiencia fluida con soporte multimoneda y ticket digital.
             </p>
+            <ul class="treinta-showcase-bullets" id="tab-bullets">
+              <li class="treinta-showcase-bullet-item">
+                <span class="treinta-bullet-check">✓</span>
+                <span><strong>Descuento automático de stock:</strong> Evita vender mercancía agotada.</span>
+              </li>
+              <li class="treinta-showcase-bullet-item">
+                <span class="treinta-bullet-check">✓</span>
+                <span><strong>Lector de códigos de barra:</strong> Compatible con pistolas USB y la cámara del celular.</span>
+              </li>
+              <li class="treinta-showcase-bullet-item">
+                <span class="treinta-bullet-check">✓</span>
+                <span><strong>Multimoneda dinámica:</strong> Conversión oficial BCV y Binance P2P protegida.</span>
+              </li>
+              <li class="treinta-showcase-bullet-item">
+                <span class="treinta-bullet-check">✓</span>
+                <span><strong>Ticket térmico o WhatsApp:</strong> Impresión rápida y comprobante al cliente.</span>
+              </li>
+            </ul>
           </div>
 
-          <div class="system-feature-card animate-on-scroll animate-scale-up">
-            <div class="system-feature-icon" style="color:#06b6d4; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.25);">💳</div>
-            <span class="system-feature-badge" style="color:#06b6d4; background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.25);">Módulo 5</span>
-            <h3 class="system-feature-title">Gestión de Cuentas por Cobrar (Deudores)</h3>
-            <p class="system-feature-desc">
-              Servicio en segundo plano que despacha recordatorios automáticos por correo cada 6 horas. Registro de abonos parciales y actualización inmediata del saldo pendiente.
-            </p>
-          </div>
-
-          <div class="system-feature-card animate-on-scroll animate-scale-up">
-            <div class="system-feature-icon" style="color:#f59e0b; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.25);">📦</div>
-            <span class="system-feature-badge" style="color:#f59e0b; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.25);">Módulo 6</span>
-            <h3 class="system-feature-title">Catálogo e Inventario Centralizado</h3>
-            <p class="system-feature-desc">
-              Generador inteligente de SKU en formato metodológico <code>CC-SSS-NNNN</code>. Búsqueda instantánea por nombre, código de barras o descripción, y carga de fotos optimizada.
-            </p>
+          <div class="treinta-device-card">
+            <div class="treinta-device-header">
+              <span class="treinta-dot" style="background:#ff5f56;"></span>
+              <span class="treinta-dot" style="background:#ffbd2e;"></span>
+              <span class="treinta-dot" style="background:#27c93f;"></span>
+              <span id="tab-mockup-url" style="margin-left:8px; font-size:11.5px; color:var(--text-secondary,#64748b); font-weight:600;">pos.facilitoapp.com — Mostrador</span>
+            </div>
+            <img id="tab-mockup-img" src="/images/facilito_pos_terminal.jpg" alt="Módulo POS FacilitoApp" class="treinta-device-img" loading="lazy" />
           </div>
         </div>
       </section>
 
-      <!-- 5. TABLA DE RESUMEN DE VALOR COMERCIAL APPLE (SIN RESPONSABLE) -->
-      <section class="animate-on-scroll animate-fade-up">
-        <div class="info-section-header">
-          <div class="info-section-tag">IMPACTO DIRECTO</div>
-          <h2 class="info-section-title">Resumen de Valor Comercial</h2>
-          <p class="info-section-desc">Cómo cada innovación del sistema se traduce en ahorro de tiempo y protección de capital.</p>
-        </div>
-
-        <div class="info-table-container animate-on-scroll animate-blur-in">
-          <table class="info-commercial-table">
-            <thead>
-              <tr>
-                <th>Característica</th>
-                <th>Beneficio Operativo</th>
-                <th>Impacto Económico</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Omnicanalidad Unificada</strong></td>
-                <td>Un solo inventario para tienda física (POS) y web (E-commerce).</td>
-                <td>Ahorro en tiempos administrativos y fin de quiebres de stock.</td>
-              </tr>
-              <tr>
-                <td><strong>Protección Cambiaria</strong></td>
-                <td>Algoritmo de ventana de 6 horas con la tasa más alta registrada.</td>
-                <td>Blindaje contra la inflación y protección del margen de utilidad.</td>
-              </tr>
-              <tr>
-                <td><strong>Cobranza Automatizada</strong></td>
-                <td>Recordatorios recurrentes por correo cada 6 horas y registro de abonos.</td>
-                <td>Aumento del flujo de caja y reducción de cuentas incobrables.</td>
-              </tr>
-              <tr>
-                <td><strong>Respaldo en la Nube</strong></td>
-                <td>Copia financiera simultánea en Google Sheets vía Webhook.</td>
-                <td>Seguridad total de datos y facilidad para auditorías externas.</td>
-              </tr>
-              <tr>
-                <td><strong>Control de Supervisor</strong></td>
-                <td>Validación digital en tiempo real de acciones críticas (anulaciones).</td>
-                <td>Reducción drástica del fraude interno y errores de caja.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- 6. SECCIÓN DE PLANES Y PRECIOS APPLE PRO -->
+      <!-- 5. SECCIÓN DE PLANES Y PRECIOS LIMPIOS -->
       <div id="planes" style="position:relative; top:-40px;"></div>
-      <section class="pricing-section-container animate-on-scroll animate-fade-up">
-        <div class="info-section-header">
-          <div class="info-section-tag">PLANES Y SUSCRIPCIÓN</div>
-          <h2 class="info-section-title">
-            Planes adaptados a tu <span class="info-hero-title-gradient">tipo de negocio</span>
-          </h2>
-          <p class="info-section-desc">Desde pequeños comercios hasta cadenas con múltiples puntos de venta.</p>
+      <section class="animate-on-scroll animate-fade-up">
+        <div class="treinta-section-header">
+          <span class="treinta-section-tag">PLANES Y PRECIOS</span>
+          <h2 class="treinta-section-title">Comienza gratis y escala cuando lo necesites</h2>
+          <p class="treinta-section-desc">Sin costos ocultos ni contratos obligatorios. Elige el plan que mejor se adapte a tu comercio.</p>
         </div>
 
-        <div class="pricing-cards-grid stagger-container">
-          <!-- TARJETA 1: DEMO GRATUITA -->
-          <div class="pricing-card animate-on-scroll animate-scale-up">
+        <div class="treinta-pricing-grid">
+          <!-- Tarjeta 1: Demo 3 días -->
+          <div class="treinta-price-card">
             <div>
-              <div class="pricing-card-header">
-                <span class="pricing-plan-tag">DEMO GRATUITA</span>
+              <div class="treinta-plan-name">Demo Gratuita</div>
+              <div class="treinta-price-value">
+                <span class="treinta-price-number">Gratis</span>
+                <span class="treinta-price-period">/ 3 días</span>
               </div>
-              <div class="pricing-price-box">
-                <span class="pricing-amount">Gratis</span>
-                <span class="pricing-cycle">por 3 días</span>
-              </div>
-              <p class="pricing-desc">
-                Prueba el sistema completo y conoce todas las herramientas sin compromiso alguno.
+              <p class="treinta-price-desc">
+                Prueba la plataforma completa con tu equipo de trabajo sin ningún compromiso.
               </p>
-
-              <ul class="pricing-features-list">
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Punto de venta e inventario activo</span>
+              <ul class="treinta-price-features">
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Punto de venta POS completo</span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Soporte multimoneda completo</span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Control de inventario y stock</span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Tasas oficiales BCV y Binance P2P</span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Soporte multimoneda (BCV y Binance)</span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Múltiples métodos de pago combinados</span>
-                </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Prueba de 3 días sin costo</span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Sin tarjeta de crédito requerida</span>
                 </li>
               </ul>
             </div>
-
-            <button class="btn-pricing-demo" id="btn-plan-demo">
-              Comenzar Demo
+            <button class="btn-price-card btn-outline" id="btn-plan-demo">
+              Comenzar Prueba Gratis
             </button>
           </div>
 
-          <!-- TARJETA 2: PRO (RECOMENDADO APPLE STYLE) -->
-          <div class="pricing-card featured animate-on-scroll animate-scale-up">
+          <!-- Tarjeta 2: Plan Pro (Recomendado) -->
+          <div class="treinta-price-card featured">
+            <span class="treinta-price-badge-popular">MÁS POPULAR</span>
             <div>
-              <div class="pricing-card-header">
-                <span class="pricing-plan-tag">PRO</span>
-                <span class="pricing-badge-recommended">⭐ RECOMENDADO</span>
+              <div class="treinta-plan-name">Plan Pro</div>
+              <div class="treinta-price-value">
+                <span class="treinta-price-number">$30</span>
+                <span class="treinta-price-period">/ mes</span>
               </div>
-              <div class="pricing-price-box">
-                <span class="pricing-amount">$30</span>
-                <span class="pricing-cycle">/ mes</span>
-              </div>
-              <p class="pricing-desc">
-                Para negocios en crecimiento. Todo lo que necesitas sin límites operativos.
+              <p class="treinta-price-desc">
+                Para negocios listos para operar sin límites y acelerar su crecimiento diario.
               </p>
-
-              <ul class="pricing-features-list">
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span><strong>Punto de venta ilimitado</strong></span>
+              <ul class="treinta-price-features">
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span><strong>Ventas y productos ilimitados</strong></span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span><strong>Productos y ventas ilimitadas</strong></span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Punto de venta y Tienda Online sincronizados</span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Inventario sincronizado en tiempo real</span>
-                </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Dashboard analítico & Google Sheets</span>
-                </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
                   <span>Múltiples usuarios y roles jerárquicos</span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Cálculo de IGTF y facturación rápida</span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Respaldo automático en Google Sheets</span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Soporte técnico prioritario</span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Cobranza automática de cuentas fiadas</span>
+                </li>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Soporte técnico prioritario por WhatsApp</span>
                 </li>
               </ul>
             </div>
-
-            <button class="btn-pricing-pro" id="btn-plan-pro">
-              Comenzar Ahora
+            <button class="btn-price-card btn-solid" id="btn-plan-pro">
+              Elegir Plan Pro
             </button>
           </div>
 
-          <!-- TARJETA 3: VERSIÓN FISCAL (SENIAT) -->
-          <div class="pricing-card animate-on-scroll animate-scale-up">
+          <!-- Tarjeta 3: Versión Fiscal -->
+          <div class="treinta-price-card">
             <div>
-              <div class="pricing-card-header">
-                <span class="pricing-plan-tag">VERSIÓN FISCAL</span>
-                <span class="pricing-badge-wip">⏳ PRONTO</span>
+              <div class="treinta-plan-name">Versión Fiscal SENIAT</div>
+              <div class="treinta-price-value">
+                <span class="treinta-price-number">Fiscal</span>
+                <span class="treinta-price-period">/ a medida</span>
               </div>
-              <div class="pricing-price-box">
-                <span class="pricing-amount">Fiscal</span>
-                <span class="pricing-cycle">integración</span>
-              </div>
-              <p class="pricing-desc">
-                Emisión de facturas y cumplimiento tributario mediante integración homologada.
+              <p class="treinta-price-desc">
+                Emisión de facturas fiscales y homologación con impresoras para cumplir la normativa.
               </p>
-
-              <div class="pricing-wip-notice">
-                <span style="font-size:18px;">⚠️</span>
-                <div>
-                  <strong>Integración SENIAT en desarrollo activo.</strong>
-                  <br>¡Muy pronto disponible! Únete a la lista de espera para ser el primero en activarlo en tu negocio.
-                </div>
-              </div>
-
-              <ul class="pricing-features-list">
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
+              <ul class="treinta-price-features">
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
                   <span>Todo lo incluido en el Plan Pro</span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Integración con impresoras fiscales</span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Homologación con impresoras fiscales</span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Sistemas homologados y providencias</span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Libros de ventas y cumplimiento</span>
                 </li>
-                <li class="pricing-feature-item">
-                  <span class="pricing-feature-check">✓</span>
-                  <span>Soporte técnico tributario especializado</span>
+                <li class="treinta-feature-row">
+                  <span class="treinta-check-green">✓</span>
+                  <span>Asesoría fiscal personalizada</span>
                 </li>
               </ul>
             </div>
-
-            <a href="https://wa.me/584120000000?text=${encodeURIComponent('Hola, me interesa conocer más sobre la Versión Fiscal SENIAT de FacilitoApp y anotarme en la lista de espera.')}" target="_blank" class="btn-pricing-fiscal" id="btn-plan-fiscal">
-              💬 Anotarme por WhatsApp
+            <a href="https://wa.me/584120000000?text=${encodeURIComponent('Hola, me interesa conocer más sobre la Versión Fiscal SENIAT de FacilitoApp y anotarme en la lista de espera.')}" target="_blank" class="btn-price-card btn-outline" id="btn-plan-fiscal">
+              💬 Consultar por WhatsApp
             </a>
           </div>
         </div>
       </section>
 
-      <!-- 7. PREGUNTAS FRECUENTES (FAQ APPLE ACORDEÓN) -->
+      <!-- 6. PREGUNTAS FRECUENTES (FAQ TREINTA ACORDEÓN) -->
       <section class="animate-on-scroll animate-fade-up">
-        <div class="info-section-header">
-          <div class="info-section-tag">DUDAS COMUNES</div>
-          <h2 class="info-section-title">Preguntas Frecuentes</h2>
-          <p class="info-section-desc">Todo lo que necesitas saber sobre FacilitoApp, tus datos y la suscripción.</p>
+        <div class="treinta-section-header">
+          <span class="treinta-section-tag">PREGUNTAS FRECUENTES</span>
+          <h2 class="treinta-section-title">Resolvemos tus dudas</h2>
+          <p class="treinta-section-desc">Todo lo que necesitas saber antes de empezar a usar FacilitoApp.</p>
         </div>
 
-        <div class="info-faq-list">
-          <div class="info-faq-item open">
-            <button class="info-faq-question">
-              <span>¿Cómo funciona la sincronización de tasas BCV y Binance?</span>
-              <span class="info-faq-chevron">▼</span>
+        <div class="treinta-faq-list">
+          <div class="treinta-faq-item open">
+            <button class="treinta-faq-question">
+              <span>¿Cómo funciona la prueba gratuita de 3 días?</span>
+              <span class="treinta-faq-chevron">▼</span>
             </button>
-            <div class="info-faq-answer">
-              El sistema se conecta automáticamente a los servidores oficiales del Banco Central de Venezuela (BCV) y a Binance P2P. Además, implementa el algoritmo de <strong>Protección de Ventana de 6 Horas</strong>, conservando la tasa más alta registrada en ese lapso para proteger tu margen de utilidad contra devaluaciones repentinas.
+            <div class="treinta-faq-answer">
+              Al registrarte dispones de acceso total a todas las herramientas: Punto de Venta, inventario, tienda virtual y reportes. No se requiere tarjeta de crédito. Al finalizar los 3 días puedes activar el Plan Pro conservando todos tus productos y datos intactos.
             </div>
           </div>
 
-          <div class="info-faq-item">
-            <button class="info-faq-question">
-              <span>¿Cuándo estará disponible el plan con integración SENIAT?</span>
-              <span class="info-faq-chevron">▼</span>
+          <div class="treinta-faq-item">
+            <button class="treinta-faq-question">
+              <span>¿Cómo protege el sistema mis precios ante la tasa del dólar?</span>
+              <span class="treinta-faq-chevron">▼</span>
             </button>
-            <div class="info-faq-answer">
-              Actualmente nos encontramos homologando impresoras fiscales para cumplir con todas las providencias del SENIAT. Puedes escribirnos a través del botón de WhatsApp para reservar tu cupo en la lista de espera preferencial.
+            <div class="treinta-faq-answer">
+              FacilitoApp actualiza automáticamente las tasas oficiales del Banco Central de Venezuela (BCV) y Binance P2P. Además, implementa una protección de ventana de 6 horas que conserva la tasa más alta registrada en ese lapso para proteger tu margen de ganancia contra devaluaciones imprevistas.
             </div>
           </div>
 
-          <div class="info-faq-item">
-            <button class="info-faq-question">
+          <div class="treinta-faq-item">
+            <button class="treinta-faq-question">
+              <span>¿Necesito comprar equipos costosos para usar FacilitoApp?</span>
+              <span class="treinta-faq-chevron">▼</span>
+            </button>
+            <div class="treinta-faq-answer">
+              No. FacilitoApp funciona directamente desde el navegador en computadoras, laptops, tablets o teléfonos inteligentes. Es compatible con lectores de código de barra USB/Bluetooth e impresoras térmicas estándar de 58mm y 80mm.
+            </div>
+          </div>
+
+          <div class="treinta-faq-item">
+            <button class="treinta-faq-question">
               <span>¿Cómo se respaldan mis ventas en Google Sheets?</span>
-              <span class="info-faq-chevron">▼</span>
+              <span class="treinta-faq-chevron">▼</span>
             </button>
-            <div class="info-faq-answer">
-              Cada venta completada emite un Webhook seguro hacia un script de Google Apps Script. Todos los datos de la transacción se escriben en tu propia hoja de cálculo de Google Drive en tiempo real, garantizando persistencia financiera externa.
+            <div class="treinta-faq-answer">
+              Cada venta confirmada se envía en tiempo real a tu propia hoja de cálculo en Google Drive mediante un Webhook automatizado. Tienes un respaldo externo, seguro y accesible en todo momento para tu contabilidad y auditorías.
             </div>
           </div>
 
-          <div class="info-faq-item">
-            <button class="info-faq-question">
-              <span>¿Cómo opera la cobranza automatizada de deudores?</span>
-              <span class="info-faq-chevron">▼</span>
+          <div class="treinta-faq-item">
+            <button class="treinta-faq-question">
+              <span>¿Puedo tener empleados con accesos limitados?</span>
+              <span class="treinta-faq-chevron">▼</span>
             </button>
-            <div class="info-faq-answer">
-              El sistema ejecuta un servicio Cron en segundo plano que inspecciona las ventas a crédito y despacha recordatorios de pago automáticos cada 6 horas por correo electrónico. Al registrar un abono parcial, el saldo se actualiza de inmediato.
-            </div>
-          </div>
-
-          <div class="info-faq-item">
-            <button class="info-faq-question">
-              <span>¿Qué ocurre tras vencer los 3 días de la Demo Gratuita?</span>
-              <span class="info-faq-chevron">▼</span>
-            </button>
-            <div class="info-faq-answer">
-              Al activar el Plan Pro ($30/mes), conservas todos tus productos, clientes y ventas registradas intactos. Cuentas con 2 días hábiles de gracia para formalizar tu activación antes de la depuración automática del comercio demo.
-            </div>
-          </div>
-
-          <div class="info-faq-item">
-            <button class="info-faq-question">
-              <span>¿Puedo tener empleados con distintos niveles de acceso?</span>
-              <span class="info-faq-chevron">▼</span>
-            </button>
-            <div class="info-faq-answer">
-              Sí. El sistema cuenta con roles jerárquicos: Administrador (control total), Vendedor (acceso al POS y clientes), Facturador (ventas online y conciliación) y Cliente. Acciones críticas como anulaciones o retiros de caja requieren autorización de supervisor.
+            <div class="treinta-faq-answer">
+              Sí. Puedes crear usuarios con diferentes roles (Administrador, Vendedor, Facturador). Las operaciones sensibles, como anulación de ventas o retiros de caja mayor a lo permitido, requieren autorización de supervisor.
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 8. LLAMADO A LA ACCIÓN FINAL APPLE -->
-      <section class="info-cta-box animate-on-scroll animate-zoom-in">
-        <h2 style="font-size:clamp(26px, 3.8vw, 42px); font-weight:900; color:var(--apple-text-title); margin-bottom:14px; letter-spacing:-0.8px;">
-          ¿Listo para transformar la gestión de tu comercio?
-        </h2>
-        <p style="font-size:16px; color:var(--apple-text-body); max-width:620px; margin:0 auto 28px; line-height:1.6;">
-          Prueba FacilitoApp gratis por 3 días y descubre la velocidad de un Punto de Venta moderno, multi-moneda y en la nube.
+      <!-- 7. BANNER FINAL ESTILO TREINTA -->
+      <section class="treinta-cta-banner animate-on-scroll animate-zoom-in">
+        <h2>Digitaliza la gestión de tu comercio hoy mismo</h2>
+        <p>
+          Únete a los comerciantes que han dejado atrás las libretas y el descontrol para vender más rápido y con mayor rentabilidad.
         </p>
-        <div style="display:flex; justify-content:center; gap:16px; flex-wrap:wrap;">
-          <button class="btn-apple-primary" id="info-cta-bottom" style="font-size:15.5px; padding:15px 34px;">
-            🚀 Comenzar Demo Gratis Ahora
+        <div class="treinta-cta-actions">
+          <button class="btn-treinta-primary" id="info-cta-bottom" style="font-size:16px; padding:16px 32px;">
+            🚀 Comenzar Prueba Gratis (3 Días)
           </button>
-          <a href="https://wa.me/584120000000?text=${encodeURIComponent('Hola, deseo una demostración personalizada del sistema FacilitoApp POS.')}" target="_blank" class="btn-apple-secondary" style="font-size:15.5px; padding:15px 28px;">
-            💬 Hablar con un Asesor
+          <a href="https://wa.me/584120000000?text=${encodeURIComponent('Hola, deseo información y una demostración de FacilitoApp.')}" target="_blank" class="btn-treinta-wa">
+            💬 Hablar por WhatsApp
           </a>
         </div>
       </section>
@@ -2017,14 +1988,13 @@ function renderInfoView(): string {
 }
 
 function bindInfoEvents() {
-
   // Navegación a Demo / Registro
   document.getElementById('info-cta-demo')?.addEventListener('click', () => navigate('auth'));
   document.getElementById('btn-plan-demo')?.addEventListener('click', () => navigate('auth'));
   document.getElementById('btn-plan-pro')?.addEventListener('click', () => navigate('auth'));
   document.getElementById('info-cta-bottom')?.addEventListener('click', () => navigate('auth'));
 
-  // Navegación a Catálogo / Tienda
+  // Navegación a Catálogo / Tienda Demo
   document.getElementById('info-cta-store')?.addEventListener('click', () => navigate('store'));
 
   // Scroll suave hacia los planes
@@ -2033,16 +2003,106 @@ function bindInfoEvents() {
     document.getElementById('planes')?.scrollIntoView({ behavior: 'smooth' });
   });
 
+  // Selector interactivo de pestañas (Tabs Showcase)
+  const tabButtons = document.querySelectorAll('.treinta-tab-btn');
+  const tabBadge = document.getElementById('tab-badge');
+  const tabTitle = document.getElementById('tab-title');
+  const tabDesc = document.getElementById('tab-desc');
+  const tabBullets = document.getElementById('tab-bullets');
+  const tabMockupImg = document.getElementById('tab-mockup-img') as HTMLImageElement | null;
+  const tabMockupUrl = document.getElementById('tab-mockup-url');
+
+  const tabData: Record<string, {
+    badge: string;
+    title: string;
+    desc: string;
+    url: string;
+    img: string;
+    bullets: string[];
+  }> = {
+    pos: {
+      badge: '🛒 MÓDULO DE CAJA Y MOSTRADOR',
+      title: 'Facturación Ultrasónica en Caja',
+      desc: 'Diseñado para eliminar filas en mostrador, registrar ventas en segundos y brindar una experiencia ágil con soporte multimoneda y ticket digital.',
+      url: 'pos.facilitoapp.com — Mostrador',
+      img: '/images/facilito_pos_terminal.jpg',
+      bullets: [
+        '<strong>Descuento automático de stock:</strong> Evita vender mercancía agotada.',
+        '<strong>Lector de códigos de barra:</strong> Compatible con pistolas USB y cámara del celular.',
+        '<strong>Multimoneda dinámica:</strong> Conversión oficial BCV y Binance P2P protegida.',
+        '<strong>Ticket térmico o WhatsApp:</strong> Impresión rápida y comprobante al cliente.'
+      ]
+    },
+    store: {
+      badge: '🌐 MÓDULO E-COMMERCE 24/7',
+      title: 'Tu Tienda Virtual Siempre Abierta',
+      desc: 'Tu catálogo en línea conectado directamente a tu inventario físico. Comparte tu tienda por WhatsApp o redes sociales y recibe pedidos organizados.',
+      url: 'tienda.facilitoapp.com — Catálogo Web',
+      img: '/images/facilito_ecommerce_mobile.jpg',
+      bullets: [
+        '<strong>Mismo inventario que tu mostrador:</strong> Cero duplicidad o ventas sin existencias.',
+        '<strong>Checkout adaptado:</strong> Modalidades de retiro en tienda o despacho con delivery.',
+        '<strong>Carga de comprobantes:</strong> El cliente adjunta captura de Pago Móvil o transferencia.',
+        '<strong>Precios transparentes:</strong> Visualización simultánea en USD y Bolívares.'
+      ]
+    },
+    analytics: {
+      badge: '📈 ANALÍTICA & RESPALDO CLOUD',
+      title: 'Control Total y Respaldo en Sheets',
+      desc: 'Visualiza tus métricas financieras en tiempo real y respalda cada una de tus facturas de forma automática en tu propia hoja de cálculo de Google Drive.',
+      url: 'admin.facilitoapp.com — Estadísticas',
+      img: '/images/facilito_dashboard_analytics.jpg',
+      bullets: [
+        '<strong>Ganancia neta y márgenes:</strong> Métricas claras del rendimiento de tu negocio.',
+        '<strong>Respaldo en Google Sheets:</strong> Cada venta emite un Webhook seguro en vivo.',
+        '<strong>Arqueo y control de caja:</strong> Aperturas, cierres X/Z y sangrías autorizadas.',
+        '<strong>Cuentas por cobrar:</strong> Alertas de fiados y cobro oportuno de deudores.'
+      ]
+    }
+  };
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const tabKey = btn.getAttribute('data-tab') || 'pos';
+      const data = tabData[tabKey];
+      if (data) {
+        if (tabBadge) tabBadge.textContent = data.badge;
+        if (tabTitle) tabTitle.textContent = data.title;
+        if (tabDesc) tabDesc.textContent = data.desc;
+        if (tabMockupUrl) tabMockupUrl.textContent = data.url;
+        if (tabMockupImg) {
+          tabMockupImg.style.opacity = '0';
+          setTimeout(() => {
+            tabMockupImg.src = data.img;
+            tabMockupImg.style.opacity = '1';
+          }, 150);
+        }
+        if (tabBullets) {
+          tabBullets.innerHTML = data.bullets.map(b => `
+            <li class="treinta-showcase-bullet-item">
+              <span class="treinta-bullet-check">✓</span>
+              <span>${b}</span>
+            </li>
+          `).join('');
+        }
+      }
+    });
+  });
+
   // Acordeón interactivo de Preguntas Frecuentes
-  document.querySelectorAll('.info-faq-question').forEach(btn => {
+  document.querySelectorAll('.treinta-faq-question').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const item = (e.currentTarget as HTMLElement).closest('.info-faq-item');
+      const item = (e.currentTarget as HTMLElement).closest('.treinta-faq-item');
       if (item) {
         item.classList.toggle('open');
       }
     });
   });
 }
+
 
 function addToCart(product: Product) {
   const existing = cart.find(item => item.product.id === product.id);
